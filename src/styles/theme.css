@@ -1,0 +1,126 @@
+/* ==========================================================================
+   Noteflow Design System - Day & Night Themes
+   Apple-inspired, clean, accessible, modern typography & tokens
+   ========================================================================== */
+
+:root {
+  /* Day Theme (Default Light Mode) */
+  --bg-app: #f6f7fb;
+  --bg-sidebar: #ffffff;
+  --bg-column: #f9faff;
+  --bg-editor: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f4f9;
+  --bg-card-active: #e9effd;
+  --bg-card-selected: #eef2ff;
+  
+  --bg-subtle: #f0f2f7;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-modal: #ffffff;
+  --bg-overlay: rgba(15, 23, 42, 0.45);
+  
+  --border-color: #e5e8ef;
+  --border-subtle: #edf0f5;
+  --border-active: #c7d2fe;
+  --border-focus: #6366f1;
+
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #838e9e;
+  --text-inverse: #ffffff;
+
+  --accent-primary: #4f46e5;
+  --accent-primary-hover: #4338ca;
+  --accent-light: #eef2ff;
+  --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  
+  --color-success: #10b981;
+  --color-success-bg: #ecfdf5;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-danger: #ef4444;
+  --color-danger-bg: #fef2f2;
+  --color-info: #0ea5e9;
+  --color-info-bg: #f0f9ff;
+  --color-purple: #8b5cf6;
+  --color-purple-bg: #f5f3ff;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.12), 0 4px 10px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 20px 40px rgba(0, 0, 0, 0.18), 0 8px 16px rgba(0, 0, 0, 0.08);
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --transition-fast: 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 320ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-track: transparent;
+}
+
+/* ==========================================================================
+   Night Theme (Dark Mode)
+   ========================================================================== */
+[data-theme="dark"] {
+  --bg-app: #0e0f13;
+  --bg-sidebar: #13151b;
+  --bg-column: #161820;
+  --bg-editor: #161820;
+  --bg-card: #1b1d26;
+  --bg-card-hover: #222530;
+  --bg-card-active: #2a2e3d;
+  --bg-card-selected: #252a3d;
+  
+  --bg-subtle: #1f222b;
+  --bg-surface: #181a22;
+  --bg-surface-elevated: #1f222c;
+  --bg-modal: #1a1c24;
+  --bg-overlay: rgba(0, 0, 0, 0.72);
+  
+  --border-color: #262936;
+  --border-subtle: #1e202a;
+  --border-active: #3f4561;
+  --border-focus: #818cf8;
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #a1a9b8;
+  --text-muted: #626a79;
+  --text-inverse: #0f1015;
+
+  --accent-primary: #6366f1;
+  --accent-primary-hover: #4f46e5;
+  --accent-light: #262b45;
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  
+  --color-success: #34d399;
+  --color-success-bg: #064e3b;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #451a03;
+  --color-danger: #f87171;
+  --color-danger-bg: #450a0a;
+  --color-info: #38bdf8;
+  --color-info-bg: #082f49;
+  --color-purple: #c084fc;
+  --color-purple-bg: #3b0764;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.75), 0 8px 20px rgba(0, 0, 0, 0.5);
+
+  --scrollbar-thumb: #373b49;
+  --scrollbar-track: transparent;
+}

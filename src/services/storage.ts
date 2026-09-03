@@ -1,4 +1,5 @@
-import type { Note, Folder, ThemeMode, Workspace, Book } from '../types';
+import type { Note, Folder, ThemeMode, Workspace, Book, UserProfile } from '../types';
+import { DEFAULT_USER_PROFILE } from '../components/SettingsModal';
 
 const DB_NAME = 'noteflow_db';
 const DB_VERSION = 2;
@@ -304,21 +305,49 @@ export const storage = {
   getTheme(): ThemeMode {
     try {
       const saved = localStorage.getItem('noteflow_theme') as ThemeMode;
-      if (saved === 'light' || saved === 'dark') return saved;
-      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      if (saved === 'system' || saved === 'light' || saved === 'dark') return saved;
+      return 'system';
     } catch {
-      return 'light';
+      return 'system';
     }
+  },
+
+  resolveTheme(theme: ThemeMode): 'light' | 'dark' {
+    if (theme === 'light' || theme === 'dark') return theme;
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
   },
 
   setTheme(theme: ThemeMode) {
     try {
       localStorage.setItem('noteflow_theme', theme);
-      document.documentElement.setAttribute('data-theme', theme);
+      const resolved = this.resolveTheme(theme);
+      document.documentElement.setAttribute('data-theme', resolved);
       const meta = document.querySelector('meta[name="color-scheme"]');
-      if (meta) meta.setAttribute('content', theme);
+      if (meta) meta.setAttribute('content', resolved);
     } catch (e) {
       console.error('Failed to save theme', e);
+    }
+  },
+
+  // --- User Profile ---
+  getUserProfile(): UserProfile {
+    try {
+      const raw = localStorage.getItem('noteflow_user_profile');
+      if (!raw) return { ...DEFAULT_USER_PROFILE };
+      return { ...DEFAULT_USER_PROFILE, ...JSON.parse(raw) };
+    } catch {
+      return { ...DEFAULT_USER_PROFILE };
+    }
+  },
+
+  setUserProfile(profile: UserProfile): void {
+    try {
+      localStorage.setItem('noteflow_user_profile', JSON.stringify(profile));
+    } catch (e) {
+      console.error('Failed to save user profile', e);
     }
   },
 

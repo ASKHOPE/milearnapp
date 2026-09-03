@@ -1,4 +1,37 @@
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'system' | 'light' | 'dark';
+export type ResolvedTheme = 'light' | 'dark';
+
+export interface UserProfile {
+  name: string;
+  bio: string;
+  role: string;
+  avatarType: 'emoji' | 'gif' | 'image';
+  avatarValue: string; // Emoji char, GIF URL, or uploaded base64 dataUrl
+  mood: string;
+}
+
+export interface HotkeyBindings {
+  search: string;
+  newNote: string;
+  closeTab: string;
+  findReplace: string;
+  studyMode: string;
+  pomodoro: string;
+  zenMode: string;
+  settings: string;
+}
+
+export interface MouseSettings {
+  doubleClickAction: 'openNewTab' | 'replaceTab' | 'toggleFavorite';
+  middleClickAction: 'closeTab' | 'duplicateTab' | 'none';
+  hoverPreview: 'instant' | 'delayed' | 'off';
+  smoothScroll: boolean;
+}
+
+export interface SecuritySettings {
+  autoLockMinutes: number; // 0 = disabled, 1, 5, 15, 30, 60
+  lockAction: 'allNotes' | 'entireApp';
+}
 
 export type AttachmentType = 'image' | 'pdf' | 'document' | 'audio';
 

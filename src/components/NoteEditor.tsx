@@ -19,7 +19,6 @@ import {
   Heading3, 
   Code, 
   Link, 
-  Eye, 
   Edit3, 
   Columns, 
   ArrowLeft,
@@ -64,6 +63,11 @@ import { MermaidRenderer } from './MermaidRenderer';
 import { LockNoteModal } from './LockNoteModal';
 import { Button } from './ui/Button';
 import { NOTE_TEMPLATES } from '../services/templates';
+import { Image as ImageIcon, Sparkles } from 'lucide-react';
+import { InteractiveTable } from './editor/InteractiveTable';
+import { InteractiveTasks, type TaskItem } from './editor/InteractiveTasks';
+import { WrappedImage } from './editor/WrappedImage';
+import { InsertImageModal } from './editor/InsertImageModal';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -112,7 +116,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onNavigateToNote,
   onBackMobile
 }) => {
-  const [mode, setMode] = useState<'edit' | 'split' | 'preview'>('edit');
+  const [mode, setMode] = useState<'live' | 'split' | 'source'>('live');
+  const [isInsertImageOpen, setIsInsertImageOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [isVoiceRecorderOpen, setIsVoiceRecorderOpen] = useState(false);
   const [isDrawingModalOpen, setIsDrawingModalOpen] = useState(false);
@@ -392,6 +397,82 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     });
   };
 
+  // Table update handler
+  const handleUpdateTableLines = (startIndex: number, oldLength: number, newLines: string[]) => {
+    if (note.isTrashed) return;
+    const allLines = note.content.split('\n');
+    allLines.splice(startIndex, oldLength, ...newLines);
+    onUpdateNote({
+      ...note,
+      content: allLines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  // Task add & delete handlers
+  const handleAddTask = (afterLineIndex: number, taskText: string) => {
+    if (note.isTrashed) return;
+    const allLines = note.content.split('\n');
+    allLines.splice(afterLineIndex + 1, 0, `- [ ] ${taskText}`);
+    onUpdateNote({
+      ...note,
+      content: allLines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  const handleDeleteTask = (lineIndex: number) => {
+    if (note.isTrashed) return;
+    const allLines = note.content.split('\n');
+    allLines.splice(lineIndex, 1);
+    onUpdateNote({
+      ...note,
+      content: allLines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  // Image alignment updater
+  const handleUpdateImageAlignment = (lineIndex: number, newAlign: 'left' | 'right' | 'center') => {
+    if (note.isTrashed) return;
+    const allLines = note.content.split('\n');
+    const line = allLines[lineIndex] || '';
+    const match = line.match(/^!\[(.*?)\]\((.*?)\)/);
+    if (match) {
+      const rawAlt = match[1];
+      const cleanAlt = rawAlt.split('|')[0].trim();
+      const url = match[2];
+      allLines[lineIndex] = `![${cleanAlt}|${newAlign}](${url})`;
+      onUpdateNote({
+        ...note,
+        content: allLines.join('\n'),
+        updatedAt: new Date().toISOString()
+      });
+    }
+  };
+
+  // Insert image tag handler
+  const handleInsertImageTag = (tag: string) => {
+    if (note.isTrashed) return;
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent = note.content.slice(0, start) + '\n' + tag + '\n' + note.content.slice(end);
+      onUpdateNote({
+        ...note,
+        content: newContent,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      onUpdateNote({
+        ...note,
+        content: note.content + '\n\n' + tag,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  };
+
   // Attachment operations
   const handleAddAttachment = (att: Attachment) => {
     if (note.isTrashed) return;
@@ -414,7 +495,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Scroll to heading from Outline
   const handleScrollToHeading = (lineIndex: number) => {
     setIsOutlineOpen(false);
-    if (textareaRef.current && mode === 'edit') {
+    if (textareaRef.current && (mode === 'source' || mode === 'split')) {
       const lines = note.content.split('\n');
       let charCount = 0;
       for (let i = 0; i < lineIndex; i++) {
@@ -455,11 +536,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     let codeBuffer: string[] = [];
 
     let insideTable = false;
+    let tableStartIndex = 0;
     let tableBuffer: string[] = [];
 
     let insideCallout = false;
     let calloutType: 'note' | 'tip' | 'warning' | 'important' = 'note';
     let calloutBuffer: string[] = [];
+
+    let insideTasks = false;
+    let taskBuffer: TaskItem[] = [];
 
     const elements: React.ReactNode[] = [];
 
@@ -494,34 +579,33 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         insideTable = false;
         return;
       }
-      const headerCells = tableBuffer[0].split('|').map((s) => s.trim()).filter(Boolean);
-      const rowLines = tableBuffer.slice(2);
-
       elements.push(
-        <table key={`table-${keyIdx}`} className="markdown-table">
-          <thead>
-            <tr>
-              {headerCells.map((h, i) => (
-                <th key={i}>{parseInlineSpans(h)}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rowLines.map((row, rIdx) => {
-              const cells = row.split('|').map((s) => s.trim()).filter(Boolean);
-              return (
-                <tr key={rIdx}>
-                  {cells.map((c, cIdx) => (
-                    <td key={cIdx}>{parseInlineSpans(c)}</td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <InteractiveTable
+          key={`table-${keyIdx}`}
+          tableLines={tableBuffer}
+          startIndex={tableStartIndex}
+          onUpdateTableLines={handleUpdateTableLines}
+          isReadOnly={note.isTrashed}
+        />
       );
       tableBuffer = [];
       insideTable = false;
+    };
+
+    const flushTasks = (keyIdx: number) => {
+      if (taskBuffer.length === 0) return;
+      elements.push(
+        <InteractiveTasks
+          key={`tasks-${keyIdx}`}
+          tasks={[...taskBuffer]}
+          onToggleTask={handleToggleChecklist}
+          onAddTask={handleAddTask}
+          onDeleteTask={handleDeleteTask}
+          isReadOnly={note.isTrashed}
+        />
+      );
+      taskBuffer = [];
+      insideTasks = false;
     };
 
     const flushCallout = (keyIdx: number) => {
@@ -550,7 +634,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     };
 
     lines.forEach((line, index) => {
+      // Code Block parsing
       if (line.startsWith('```')) {
+        if (insideTable) flushTable(index);
+        if (insideCallout) flushCallout(index);
+        if (insideTasks) flushTasks(index);
+
         if (insideCodeBlock) {
           const codeText = codeBuffer.join('\n');
           const blockId = `code-block-${index}`;
@@ -601,22 +690,67 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
       // Standalone Block Math ($$ ... $$)
       if (line.startsWith('$$') && line.endsWith('$$') && line.length > 4) {
+        if (insideTable) flushTable(index);
+        if (insideCallout) flushCallout(index);
+        if (insideTasks) flushTasks(index);
+
         elements.push(
           <MathRenderer key={`math-block-${index}`} math={line.slice(2, -2)} block />
         );
         return;
       }
 
+      // Image with optional text wrap: ![caption|align](url) or ![caption](url)
+      const imgMatch = line.match(/^!\[(.*?)\]\((.*?)\)/);
+      if (imgMatch) {
+        if (insideTable) flushTable(index);
+        if (insideCallout) flushCallout(index);
+        if (insideTasks) flushTasks(index);
+
+        const rawAlt = imgMatch[1];
+        const url = imgMatch[2];
+        let align: 'left' | 'right' | 'center' = 'center';
+        let caption = rawAlt;
+        if (rawAlt.includes('|')) {
+          const parts = rawAlt.split('|');
+          caption = parts[0].trim();
+          const a = parts[1].trim().toLowerCase();
+          if (a === 'left' || a === 'right' || a === 'center') {
+            align = a;
+          }
+        }
+        elements.push(
+          <WrappedImage
+            key={`img-${index}`}
+            src={url}
+            alt={caption}
+            align={align}
+            lineIndex={index}
+            onUpdateAlign={handleUpdateImageAlignment}
+            isReadOnly={note.isTrashed}
+          />
+        );
+        return;
+      }
+
+      // Markdown Tables
       if (line.startsWith('|') && line.endsWith('|')) {
-        insideTable = true;
+        if (insideTasks) flushTasks(index);
+        if (!insideTable) {
+          insideTable = true;
+          tableStartIndex = index;
+          tableBuffer = [];
+        }
         tableBuffer.push(line);
         return;
       } else if (insideTable) {
         flushTable(index);
       }
 
+      // Callout Boxes (> [!NOTE])
       const calloutMatch = line.match(/^>\s\[!(NOTE|TIP|WARNING|IMPORTANT)\]/i);
       if (calloutMatch) {
+        if (insideTasks) flushTasks(index);
         if (insideCallout) flushCallout(index);
         insideCallout = true;
         calloutType = calloutMatch[1].toLowerCase() as any;
@@ -632,23 +766,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         }
       }
 
-      if (line.match(/^-\s\[([ x])\]\s/)) {
-        const isChecked = line.startsWith('- [x]');
-        const itemText = line.replace(/^-\s\[([ x])\]\s/, '');
-        elements.push(
-          <div key={`check-${index}`} className="checklist-item" onClick={() => handleToggleChecklist(index)}>
-            <input 
-              type="checkbox" 
-              checked={isChecked} 
-              readOnly 
-              className="checklist-checkbox" 
-            />
-            <span className={`checklist-text ${isChecked ? 'checked' : ''}`}>
-              {parseInlineSpans(itemText)}
-            </span>
-          </div>
-        );
+      // Interactive Tasks / Checklists: - [ ] or - [x]
+      const checkMatch = line.match(/^-\s\[([ x])\]\s(.*)/);
+      if (checkMatch) {
+        if (!insideTasks) {
+          insideTasks = true;
+          taskBuffer = [];
+        }
+        const isCompleted = checkMatch[1] === 'x';
+        const itemText = checkMatch[2];
+        taskBuffer.push({ lineIndex: index, text: itemText, isCompleted });
         return;
+      } else if (insideTasks) {
+        flushTasks(index);
       }
 
       if (line.startsWith('# ')) {
@@ -697,6 +827,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     if (insideTable) flushTable(lines.length);
     if (insideCallout) flushCallout(lines.length);
+    if (insideTasks) flushTasks(lines.length);
 
     return elements;
   };
@@ -963,6 +1094,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           <GitBranch size={14} />
           <span>Diagram</span>
         </button>
+        <button className="toolbar-btn" onClick={() => setIsInsertImageOpen(true)} disabled={note.isTrashed} title="Insert & Position Image (Wrap Text)">
+          <ImageIcon size={14} color="var(--accent-primary)" />
+          <span>Image</span>
+        </button>
 
         {/* Templates Dropdown Button */}
         <div style={{ position: 'relative' }}>
@@ -1006,15 +1141,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           )}
         </div>
 
-        {/* View Mode Selector: Edit, Split, Read */}
+        {/* View Mode Selector: Live, Split, Markdown */}
         <div className="mode-toggle-group">
           <button 
-            className={`mode-btn ${mode === 'edit' ? 'active' : ''}`}
-            onClick={() => setMode('edit')}
-            title="Edit Mode"
+            className={`mode-btn ${mode === 'live' ? 'active' : ''}`}
+            onClick={() => setMode('live')}
+            title="Interactive Live Document (WYSIWYG)"
           >
-            <Edit3 size={11} style={{ marginRight: '3px' }} />
-            <span>Edit</span>
+            <Sparkles size={11} style={{ marginRight: '3px' }} />
+            <span>Live</span>
           </button>
           <button 
             className={`mode-btn ${mode === 'split' ? 'active' : ''}`}
@@ -1025,12 +1160,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             <span>Split</span>
           </button>
           <button 
-            className={`mode-btn ${mode === 'preview' ? 'active' : ''}`}
-            onClick={() => setMode('preview')}
-            title="Read / Preview Mode"
+            className={`mode-btn ${mode === 'source' ? 'active' : ''}`}
+            onClick={() => setMode('source')}
+            title="Raw Markdown Source Editor"
           >
-            <Eye size={11} style={{ marginRight: '3px' }} />
-            <span>Read</span>
+            <Edit3 size={11} style={{ marginRight: '3px' }} />
+            <span>Markdown</span>
           </button>
         </div>
       </div>
@@ -1184,7 +1319,47 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       ) : (
-        <div className="editor-scroll-area" ref={scrollAreaRef}>
+        <div className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''}`} ref={scrollAreaRef}>
+          {/* Hierarchy Breadcrumb Trail */}
+          <nav className="editor-hierarchy-breadcrumbs" aria-label="Hierarchy">
+            {activeWorkspace && (
+              <span className="crumb-item ws" title={`Workspace: ${activeWorkspace.name}`}>
+                <span className="crumb-icon">{activeWorkspace.icon}</span>
+                <span>{activeWorkspace.name}</span>
+              </span>
+            )}
+            {currentBook ? (
+              <>
+                <span className="crumb-sep">/</span>
+                <span className="crumb-item book" title={`Book: ${currentBook.title}`}>
+                  <span>{currentBook.icon}</span>
+                  <span>{currentBook.title}</span>
+                </span>
+                {typeof note.pageOrder === 'number' && (
+                  <>
+                    <span className="crumb-sep">/</span>
+                    <span className="crumb-item chapter">Chapter {note.pageOrder + 1}</span>
+                  </>
+                )}
+              </>
+            ) : folders.find((f) => f.id === note.folderId) ? (
+              <>
+                <span className="crumb-sep">/</span>
+                <span className="crumb-item folder" style={{ color: folders.find((f) => f.id === note.folderId)?.color }}>
+                  <FolderIcon size={11} />
+                  <span>{folders.find((f) => f.id === note.folderId)?.name}</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="crumb-sep">/</span>
+                <span className="crumb-item root">Root Notes</span>
+              </>
+            )}
+            <span className="crumb-sep">/</span>
+            <span className="crumb-item current">{note.title || 'Untitled Note'}</span>
+          </nav>
+
           {/* Title Field */}
           <input
             type="text"
@@ -1223,8 +1398,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             )}
           </div>
 
-          {/* Content Field: Edit or Interactive Preview */}
-          {mode === 'edit' ? (
+          {/* Content Field: Live Interactive Document vs Raw Source Editor */}
+          {mode === 'source' ? (
             <textarea
               ref={textareaRef}
               className="editor-content-textarea selectable-text"
@@ -1234,8 +1409,23 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               onChange={handleContentChange}
             />
           ) : (
-            <div className="markdown-body selectable-text">
-              {renderMarkdownPreview(note.content)}
+            <div className="live-document-wrapper">
+              <div className="live-view-quick-action-bar">
+                <span className="live-badge">✨ Live Interactive View</span>
+                <button
+                  type="button"
+                  className="btn-quick-edit-source"
+                  onClick={() => setMode('split')}
+                  title="Open Split View to write markdown"
+                >
+                  <Columns size={11} />
+                  <span>Open Split View</span>
+                </button>
+              </div>
+
+              <div className="markdown-body live-rich-document selectable-text">
+                {renderMarkdownPreview(note.content)}
+              </div>
             </div>
           )}
 
@@ -1314,6 +1504,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           });
           setIsCryptoModalOpen(false);
         }}
+      />
+
+      {/* Insert & Wrap Image Modal */}
+      <InsertImageModal
+        isOpen={isInsertImageOpen}
+        onClose={() => setIsInsertImageOpen(false)}
+        onInsert={handleInsertImageTag}
       />
     </main>
   );

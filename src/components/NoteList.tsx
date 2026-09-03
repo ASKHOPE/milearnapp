@@ -15,7 +15,9 @@ import {
   Music,
   Trash2,
   RotateCcw,
-  Lock
+  Lock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface NoteListProps {
@@ -25,6 +27,8 @@ interface NoteListProps {
   currentFilter: ViewFilter;
   currentFolderId: string | null;
   selectedTag: string | null;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   onSelectNote: (noteId: string) => void;
   onCreateNote: () => void;
   onToggleFavorite: (noteId: string, e: React.MouseEvent) => void;
@@ -39,6 +43,8 @@ export const NoteList: React.FC<NoteListProps> = ({
   currentFilter,
   currentFolderId,
   selectedTag,
+  isCollapsed = false,
+  onToggleCollapse,
   onSelectNote,
   onCreateNote,
   onToggleFavorite,
@@ -101,8 +107,8 @@ export const NoteList: React.FC<NoteListProps> = ({
     if (currentFilter === 'favorites' && !note.isFavorite) {
       return false;
     }
-    if (currentFilter === 'attachments' && (!note.attachments || note.attachments.length === 0)) {
-      return false;
+    if (currentFilter === 'attachments') {
+      if (!note.attachments || note.attachments.length === 0) return false;
     }
 
     // List search query
@@ -110,8 +116,8 @@ export const NoteList: React.FC<NoteListProps> = ({
       const q = listSearch.toLowerCase();
       const matchTitle = note.title.toLowerCase().includes(q);
       const matchContent = note.content.toLowerCase().includes(q);
-      const matchTags = note.tags?.some((t) => t.toLowerCase().includes(q));
-      if (!matchTitle && !matchContent && !matchTags) return false;
+      const matchTag = note.tags?.some((t) => t.toLowerCase().includes(q));
+      if (!matchTitle && !matchContent && !matchTag) return false;
     }
 
     return true;
@@ -166,11 +172,36 @@ export const NoteList: React.FC<NoteListProps> = ({
       .trim();
   };
 
+  // Collapsed Panel Strip
+  if (isCollapsed) {
+    return (
+      <section className="notes-list-pane collapsed">
+        <button
+          className="btn-expand-notes-pane"
+          onClick={onToggleCollapse}
+          title="Expand notes list"
+        >
+          <ChevronRight size={15} />
+          <span className="collapsed-notes-count">{filteredNotes.length}</span>
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="notes-list-pane">
       {/* List Header */}
       <div className="list-header-row">
         <div className="list-title-group">
+          {onToggleCollapse && (
+            <button
+              className="btn-collapse-notes-pane"
+              onClick={onToggleCollapse}
+              title="Collapse notes panel"
+            >
+              <ChevronLeft size={14} />
+            </button>
+          )}
           <span className="list-column-title">{columnTitle}</span>
           <span className="list-count-badge">{filteredNotes.length}</span>
         </div>
@@ -252,30 +283,29 @@ export const NoteList: React.FC<NoteListProps> = ({
             return (
               <div
                 key={note.id}
-                className={`note-card ${isSelected ? 'selected' : ''}`}
+                className={`note-card compact-card ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectNote(note.id)}
               >
-                {/* Note Card Header: Title & Pin/Favorite/Restore */}
+                {/* Heading: Title & Pin/Favorite */}
                 <div className="card-top-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-                    {note.isPinned && <Pin size={12} className="card-pin-icon" />}
+                  <div className="card-heading-wrap">
+                    {note.isPinned && <Pin size={11} className="card-pin-icon" />}
                     {note.isLocked && (
                       <span title="Encrypted with AES-256-GCM" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Lock size={12} color="var(--color-warning)" />
+                        <Lock size={11} color="var(--color-warning)" />
                       </span>
                     )}
-                    <span className="card-title">{note.title || 'Untitled Note'}</span>
+                    <span className="card-heading">{note.title || 'Untitled Note'}</span>
                   </div>
 
                   <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-                    {/* Restore Button in Trash */}
                     {note.isTrashed ? (
                       <button
                         className="card-icon-btn"
                         title="Restore Note"
                         onClick={(e) => onRestoreNote(note.id, e)}
                       >
-                        <RotateCcw size={13} color="var(--color-success)" />
+                        <RotateCcw size={12} color="var(--color-success)" />
                       </button>
                     ) : (
                       <button
@@ -284,7 +314,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                         title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                       >
                         <Star 
-                          size={13} 
+                          size={12} 
                           fill={note.isFavorite ? '#f59e0b' : 'none'} 
                           color={note.isFavorite ? '#f59e0b' : 'var(--text-muted)'} 
                         />
@@ -293,36 +323,44 @@ export const NoteList: React.FC<NoteListProps> = ({
                   </div>
                 </div>
 
-                {/* Content Snippet */}
-                <p className="card-snippet">
-                  {note.isLocked ? '🔒 Encrypted (AES-256-GCM authenticated)' : snippet || 'Empty note...'}
-                </p>
-
-                {/* Footer Metadata */}
-                <div className="card-meta-row">
+                {/* Subheading: Time • Folder • Media Icons */}
+                <div className="card-subheading">
                   <span className="card-time">{formatTime(note.updatedAt)}</span>
-
-                  <div className="card-badges">
-                    {/* Folder Badge */}
-                    {folder && (
-                      <span className="card-badge folder" style={{ color: folder.color }}>
-                        <FolderIcon size={9} />
+                  {folder && (
+                    <>
+                      <span className="card-meta-dot">•</span>
+                      <span className="card-folder-chip" style={{ color: folder.color }}>
+                        <FolderIcon size={10} />
                         <span>{folder.name}</span>
                       </span>
-                    )}
+                    </>
+                  )}
+                  {(hasImages || hasAudio || hasFiles) && (
+                    <>
+                      <span className="card-meta-dot">•</span>
+                      <div className="card-media-chips">
+                        {hasImages && <span title="Has images"><ImageIcon size={10} /></span>}
+                        {hasAudio && <span title="Has audio" style={{ color: '#ef4444' }}><Music size={10} /></span>}
+                        {hasFiles && <span title="Has files"><FileIcon size={10} /></span>}
+                      </div>
+                    </>
+                  )}
+                </div>
 
-                    {/* Media Indicators */}
-                    {hasImages && <span title="Has images"><ImageIcon size={11} className="card-media-icon" /></span>}
-                    {hasAudio && <span title="Has voice recording"><Music size={11} className="card-media-icon" style={{ color: '#ef4444' }} /></span>}
-                    {hasFiles && <span title="Has documents/PDFs"><FileIcon size={11} className="card-media-icon" /></span>}
-
-                    {/* Tag Pills */}
-                    {note.tags && note.tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className="card-badge tag">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
+                {/* Hover Details: Reveals 2 lines of text and tags on hover */}
+                <div className="card-hover-details">
+                  <p className="card-snippet-2lines">
+                    {note.isLocked ? '🔒 Encrypted (AES-256-GCM authenticated)' : snippet || 'Empty note...'}
+                  </p>
+                  {note.tags && note.tags.length > 0 && (
+                    <div className="card-hover-tags">
+                      {note.tags.slice(0, 4).map((tag) => (
+                        <span key={tag} className="card-badge tag">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );

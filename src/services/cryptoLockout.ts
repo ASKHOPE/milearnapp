@@ -135,6 +135,45 @@ export class CryptoLockoutManager {
   public recordSuccess(noteId: string): void {
     safeRemoveItem(this.getStorageKey(noteId));
   }
+
+  /**
+   * Returns list of currently active lockouts
+   */
+  public getAllActiveLockouts(): string[] {
+    const keys: string[] = [];
+    try {
+      if (typeof localStorage !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('noteflow_lockout_')) {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const data = JSON.parse(raw);
+              if (data.lockedUntil > Date.now()) keys.push(k);
+            }
+          }
+        }
+      }
+    } catch {}
+    return keys;
+  }
+
+  /**
+   * Clears all lockout penalties and cooldowns
+   */
+  public clearAllLockouts(): void {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('noteflow_lockout_')) toRemove.push(k);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+      }
+      memoryStore.clear();
+    } catch {}
+  }
 }
 
 export const lockoutManager = new CryptoLockoutManager();

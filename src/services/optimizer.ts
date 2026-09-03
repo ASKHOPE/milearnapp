@@ -148,6 +148,19 @@ export class DataOptimizer {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
+
+  public async getHealthReport(): Promise<StorageHealth & { usedBytesFormatted: string; quotaUsagePercent: number }> {
+    const health = await this.getStorageHealth([]);
+    return {
+      ...health,
+      usedBytesFormatted: this.formatBytes(health.usageBytes),
+      quotaUsagePercent: Math.round(health.usagePercent)
+    };
+  }
+
+  public async purgeOrphanedData(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 200));
+  }
 }
 
 export const optimizer = new DataOptimizer();

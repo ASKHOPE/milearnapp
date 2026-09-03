@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import type { Note, Folder, ViewFilter, ThemeMode, Workspace, Book, PomodoroMode } from './types';
+import type { Note, Folder, ViewFilter, ThemeMode, Workspace, Book, PomodoroMode, UserProfile } from './types';
 import { storage } from './services/storage';
+import { shortcutManager } from './services/shortcutManager';
+import { inactivityLockManager } from './services/inactivityLock';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -8,9 +10,11 @@ import { NoteEditor } from './components/NoteEditor';
 import { KnowledgeBaseModal } from './components/KnowledgeBaseModal';
 import { FolderLinkTreeModal } from './components/FolderLinkTreeModal';
 import { SearchModal } from './components/SearchModal';
-import { SettingsModal } from './components/SettingsModal';
+import { SettingsModal, DEFAULT_USER_PROFILE } from './components/SettingsModal';
 import { StudyModeModal } from './components/StudyModeModal';
 import { FocusPomodoroModal } from './components/FocusPomodoroModal';
+import { InternalMindModal } from './components/InternalMindModal';
+import { InactivityOverlay } from './components/InactivityOverlay';
 import { NOTE_TEMPLATES } from './services/templates';
 import './styles/main.css';
 
@@ -28,16 +32,20 @@ export const App: React.FC = () => {
   const [currentFilter, setCurrentFilter] = useState<ViewFilter>('all');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [isNotesCollapsed, setIsNotesCollapsed] = useState(false);
 
-  // Modals, Study & Focus
-  const [theme, setTheme] = useState<ThemeMode>('light');
+  // Modals, Study, Inactivity & Focus
+  const [theme, setTheme] = useState<ThemeMode>('system');
+  const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
+  const [isInternalMindOpen, setIsInternalMindOpen] = useState(false);
   const [isLinkTreeOpen, setIsLinkTreeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isStudyModeOpen, setIsStudyModeOpen] = useState(false);
   const [isPomodoroOpen, setIsPomodoroOpen] = useState(false);
+  const [isVaultLockedDueToInactivity, setIsVaultLockedDueToInactivity] = useState(false);
   const [pomodoroSecondsLeft, setPomodoroSecondsLeft] = useState(25 * 60);
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
   const [pomodoroMode, setPomodoroMode] = useState<PomodoroMode>('work');
@@ -52,6 +60,9 @@ export const App: React.FC = () => {
         const savedTheme = storage.getTheme();
         setTheme(savedTheme);
         storage.setTheme(savedTheme);
+
+        const savedProfile = storage.getUserProfile();
+        setUserProfile(savedProfile);
 
         const micPref = storage.isMicEnabled();
         setIsMicEnabled(micPref);
@@ -80,30 +91,57 @@ export const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Keyboard Shortcuts: Cmd+K, Cmd+N, Cmd+W
+  // System Dark Theme Auto-Sync Listener
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleMql = () => {
+      storage.setTheme('system');
+    };
+    mql.addEventListener('change', handleMql);
+    return () => mql.removeEventListener('change', handleMql);
+  }, [theme]);
+
+  // Inactivity Auto-Lock Listener
+  useEffect(() => {
+    inactivityLockManager.start(() => {
+      setIsVaultLockedDueToInactivity(true);
+    });
+    return () => inactivityLockManager.stop();
+  }, []);
+
+  // Dynamic Keyboard Shortcuts via shortcutManager
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const cmdKey = isMac ? e.metaKey : e.ctrlKey;
+      const hotkeys = shortcutManager.getHotkeys();
 
-      if (cmdKey && e.key.toLowerCase() === 'k') {
+      if (shortcutManager.matchesEvent(e, hotkeys.search)) {
         e.preventDefault();
         setIsSearchOpen((prev) => !prev);
-      }
-
-      if (cmdKey && e.key.toLowerCase() === 'n') {
+      } else if (shortcutManager.matchesEvent(e, hotkeys.newNote)) {
         e.preventDefault();
         handleCreateNote();
-      }
-
-      if (cmdKey && e.key.toLowerCase() === 'w' && selectedNoteId) {
+      } else if (shortcutManager.matchesEvent(e, hotkeys.closeTab) && selectedNoteId) {
         e.preventDefault();
         handleCloseTab(selectedNoteId);
+      } else if (shortcutManager.matchesEvent(e, hotkeys.studyMode)) {
+        e.preventDefault();
+        setIsStudyModeOpen((prev) => !prev);
+      } else if (shortcutManager.matchesEvent(e, hotkeys.pomodoro)) {
+        e.preventDefault();
+        setIsPomodoroOpen((prev) => !prev);
+      } else if (shortcutManager.matchesEvent(e, hotkeys.zenMode)) {
+        e.preventDefault();
+        setIsZenMode((prev) => !prev);
+      } else if (shortcutManager.matchesEvent(e, hotkeys.settings)) {
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
       }
 
       if (e.key === 'Escape') {
         setIsSearchOpen(false);
         setIsKnowledgeBaseOpen(false);
+        setIsInternalMindOpen(false);
         setIsLinkTreeOpen(false);
         setIsSettingsOpen(false);
         setIsStudyModeOpen(false);
@@ -116,11 +154,16 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNoteId, openNoteIds, isZenMode]);
 
-  // Theme Toggle Handler
+  // 3-Way Theme Toggle: System -> Day -> Night
   const handleToggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    const nextTheme: ThemeMode = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
     setTheme(nextTheme);
     storage.setTheme(nextTheme);
+  };
+
+  const handleChangeTheme = (newTheme: ThemeMode) => {
+    setTheme(newTheme);
+    storage.setTheme(newTheme);
   };
 
   // Mic Privacy Handler
@@ -528,12 +571,14 @@ export const App: React.FC = () => {
       <Header
         theme={theme}
         activeWorkspace={activeWorkspace}
+        userProfile={userProfile}
         pomodoroSecondsLeft={pomodoroSecondsLeft}
         isPomodoroRunning={isPomodoroRunning}
         pomodoroMode={pomodoroMode}
         onToggleTheme={handleToggleTheme}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
+        onOpenInternalMind={() => setIsInternalMindOpen(true)}
         onOpenLinkTree={() => setIsLinkTreeOpen(true)}
         onOpenProfile={() => setIsSettingsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -584,7 +629,7 @@ export const App: React.FC = () => {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
-        {/* Pane 2: Notes List with Search, Sorting & Note Preview Cards */}
+        {/* Pane 2: Notes List with Search, Sorting & Compact Hover Preview Cards */}
         <NoteList
           notes={workspaceNotes}
           folders={workspaceFolders}
@@ -592,6 +637,8 @@ export const App: React.FC = () => {
           currentFilter={currentFilter}
           currentFolderId={currentFolderId}
           selectedTag={selectedTag}
+          isCollapsed={isNotesCollapsed}
+          onToggleCollapse={() => setIsNotesCollapsed(!isNotesCollapsed)}
           onSelectNote={handleOpenNote}
           onCreateNote={handleCreateNote}
           onToggleFavorite={handleToggleFavorite}
@@ -599,7 +646,7 @@ export const App: React.FC = () => {
           onRestoreNote={handleRestoreNote}
         />
 
-        {/* Pane 3: Rich Note Editor with Multi-Tabs, Books Paging, Attachments & Backlinks */}
+        {/* Pane 3: Rich Note Editor with Live View, Books Paging, Floated Images & Tables */}
         <NoteEditor
           note={currentNote}
           folders={workspaceFolders}
@@ -625,22 +672,24 @@ export const App: React.FC = () => {
         />
       </div>
 
-      {/* Settings, Backup, Security & Tutorial Hub */}
+      {/* Settings, Backup, Security, Hotkeys & Identity Hub */}
       <SettingsModal
         isOpen={isSettingsOpen}
         theme={theme}
+        onChangeTheme={handleChangeTheme}
         activeWorkspace={activeWorkspace}
         allNotes={notes}
         allFolders={folders}
         allBooks={books}
         isMicEnabled={isMicEnabled}
-        onToggleTheme={handleToggleTheme}
         onToggleMic={handleToggleMic}
         onExportVault={handleExportData}
         onImportVault={handleImportData}
         onReseedTutorialVault={handleReseedTutorialVault}
         onSelectNote={handleOpenNote}
         onClose={() => setIsSettingsOpen(false)}
+        userProfile={userProfile}
+        onUpdateProfile={setUserProfile}
       />
 
       {/* Knowledge Base Modal: Infinite Galaxy Force-Directed Graph */}
@@ -691,6 +740,23 @@ export const App: React.FC = () => {
           setIsPomodoroRunning(running);
           setPomodoroMode(m);
         }}
+      />
+
+      {/* Internal Mind / Knowledge Lexicon Modal */}
+      <InternalMindModal
+        isOpen={isInternalMindOpen}
+        notes={workspaceNotes.filter((n) => !n.isTrashed)}
+        onNavigateToNote={handleOpenNote}
+        onClose={() => setIsInternalMindOpen(false)}
+      />
+
+      {/* Inactivity Security Screen Lock */}
+      <InactivityOverlay
+        isLocked={isVaultLockedDueToInactivity}
+        profileName={userProfile.name}
+        profileAvatar={userProfile.avatarValue}
+        avatarType={userProfile.avatarType}
+        onUnlock={() => setIsVaultLockedDueToInactivity(false)}
       />
     </div>
   );

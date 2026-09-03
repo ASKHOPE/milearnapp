@@ -1,119 +1,232 @@
-import React, { useState, useEffect } from 'react';
-import type { Workspace, Note, Folder, Book } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import type { Workspace, Note, Folder, Book, ThemeMode, UserProfile } from '../types';
 import { optimizer, type StorageHealth } from '../services/optimizer';
 import { lockoutManager } from '../services/cryptoLockout';
+import { shortcutManager } from '../services/shortcutManager';
+import { inactivityLockManager } from '../services/inactivityLock';
+import { AVATAR_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { Tabs } from './ui/Tabs';
 import { 
-  Settings,
   User, 
+  Palette,
+  Keyboard,
   ShieldCheck, 
   HardDrive, 
-  Share2, 
   RotateCcw, 
   Download, 
   Upload, 
-  Lock, 
   Mic, 
   MicOff, 
-  BookOpen, 
-  Sparkles, 
-  Check
+  Check,
+  Camera,
+  Sun,
+  Moon,
+  Monitor,
+  QrCode
 } from 'lucide-react';
+
+export const DEFAULT_USER_PROFILE: UserProfile = {
+  name: 'Alex Mercer',
+  bio: 'Staff Engineer • Local-First Systems & Mathematics Enthusiast',
+  role: 'Systems Architect',
+  avatarType: 'emoji',
+  avatarValue: '⚡',
+  mood: 'Deep Focus'
+};
 
 interface SettingsModalProps {
   isOpen: boolean;
-  theme: 'light' | 'dark';
+  theme: ThemeMode;
+  onChangeTheme: (theme: ThemeMode) => void;
   activeWorkspace: Workspace;
   allNotes: Note[];
   allFolders: Folder[];
   allBooks: Book[];
   isMicEnabled: boolean;
-  onToggleTheme: () => void;
   onToggleMic: (enabled: boolean) => void;
   onExportVault: () => void;
   onImportVault: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onReseedTutorialVault: () => Promise<void>;
   onSelectNote: (noteId: string) => void;
   onClose: () => void;
+  userProfile?: UserProfile;
+  onUpdateProfile?: (profile: UserProfile) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   theme,
-  activeWorkspace,
+  onChangeTheme,
   allNotes,
   isMicEnabled,
-  onToggleTheme,
   onToggleMic,
   onExportVault,
   onImportVault,
   onReseedTutorialVault,
-  onSelectNote,
-  onClose
+  onClose,
+  userProfile = DEFAULT_USER_PROFILE,
+  onUpdateProfile
 }) => {
-  const [activeTab, setActiveTab] = useState('general');
-  const [profileName, setProfileName] = useState(() => localStorage.getItem('noteflow_user_name') || 'Chief Thinker');
-  const [profileAvatar, setProfileAvatar] = useState(() => localStorage.getItem('noteflow_user_avatar') || '⚡');
-  const [storageHealth, setStorageHealth] = useState<StorageHealth | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('profile');
+
+  // Profile Form State
+  const [profileName, setProfileName] = useState(userProfile.name);
+  const [profileBio, setProfileBio] = useState(userProfile.bio);
+  const [profileRole, setProfileRole] = useState(userProfile.role);
+  const [avatarType, setAvatarType] = useState<'emoji' | 'gif' | 'image'>(userProfile.avatarType);
+  const [avatarValue, setAvatarValue] = useState(userProfile.avatarValue);
+  const [selectedMood, setSelectedMood] = useState(userProfile.mood);
+  const [customGifUrl, setCustomGifUrl] = useState('');
+  const [profileSaveNotice, setProfileSaveNotice] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Hotkeys & Mouse State
+  const [hotkeys, setHotkeys] = useState(shortcutManager.getHotkeys());
+  const [mouseSettings, setMouseSettings] = useState(shortcutManager.getMouseSettings());
+  const [recordingHotkeyKey, setRecordingHotkeyKey] = useState<string | null>(null);
+
+  // Security & Inactivity State
+  const [securitySettings, setSecuritySettings] = useState(inactivityLockManager.getSettings());
+  const [lockoutCount, setLockoutCount] = useState<number>(0);
+  const [showClearSuccess, setShowClearSuccess] = useState(false);
+
+  // Storage Health State
+  const [health, setHealth] = useState<StorageHealth | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleanSuccess, setCleanSuccess] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Reset / Reseed Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [clearedLockouts, setClearedLockouts] = useState(false);
-  const [qrNoteId, setQrNoteId] = useState<string>(allNotes[0]?.id || '');
+  const [isResetting, setIsResetting] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      optimizer.getStorageHealth(allNotes).then(setStorageHealth);
-      setShowResetConfirm(false);
-      setResetSuccess(false);
+      setLockoutCount(lockoutManager.getAllActiveLockouts().length);
+      optimizer.getHealthReport().then(setHealth);
+      setHotkeys(shortcutManager.getHotkeys());
+      setMouseSettings(shortcutManager.getMouseSettings());
+      setSecuritySettings(inactivityLockManager.getSettings());
     }
-  }, [isOpen, allNotes]);
+  }, [isOpen]);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('noteflow_user_name', profileName);
-    localStorage.setItem('noteflow_user_avatar', profileAvatar);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2000);
+  // Handle Photo Upload (1:1 Square Crop on Canvas)
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const size = Math.min(img.width, img.height, 400);
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Center 1:1 crop
+          const offsetX = (img.width - size) / 2;
+          const offsetY = (img.height - size) / 2;
+          ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
+          const croppedData = canvas.toDataURL('image/webp', 0.88);
+          setAvatarType('image');
+          setAvatarValue(croppedData);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleCleanStorage = () => {
+  const handleSaveProfile = () => {
+    const updated: UserProfile = {
+      name: profileName.trim() || 'Alex Mercer',
+      bio: profileBio.trim(),
+      role: profileRole.trim() || 'Noteflow Member',
+      avatarType,
+      avatarValue,
+      mood: selectedMood
+    };
+    if (onUpdateProfile) {
+      onUpdateProfile(updated);
+    }
+    try {
+      localStorage.setItem('noteflow_user_profile', JSON.stringify(updated));
+    } catch {}
+    setProfileSaveNotice(true);
+    setTimeout(() => setProfileSaveNotice(false), 2000);
+  };
+
+  // Hotkey Recorder
+  useEffect(() => {
+    if (!recordingHotkeyKey) return;
+
+    const handleKeyRecord = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Ignore lone modifier presses
+      if (['Meta', 'Control', 'Shift', 'Alt'].includes(e.key)) return;
+
+      const parts: string[] = [];
+      if (e.metaKey || (e.ctrlKey && navigator.platform.toUpperCase().indexOf('MAC') < 0)) parts.push('Meta');
+      if (e.ctrlKey && navigator.platform.toUpperCase().indexOf('MAC') >= 0) parts.push('Ctrl');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.altKey) parts.push('Alt');
+      parts.push(e.key.toLowerCase());
+
+      const shortcutStr = parts.join('+');
+      const nextHotkeys = { ...hotkeys, [recordingHotkeyKey]: shortcutStr };
+      setHotkeys(nextHotkeys);
+      shortcutManager.saveHotkeys(nextHotkeys);
+      setRecordingHotkeyKey(null);
+    };
+
+    window.addEventListener('keydown', handleKeyRecord, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyRecord, { capture: true });
+  }, [recordingHotkeyKey, hotkeys]);
+
+  const handleResetHotkeys = () => {
+    const defaults = shortcutManager.resetHotkeys();
+    setHotkeys(defaults);
+  };
+
+  const handleUpdateMouse = (field: string, val: any) => {
+    const next = { ...mouseSettings, [field]: val };
+    setMouseSettings(next);
+    shortcutManager.saveMouseSettings(next);
+  };
+
+  const handleUpdateSecurity = (field: string, val: any) => {
+    const next = { ...securitySettings, [field]: val };
+    setSecuritySettings(next);
+    inactivityLockManager.saveSettings(next);
+  };
+
+  const handleCleanStorage = async () => {
     setIsCleaning(true);
-    setTimeout(() => {
-      setIsCleaning(false);
-      setCleanSuccess(true);
-      optimizer.getStorageHealth(allNotes).then(setStorageHealth);
-      setTimeout(() => setCleanSuccess(false), 3000);
-    }, 600);
+    await optimizer.purgeOrphanedData();
+    const updated = await optimizer.getHealthReport();
+    setHealth(updated);
+    setIsCleaning(false);
+    setCleanSuccess(true);
+    setTimeout(() => setCleanSuccess(false), 3000);
   };
 
   const handleConfirmReseed = async () => {
     setIsResetting(true);
     try {
       await onReseedTutorialVault();
-      setResetSuccess(true);
       setShowResetConfirm(false);
-      setTimeout(() => setResetSuccess(false), 4000);
-    } catch (err) {
-      console.error('Failed to reseed vault', err);
+      onClose();
     } finally {
       setIsResetting(false);
     }
   };
-
-  const handleClearAllLockouts = () => {
-    allNotes.forEach((n) => lockoutManager.recordSuccess(n.id));
-    setClearedLockouts(true);
-    setTimeout(() => setClearedLockouts(false), 3000);
-  };
-
-  const selectedQrNote = allNotes.find((n) => n.id === qrNoteId) || allNotes[0];
 
   const lockedNotesCount = allNotes.filter((n) => n.isLocked).length;
 
@@ -121,422 +234,579 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Settings & System Vault"
-      subtitle={`Local-first configuration • ${activeWorkspace.name}`}
-      icon={<Settings size={20} color="var(--accent-primary)" />}
-      maxWidth={680}
+      title="Settings & System Preferences"
+      subtitle="Identity, themes, custom hotkeys, zero-knowledge security, and local vault controls"
+      maxWidth="880px"
     >
-      {/* Segmented Tab Strip */}
+      {/* Symmetrical Header Navigation Tabs */}
       <Tabs
         activeTab={activeTab}
         onChange={setActiveTab}
         tabs={[
-          { id: 'general', label: 'General', icon: <User size={13} /> },
-          { id: 'backup', label: 'Backup & Restore', icon: <RotateCcw size={13} /> },
-          { id: 'security', label: 'Security & Lock', icon: <ShieldCheck size={13} />, badge: lockedNotesCount > 0 ? lockedNotesCount : undefined },
-          { id: 'tutorial', label: 'Tutorial & Keys', icon: <Sparkles size={13} /> },
-          { id: 'storage', label: 'Storage', icon: <HardDrive size={13} /> },
-          { id: 'transfer', label: 'Offline Beam', icon: <Share2 size={13} /> }
+          { id: 'profile', label: 'Identity', icon: <User size={14} /> },
+          { id: 'appearance', label: 'Themes', icon: <Palette size={14} /> },
+          { id: 'controls', label: 'Hotkeys & Mouse', icon: <Keyboard size={14} /> },
+          { id: 'security', label: 'Security & Lock', icon: <ShieldCheck size={14} /> },
+          { id: 'backup', label: 'Backup & Vault', icon: <HardDrive size={14} /> },
+          { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={14} /> }
         ]}
       />
 
-      {/* TAB 1: General & Persona */}
-      {activeTab === 'general' && (
-        <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-            <div className="profile-avatar-display" style={{ fontSize: '28px', width: '52px', height: '52px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-card)', borderRadius: '50%', border: '1px solid var(--border-color)' }}>
-              {profileAvatar}
+      {/* TAB 1: IDENTITY & PROFILE */}
+      {activeTab === 'profile' && (
+        <div className="settings-symmetrical-grid">
+          {/* Left Column: Form Controls */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Profile Information</h4>
+
+            <div className="form-field-row">
+              <label className="form-field-label">Display Name</label>
+              <input
+                type="text"
+                className="dialog-text-input"
+                placeholder="Your Name"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+              />
             </div>
-            <div style={{ flex: 1 }}>
-              <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>{profileName}</h4>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Active Persona: {activeWorkspace.icon} {activeWorkspace.name}
-              </span>
+
+            <div className="form-field-row">
+              <label className="form-field-label">Role / Headline</label>
+              <input
+                type="text"
+                className="dialog-text-input"
+                placeholder="e.g. Systems Engineer, Student"
+                value={profileRole}
+                onChange={(e) => setProfileRole(e.target.value)}
+              />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onToggleTheme}
-              title="Toggle Day and Night Theme"
-            >
-              {theme === 'dark' ? '☀️ Light Theme' : '🌙 Dark Theme'}
-            </Button>
-          </div>
 
-          <div className="ui-form-group">
-            <label className="ui-form-label">Display Name / Handle</label>
-            <input
-              type="text"
-              className="ui-input"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-              placeholder="Your Name"
-              required
-            />
-          </div>
-
-          <div className="ui-form-group">
-            <label className="ui-form-label">Avatar Emoji</label>
-            <div className="book-emoji-picker" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['⚡', '🚀', '🧠', '🦉', '🎨', '💻', '✨', '🦊', '☕', '🛡️', '🔬', '📐'].map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  className={`emoji-btn ${profileAvatar === em ? 'active' : ''}`}
-                  onClick={() => setProfileAvatar(em)}
-                  style={{
-                    fontSize: '18px',
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: profileAvatar === em ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                    background: profileAvatar === em ? 'rgba(79, 70, 229, 0.1)' : 'var(--bg-subtle)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {em}
-                </button>
-              ))}
+            <div className="form-field-row">
+              <label className="form-field-label">Bio & Motto</label>
+              <textarea
+                className="dialog-textarea-input"
+                placeholder="Short bio or personal philosophy..."
+                rows={2}
+                value={profileBio}
+                onChange={(e) => setProfileBio(e.target.value)}
+              />
             </div>
-          </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-            <Button type="submit" variant="primary" size="md">
-              {isSaved ? '✓ Saved!' : 'Save Persona'}
-            </Button>
-          </div>
-        </form>
-      )}
-
-      {/* TAB 2: Backup, Restore & Seed Vault */}
-      {activeTab === 'backup' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {resetSuccess && (
-            <div className="crypto-lockout-banner" style={{ background: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.3)', color: 'var(--color-success)' }}>
-              <Check size={18} />
-              <div>
-                <strong>Tutorial Vault Restored!</strong>
-                <p>All workspaces, books, chapters, flashcards, and math guides have been re-seeded.</p>
+            {/* Categorized Moods */}
+            <div className="form-field-row">
+              <label className="form-field-label">Current Mindset / Mood</label>
+              <div className="mood-pills-row">
+                {AVATAR_MOODS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`mood-pill-btn ${selectedMood === m.label ? 'active' : ''}`}
+                    onClick={() => setSelectedMood(m.label)}
+                  >
+                    <span>{m.emoji}</span>
+                    <span>{m.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          {/* Export & Import Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="transfer-card" style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <Download size={22} color="var(--accent-primary)" style={{ marginBottom: '8px' }} />
-              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Export Entire Vault</h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 14px 0', lineHeight: 1.4 }}>
-                Download all notes, folders, books, and attachments as a JSON archive.
-              </p>
-              <Button variant="primary" size="sm" onClick={onExportVault} fullWidth>
-                Download .noteflow
-              </Button>
+            {/* 1:1 Animated GIFs & SVGs */}
+            <div className="form-field-row">
+              <label className="form-field-label">1:1 Looping Animated Avatars</label>
+              <div className="animated-gif-grid">
+                {ANIMATED_AVATARS.map((gif) => (
+                  <button
+                    key={gif.id}
+                    type="button"
+                    className={`gif-choice-btn ${avatarType === 'gif' && avatarValue === gif.dataUrl ? 'active' : ''}`}
+                    onClick={() => {
+                      setAvatarType('gif');
+                      setAvatarValue(gif.dataUrl);
+                    }}
+                    title={gif.name}
+                  >
+                    <img src={gif.dataUrl} alt={gif.name} />
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="transfer-card" style={{ padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <Upload size={22} color="var(--color-warning)" style={{ marginBottom: '8px' }} />
-              <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Restore From Backup</h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 14px 0', lineHeight: 1.4 }}>
-                Import an existing .noteflow or .json backup into your local vault.
-              </p>
-              <label style={{ width: '100%', display: 'block' }}>
+            {/* Custom GIF / Image URL */}
+            <div className="form-field-row">
+              <label className="form-field-label">Or Custom GIF / Image URL</label>
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <input
-                  type="file"
-                  accept=".json,.noteflow"
-                  style={{ display: 'none' }}
-                  onChange={onImportVault}
+                  type="url"
+                  className="dialog-text-input"
+                  placeholder="https://.../avatar.gif"
+                  value={customGifUrl}
+                  onChange={(e) => setCustomGifUrl(e.target.value)}
                 />
-                <Button variant="secondary" size="sm" fullWidth onClick={(e) => {
-                  const input = (e.currentTarget.parentElement?.querySelector('input[type=file]') as HTMLInputElement);
-                  input?.click();
-                }}>
-                  Upload Backup File
-                </Button>
-              </label>
-            </div>
-          </div>
-
-          {/* Re-seed / Initialize Tutorial Vault */}
-          <div style={{ padding: '16px', background: 'rgba(79, 70, 229, 0.05)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <Sparkles size={16} color="var(--accent-primary)" />
-                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>
-                    Reset & Initialize Tutorial Vault
-                  </h4>
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                  Repopulates the complete curated onboarding dataset: 4 workspaces, 3 books with ordered chapters, 14 rich notes showcasing <strong>LaTeX math</strong>, <strong>Mermaid diagrams</strong>, <strong>Active Recall flashcards</strong>, <strong>Canvas sketches</strong>, and <strong>Daily journal</strong>.
-                </p>
-              </div>
-
-              {!showResetConfirm ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowResetConfirm(true)}
-                  style={{ flexShrink: 0 }}
+                  disabled={!customGifUrl.trim()}
+                  onClick={() => {
+                    setAvatarType('gif');
+                    setAvatarValue(customGifUrl.trim());
+                  }}
                 >
-                  <RotateCcw size={13} />
-                  Reset to Tutorial
+                  Apply
                 </Button>
-              ) : (
-                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    isLoading={isResetting}
-                    onClick={handleConfirmReseed}
-                  >
-                    Confirm Reset
-                  </Button>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Button variant="primary" size="sm" onClick={handleSaveProfile}>
+                <Check size={13} />
+                <span>Save Profile</span>
+              </Button>
+              {profileSaveNotice && (
+                <span style={{ fontSize: '12px', color: 'var(--color-success)' }}>
+                  ✓ Profile updated
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Live Identity Preview Card */}
+          <div className="settings-card-panel preview-center">
+            <h4 className="panel-section-title">Identity Preview</h4>
+
+            <div className="identity-preview-badge-card">
+              <div className="identity-avatar-hero">
+                {avatarType === 'emoji' ? (
+                  <span className="hero-emoji">{avatarValue || '⚡'}</span>
+                ) : (
+                  <img src={avatarValue} alt="Avatar" className="hero-avatar-img" />
+                )}
+                <button
+                  type="button"
+                  className="btn-change-photo-badge"
+                  onClick={() => photoInputRef.current?.click()}
+                  title="Upload 1:1 Photo"
+                >
+                  <Camera size={12} />
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handlePhotoUpload}
+                />
+              </div>
+
+              <span className="hero-mood-tag">
+                {AVATAR_MOODS.find((m) => m.label === selectedMood)?.emoji || '🧠'} {selectedMood}
+              </span>
+
+              <h3 className="hero-user-name">{profileName || 'Alex Mercer'}</h3>
+              <span className="hero-user-role">{profileRole || 'Systems Architect'}</span>
+
+              <p className="hero-user-bio">
+                {profileBio || 'Zero-cloud, local-first researcher & builder.'}
+              </p>
+
+              <div className="hero-actions-row">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => photoInputRef.current?.click()}
+                >
+                  Upload Photo
+                </Button>
+                {avatarType !== 'emoji' && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setShowResetConfirm(false)}
+                    onClick={() => {
+                      setAvatarType('emoji');
+                      setAvatarValue('⚡');
+                    }}
                   >
-                    Cancel
+                    Reset Emoji
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 3: Zero-Knowledge Security & Note Locking */}
-      {activeTab === 'security' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="crypto-badge-strip">
-            <Badge variant="primary" dot>AES-256-GCM</Badge>
-            <Badge variant="purple">PBKDF2 600,000x</Badge>
-            <Badge variant="success">Anti-MITM Tag</Badge>
-            <Badge variant="warning">Brute-Force Lockout</Badge>
+      {/* TAB 2: APPEARANCE & 3-WAY THEMES */}
+      {activeTab === 'appearance' && (
+        <div className="settings-card-panel" style={{ maxWidth: '640px', margin: '0 auto' }}>
+          <h4 className="panel-section-title">Theme Preferences</h4>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            Choose whether Noteflow matches your operating system appearance or stays locked to Day or Night mode.
+          </p>
+
+          <div className="theme-selector-3way">
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'system' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('system')}
+            >
+              <Monitor size={22} />
+              <div className="theme-card-text">
+                <span className="theme-card-title">System Default</span>
+                <span className="theme-card-desc">Sync with macOS / OS appearance</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'light' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('light')}
+            >
+              <Sun size={22} color="#f59e0b" />
+              <div className="theme-card-text">
+                <span className="theme-card-title">Day Theme</span>
+                <span className="theme-card-desc">Crisp white & gentle paper tones</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'dark' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('dark')}
+            >
+              <Moon size={22} color="#8b5cf6" />
+              <div className="theme-card-text">
+                <span className="theme-card-title">Night Theme</span>
+                <span className="theme-card-desc">Deep OLED slate & subtle luminescence</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: CUSTOM HOTKEYS & MOUSE CUSTOMIZATION */}
+      {activeTab === 'controls' && (
+        <div className="settings-symmetrical-grid">
+          {/* Left Column: Keyboard Shortcuts Customizer */}
+          <div className="settings-card-panel">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <h4 className="panel-section-title" style={{ margin: 0 }}>Custom Hotkeys</h4>
+              <button className="btn-small-link" onClick={handleResetHotkeys}>Reset Defaults</button>
+            </div>
+
+            <div className="hotkeys-list-container">
+              {[
+                { key: 'search', label: 'Quick Search' },
+                { key: 'newNote', label: 'New Note' },
+                { key: 'closeTab', label: 'Close Active Tab' },
+                { key: 'findReplace', label: 'Find in Note' },
+                { key: 'studyMode', label: 'Spaced Repetition' },
+                { key: 'pomodoro', label: 'Focus Pomodoro' },
+                { key: 'zenMode', label: 'Zen Mode' },
+                { key: 'settings', label: 'Open Settings' }
+              ].map((item) => {
+                const isRecording = recordingHotkeyKey === item.key;
+                const currentBinding = (hotkeys as any)[item.key];
+                return (
+                  <div key={item.key} className="hotkey-edit-row">
+                    <span className="hotkey-label">{item.label}</span>
+                    <button
+                      type="button"
+                      className={`hotkey-record-chip ${isRecording ? 'recording' : ''}`}
+                      onClick={() => setRecordingHotkeyKey(isRecording ? null : item.key)}
+                      title="Click to record new shortcut"
+                    >
+                      {isRecording ? 'Press Keys...' : shortcutManager.formatDisplayShortcut(currentBinding)}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div style={{ padding: '14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            <h4 style={{ margin: '0 0 6px 0', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Lock size={16} color="var(--color-warning)" />
-              <span>Zero-Knowledge Authenticated Encryption Status</span>
-            </h4>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
-              Currently protecting <strong>{lockedNotesCount} locked notes</strong> in this vault. Plaintext is mathematically impossible to reconstruct without your secret passphrase.
+          {/* Right Column: Mouse & Trackpad Customization */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Mouse & Navigation</h4>
+
+            <div className="form-field-row">
+              <label className="form-field-label">Double-Click Note Card Action</label>
+              <select
+                className="dialog-select-input"
+                value={mouseSettings.doubleClickAction}
+                onChange={(e) => handleUpdateMouse('doubleClickAction', e.target.value)}
+              >
+                <option value="openNewTab">Open in New Tab</option>
+                <option value="replaceTab">Replace Active Tab</option>
+                <option value="toggleFavorite">Toggle Star Favorite</option>
+              </select>
+            </div>
+
+            <div className="form-field-row">
+              <label className="form-field-label">Middle-Click on Tab</label>
+              <select
+                className="dialog-select-input"
+                value={mouseSettings.middleClickAction}
+                onChange={(e) => handleUpdateMouse('middleClickAction', e.target.value)}
+              >
+                <option value="closeTab">Close Tab</option>
+                <option value="duplicateTab">Duplicate Tab</option>
+                <option value="none">Do Nothing</option>
+              </select>
+            </div>
+
+            <div className="form-field-row">
+              <label className="form-field-label">Note Card Hover Preview</label>
+              <select
+                className="dialog-select-input"
+                value={mouseSettings.hoverPreview}
+                onChange={(e) => handleUpdateMouse('hoverPreview', e.target.value)}
+              >
+                <option value="delayed">Delayed (Smooth 300ms)</option>
+                <option value="instant">Instant Preview</option>
+                <option value="off">Disabled</option>
+              </select>
+            </div>
+
+            <div className="settings-toggle-row" style={{ marginTop: '14px' }}>
+              <div>
+                <span className="settings-toggle-title">Smooth Document Scrolling</span>
+                <span className="settings-toggle-sub">Hardware-accelerated inertia scrolling</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={mouseSettings.smoothScroll}
+                onChange={(e) => handleUpdateMouse('smoothScroll', e.target.checked)}
+                className="settings-checkbox"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: SECURITY & INACTIVITY AUTO-LOCK */}
+      {activeTab === 'security' && (
+        <div className="settings-symmetrical-grid">
+          {/* Inactivity Auto-Lock */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Inactivity Auto-Lock</h4>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Automatically secure your vault and wipe confidential memory if the workstation is left unattended.
             </p>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+            <div className="form-field-row">
+              <label className="form-field-label">Auto-Lock Inactivity Timeout</label>
+              <select
+                className="dialog-select-input"
+                value={securitySettings.autoLockMinutes}
+                onChange={(e) => handleUpdateSecurity('autoLockMinutes', Number(e.target.value))}
+              >
+                <option value={0}>Disabled (Never Auto-Lock)</option>
+                <option value={1}>1 Minute (Fast Testing)</option>
+                <option value={5}>5 Minutes</option>
+                <option value={15}>15 Minutes</option>
+                <option value={30}>30 Minutes</option>
+                <option value={60}>1 Hour</option>
+              </select>
+            </div>
+
+            <div className="form-field-row">
+              <label className="form-field-label">Lockout Action</label>
+              <select
+                className="dialog-select-input"
+                value={securitySettings.lockAction}
+                onChange={(e) => handleUpdateSecurity('lockAction', e.target.value)}
+              >
+                <option value="entireApp">Lock Entire Vault (Screen Blur Guard)</option>
+                <option value="allNotes">Lock Protected Notes Only</option>
+              </select>
+            </div>
+
+            <div className="settings-toggle-row" style={{ marginTop: '16px' }}>
               <div>
-                <span style={{ fontSize: '12px', fontWeight: 600, display: 'block', color: 'var(--text-primary)' }}>
-                  Brute-Force Rate Limiting Lockouts
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Clear cooldown lockouts if testing incorrect passphrases.
-                </span>
+                <span className="settings-toggle-title">Hardware Microphone Kill-Switch</span>
+                <span className="settings-toggle-sub">Disallow audio memos completely</span>
               </div>
               <Button
-                variant="outline"
+                variant={isMicEnabled ? 'outline' : 'danger'}
                 size="sm"
-                onClick={handleClearAllLockouts}
+                onClick={() => onToggleMic(!isMicEnabled)}
               >
-                {clearedLockouts ? '✓ Cleared!' : 'Clear Lockouts'}
+                {isMicEnabled ? <Mic size={12} /> : <MicOff size={12} />}
+                <span>{isMicEnabled ? 'Mic Allowed' : 'Mic Blocked'}</span>
               </Button>
             </div>
           </div>
 
-          {/* Privacy & Microphone Kill-Switch */}
-          <div className="privacy-toggle-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div className={`privacy-icon-box ${isMicEnabled ? 'enabled' : 'disabled'}`} style={{ width: '36px', height: '36px', borderRadius: '50%', background: isMicEnabled ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {isMicEnabled ? <Mic size={18} color="var(--color-success)" /> : <MicOff size={18} color="var(--color-danger)" />}
+          {/* Zero-Knowledge Status */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Cryptographic Guarantees</h4>
+
+            <div className="security-spec-card">
+              <div className="sec-spec-row">
+                <span className="sec-spec-lbl">Encryption Algorithm</span>
+                <span className="sec-spec-val">AES-256-GCM AEAD</span>
               </div>
-              <div>
-                <span style={{ fontWeight: 600, fontSize: '13px', display: 'block', color: 'var(--text-primary)' }}>
-                  Microphone Hardware Kill-Switch
-                </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {isMicEnabled ? 'Microphone active in editor' : 'Microphone completely detached & disabled'}
-                </span>
+              <div className="sec-spec-row">
+                <span className="sec-spec-lbl">Key Derivation</span>
+                <span className="sec-spec-val">PBKDF2-SHA256 (600,000x)</span>
+              </div>
+              <div className="sec-spec-row">
+                <span className="sec-spec-lbl">MITM Protection</span>
+                <span className="sec-spec-val">AAD Note-ID Binding</span>
+              </div>
+              <div className="sec-spec-row">
+                <span className="sec-spec-lbl">Currently Locked Notes</span>
+                <span className="sec-spec-val">{lockedNotesCount}</span>
               </div>
             </div>
 
-            <label className="switch-toggle">
+            <div style={{ marginTop: '16px' }}>
+              <div className="settings-toggle-row">
+                <div>
+                  <span className="settings-toggle-title">Active Failed Lockouts</span>
+                  <span className="settings-toggle-sub">{lockoutCount} note(s) on exponential backoff</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    lockoutManager.clearAllLockouts();
+                    setLockoutCount(0);
+                    setShowClearSuccess(true);
+                    setTimeout(() => setShowClearSuccess(false), 3000);
+                  }}
+                >
+                  {showClearSuccess ? '✓ Cleared' : 'Reset Cooldowns'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: BACKUP, RESTORE & TUTORIAL RESET */}
+      {activeTab === 'backup' && (
+        <div className="settings-symmetrical-grid">
+          {/* Backup & Restore */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Vault Backup & Sync</h4>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Export full database backups with zero external cloud dependencies.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <Button variant="outline" size="md" onClick={onExportVault}>
+                <Download size={14} />
+                <span>Export Entire Vault (.noteflow)</span>
+              </Button>
+
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={14} />
+                <span>Restore Vault from Backup File</span>
+              </Button>
               <input
-                type="checkbox"
-                checked={isMicEnabled}
-                onChange={(e) => onToggleMic(e.target.checked)}
-              />
-              <span className="slider-round" />
-            </label>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: Interactive Tutorial & Keyboard Shortcuts */}
-      {activeTab === 'tutorial' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'rgba(79, 70, 229, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(79, 70, 229, 0.2)' }}>
-            <div>
-              <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text-primary)' }}>
-                Welcome to Noteflow Master Guide
-              </h4>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
-                Interactive tutorial note with Wikilinks, KaTeX formulas, and diagrams.
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                onClose();
-                onSelectNote('n-welcome');
-              }}
-            >
-              <BookOpen size={13} />
-              Open Tutorial Note
-            </Button>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <h4 style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>
-              Essential Keyboard Shortcuts
-            </h4>
-            <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg-subtle)', textAlign: 'left' }}>
-                  <th style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Shortcut</th>
-                  <th style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>Cmd + K</td>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Global fuzzy search across all notes & tags</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>Cmd + N</td>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Create a new note</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>Cmd + W</td>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Close active note tab</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>Cmd + F</td>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Find & replace within note</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>Space / Enter</td>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Flip card in <strong>Study Mode</strong></td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontFamily: 'var(--font-mono)' }}>1, 2, 3, 4</td>
-                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>Rate flashcard difficulty (Again, Hard, Good, Easy)</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px 12px', fontFamily: 'var(--font-mono)' }}>/</td>
-                  <td style={{ padding: '8px 12px' }}>Summon Slash Commands menu (headings, tables, callouts)</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 5: Storage & Quota */}
-      {activeTab === 'storage' && storageHealth && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="storage-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-            <div className="storage-card" style={{ padding: '12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Used Storage</span>
-              <strong style={{ fontSize: '18px', display: 'block', color: 'var(--text-primary)', marginTop: '2px' }}>
-                {optimizer.formatBytes(storageHealth.usageBytes)}
-              </strong>
-            </div>
-            <div className="storage-card" style={{ padding: '12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Media & Sketches</span>
-              <strong style={{ fontSize: '18px', display: 'block', color: 'var(--color-purple)', marginTop: '2px' }}>
-                {optimizer.formatBytes(storageHealth.mediaBytes)}
-              </strong>
-            </div>
-            <div className="storage-card" style={{ padding: '12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Text & Markdown</span>
-              <strong style={{ fontSize: '18px', display: 'block', color: 'var(--accent-primary)', marginTop: '2px' }}>
-                {optimizer.formatBytes(storageHealth.textBytes)}
-              </strong>
-            </div>
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-              <span>Browser Storage Quota</span>
-              <span>{storageHealth.usagePercent.toFixed(2)}% of {optimizer.formatBytes(storageHealth.quotaBytes)}</span>
-            </div>
-            <div className="storage-progress-bar" style={{ height: '6px', background: 'var(--bg-subtle)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div 
-                className="storage-progress-fill" 
-                style={{ height: '100%', background: 'var(--accent-primary)', width: `${Math.max(1, Math.min(100, storageHealth.usagePercent))}%` }} 
+                ref={fileInputRef}
+                type="file"
+                accept=".noteflow,.json"
+                style={{ display: 'none' }}
+                onChange={onImportVault}
               />
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-            <div>
-              <span style={{ fontWeight: 600, fontSize: '13px', display: 'block', color: 'var(--text-primary)' }}>
-                1-Click Cache Optimizer
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Prune orphaned preview blobs and compress local indices
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              isLoading={isCleaning}
-              onClick={handleCleanStorage}
-            >
-              {cleanSuccess ? '✓ Cleaned!' : 'Clean Cache'}
-            </Button>
+          {/* Reset & Initialize Tutorial Vault */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Tutorial & Factory Reset</h4>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Reset vault to the comprehensive interactive tutorial dataset (4 workspaces, 3 books with chapters, LaTeX math, diagrams, drawing vector sketches, and flashcards).
+            </p>
+
+            {!showResetConfirm ? (
+              <Button
+                variant="danger"
+                size="md"
+                onClick={() => setShowResetConfirm(true)}
+              >
+                <RotateCcw size={14} />
+                <span>Reset to Curated Tutorial Vault</span>
+              </Button>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button
+                  variant="danger"
+                  size="md"
+                  isLoading={isResetting}
+                  onClick={handleConfirmReseed}
+                >
+                  Confirm Reset
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="md"
+                  onClick={() => setShowResetConfirm(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* TAB 6: Zero-Cloud QR Beam */}
-      {activeTab === 'transfer' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label className="ui-form-label" style={{ margin: 0 }}>Beam Note via QR:</label>
-            <select
-              className="ui-input"
-              value={qrNoteId}
-              onChange={(e) => setQrNoteId(e.target.value)}
-              style={{ flex: 1 }}
-            >
-              {allNotes.filter((n) => !n.isTrashed && !n.isLocked).map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.title || 'Untitled Note'}
-                </option>
-              ))}
-            </select>
+      {/* TAB 6: DIAGNOSTICS & OFFLINE BEAM */}
+      {activeTab === 'diagnostics' && (
+        <div className="settings-symmetrical-grid">
+          {/* Storage Diagnostics */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">Storage Quota Diagnostics</h4>
+            {health && (
+              <>
+                <div className="storage-meter-track" style={{ margin: '14px 0 8px 0' }}>
+                  <div
+                    className="storage-meter-fill"
+                    style={{ width: `${Math.min(Math.round(health.usagePercent), 100)}%` }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <span>{optimizer.formatBytes(health.usageBytes)} used</span>
+                  <span>{Math.round(health.usagePercent)}% of browser capacity</span>
+                </div>
+
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: '13px', display: 'block' }}>Cache Optimizer</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Prune orphaned preview blobs</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    isLoading={isCleaning}
+                    onClick={handleCleanStorage}
+                  >
+                    {cleanSuccess ? '✓ Cleaned!' : 'Clean Cache'}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
 
-          {selectedQrNote && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                  JSON.stringify({
-                    title: selectedQrNote.title,
-                    content: selectedQrNote.content.slice(0, 800)
-                  })
-                )}`}
-                alt="QR Code"
-                style={{ borderRadius: '8px', border: '1px solid var(--border-color)', background: '#ffffff', padding: '8px' }}
-              />
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                Scan with mobile camera to import note without internet
+          {/* Offline QR Beam */}
+          <div className="settings-card-panel preview-center">
+            <h4 className="panel-section-title">Zero-Cloud QR Beam</h4>
+            <div className="qr-beam-box">
+              <div className="qr-code-placeholder">
+                <QrCode size={90} color="var(--text-primary)" />
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 600, marginTop: '8px' }}>
+                Offline Device Transfer
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Scan with mobile camera to beam selected notes without server uplink.
               </span>
             </div>
-          )}
+          </div>
         </div>
       )}
     </Modal>

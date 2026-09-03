@@ -9,19 +9,23 @@ import {
   Menu,
   GraduationCap,
   Timer,
-  Settings
+  Settings,
+  Brain,
+  Monitor
 } from 'lucide-react';
-import type { ThemeMode, Workspace, PomodoroMode } from '../types';
+import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
 
 interface HeaderProps {
   theme: ThemeMode;
   activeWorkspace?: Workspace;
+  userProfile?: UserProfile;
   pomodoroSecondsLeft?: number;
   isPomodoroRunning?: boolean;
   pomodoroMode?: PomodoroMode;
   onToggleTheme: () => void;
   onOpenSearch: () => void;
   onOpenKnowledgeBase: () => void;
+  onOpenInternalMind?: () => void;
   onOpenLinkTree: () => void;
   onOpenProfile: () => void;
   onOpenSettings?: () => void;
@@ -33,12 +37,14 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   theme,
   activeWorkspace,
+  userProfile,
   pomodoroSecondsLeft,
   isPomodoroRunning,
   pomodoroMode,
   onToggleTheme,
   onOpenSearch,
   onOpenKnowledgeBase,
+  onOpenInternalMind,
   onOpenLinkTree,
   onOpenProfile,
   onOpenSettings,
@@ -125,6 +131,18 @@ export const Header: React.FC<HeaderProps> = ({
           <span>Knowledge Base</span>
         </button>
 
+        {/* Internal Mind Lexicon Dictionary Button */}
+        {onOpenInternalMind && (
+          <button 
+            className="header-btn highlight-mind"
+            onClick={onOpenInternalMind}
+            title="Internal Mind: Autonomous Lexicon & Word Frequency Dictionary"
+          >
+            <Brain size={15} color="var(--color-purple)" />
+            <span>Mind</span>
+          </button>
+        )}
+
         {/* Link Tree Button */}
         <button 
           className="header-btn"
@@ -135,14 +153,26 @@ export const Header: React.FC<HeaderProps> = ({
           <span>Link Tree</span>
         </button>
 
-        {/* Day / Night Theme Toggle */}
+        {/* 3-Way Theme Toggle: System -> Day -> Night */}
         <button 
           className="theme-toggle-btn"
           onClick={onToggleTheme}
-          title={theme === 'dark' ? 'Switch to Day Theme' : 'Switch to Night Theme'}
-          aria-label="Toggle Day and Night Theme"
+          title={
+            theme === 'system'
+              ? 'Theme: System Default (Click for Day Theme)'
+              : theme === 'light'
+              ? 'Theme: Day (Click for Night Theme)'
+              : 'Theme: Night (Click for System Default)'
+          }
+          aria-label="Toggle Theme"
         >
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          {theme === 'system' ? (
+            <Monitor size={16} />
+          ) : theme === 'light' ? (
+            <Sun size={16} color="#f59e0b" />
+          ) : (
+            <Moon size={16} color="#8b5cf6" />
+          )}
         </button>
 
         {/* Settings & Vault Hub Button */}
@@ -159,10 +189,22 @@ export const Header: React.FC<HeaderProps> = ({
         <button 
           className="header-profile-btn"
           onClick={onOpenProfile}
-          title={`Persona: ${activeWorkspace?.name || 'Personal Vault'} (Click for Settings, Privacy & Storage)`}
+          title={`Profile: ${userProfile?.name || activeWorkspace?.name || 'Personal'} (Click for Settings)`}
         >
-          <span style={{ fontSize: '15px' }}>{activeWorkspace?.icon || '🏠'}</span>
-          <span className="header-profile-name">{activeWorkspace?.name || 'Personal'}</span>
+          {userProfile?.avatarType === 'image' || userProfile?.avatarType === 'gif' ? (
+            <img
+              src={userProfile.avatarValue}
+              alt="Avatar"
+              className="header-avatar-mini"
+            />
+          ) : (
+            <span style={{ fontSize: '15px' }}>
+              {userProfile?.avatarValue || activeWorkspace?.icon || '⚡'}
+            </span>
+          )}
+          <span className="header-profile-name">
+            {userProfile?.name || activeWorkspace?.name || 'Personal'}
+          </span>
         </button>
       </div>
     </header>

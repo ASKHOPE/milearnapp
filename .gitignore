@@ -1,6 +1,7 @@
 # Build Output
 dist/
 dist-ssr/
+.vite/
 
 # Node / Bun
 node_modules/

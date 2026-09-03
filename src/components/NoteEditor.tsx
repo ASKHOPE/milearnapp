@@ -42,7 +42,12 @@ import {
   ChevronDown,
   Archive,
   RotateCcw,
-  BookOpen
+  BookOpen,
+  Lock,
+  Unlock,
+  KeyRound,
+  Sigma,
+  GitBranch
 } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -54,6 +59,10 @@ import { FindReplaceBar } from './FindReplaceBar';
 import { DrawingCanvasModal } from './DrawingCanvasModal';
 import { ExportModal } from './ExportModal';
 import { BookPageNavigator } from './BookPageNavigator';
+import { MathRenderer } from './MathRenderer';
+import { MermaidRenderer } from './MermaidRenderer';
+import { LockNoteModal } from './LockNoteModal';
+import { Button } from './ui/Button';
 import { NOTE_TEMPLATES } from '../services/templates';
 
 interface NoteEditorProps {
@@ -111,6 +120,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [isOutlineOpen, setIsOutlineOpen] = useState(false);
   const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isCryptoModalOpen, setIsCryptoModalOpen] = useState(false);
+  const [cryptoModalMode, setCryptoModalMode] = useState<'lock' | 'unlock'>('lock');
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
   // Suggestions state (Slash command & Wiki-link)
@@ -453,7 +464,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     const elements: React.ReactNode[] = [];
 
     const parseInlineSpans = (str: string) => {
-      const parts = str.split(/(\[\[.*?\]\])/g);
+      const parts = str.split(/(\[\[.*?\]\]|\$[^$]+\$)/g);
       return parts.map((part, i) => {
         if (part.startsWith('[[') && part.endsWith(']]')) {
           const targetTitle = part.slice(2, -2).trim();
@@ -468,6 +479,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               <span>{targetTitle}</span>
             </button>
           );
+        }
+        if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+          const mathExpr = part.slice(1, -1);
+          return <MathRenderer key={i} math={mathExpr} />;
         }
         return <span key={i}>{part}</span>;
       });
@@ -541,24 +556,35 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           const blockId = `code-block-${index}`;
           const isCopied = copiedCodeId === blockId;
 
-          elements.push(
-            <div key={blockId} className="code-block-container">
-              <div className="code-block-header">
-                <span>{codeLanguage || 'code'}</span>
-                <button 
-                  className="btn-copy-code"
-                  onClick={() => handleCopyCode(codeText, blockId)}
-                  title="Copy code to clipboard"
-                >
-                  {isCopied ? <Check size={12} color="var(--color-success)" /> : <Copy size={12} />}
-                  <span>{isCopied ? 'Copied!' : 'Copy'}</span>
-                </button>
+          // Mermaid Diagram
+          if (codeLanguage === 'mermaid') {
+            elements.push(
+              <MermaidRenderer key={blockId} chart={codeText} id={blockId} />
+            );
+          } else if (codeLanguage === 'math' || codeLanguage === 'latex') {
+            elements.push(
+              <MathRenderer key={blockId} math={codeText} block />
+            );
+          } else {
+            elements.push(
+              <div key={blockId} className="code-block-container">
+                <div className="code-block-header">
+                  <span>{codeLanguage || 'code'}</span>
+                  <button 
+                    className="btn-copy-code"
+                    onClick={() => handleCopyCode(codeText, blockId)}
+                    title="Copy code to clipboard"
+                  >
+                    {isCopied ? <Check size={12} color="var(--color-success)" /> : <Copy size={12} />}
+                    <span>{isCopied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+                <pre style={{ margin: 0, padding: '12px 14px' }}>
+                  <code>{codeText}</code>
+                </pre>
               </div>
-              <pre style={{ margin: 0, padding: '12px 14px' }}>
-                <code>{codeText}</code>
-              </pre>
-            </div>
-          );
+            );
+          }
           codeBuffer = [];
           insideCodeBlock = false;
         } else {
@@ -570,6 +596,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
       if (insideCodeBlock) {
         codeBuffer.push(line);
+        return;
+      }
+
+      // Standalone Block Math ($$ ... $$)
+      if (line.startsWith('$$') && line.endsWith('$$') && line.length > 4) {
+        elements.push(
+          <MathRenderer key={`math-block-${index}`} math={line.slice(2, -2)} block />
+        );
         return;
       }
 
@@ -856,6 +890,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             <Star size={16} fill={note.isFavorite ? '#f59e0b' : 'none'} />
           </button>
 
+          {/* Zero-Knowledge Note Lock / Unlock */}
+          <button
+            className={`editor-icon-btn ${note.isLocked ? 'active-lock' : ''}`}
+            onClick={() => {
+              setCryptoModalMode(note.isLocked ? 'unlock' : 'lock');
+              setIsCryptoModalOpen(true);
+            }}
+            disabled={note.isTrashed}
+            title={note.isLocked ? 'Unlock Encrypted Note (AES-256-GCM)' : 'Encrypt & Lock Note (AES-256-GCM)'}
+          >
+            {note.isLocked ? <Lock size={16} color="var(--color-warning)" /> : <KeyRound size={16} />}
+          </button>
+
           {/* Delete to Trash Button */}
           <button
             className="editor-icon-btn danger"
@@ -907,6 +954,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <button className="toolbar-btn" onClick={() => insertFormatting('[[', ']]')} disabled={note.isTrashed} title="Link to Note [[Wiki]]">
           <Link size={14} />
           <span>[[Link]]</span>
+        </button>
+        <button className="toolbar-btn" onClick={() => insertFormatting('$$ ', ' $$')} disabled={note.isTrashed} title="LaTeX Math Formula ($$)">
+          <Sigma size={14} />
+          <span>Math</span>
+        </button>
+        <button className="toolbar-btn" onClick={() => insertFormatting('```mermaid\nflowchart TD\n  A[Start] --> B(Task)\n  B --> C{Decision}\n  C -->|Yes| D[Done]\n  C -->|No| B\n```\n')} disabled={note.isTrashed} title="Insert Mermaid Diagram">
+          <GitBranch size={14} />
+          <span>Diagram</span>
         </button>
 
         {/* Templates Dropdown Button */}
@@ -1036,8 +1091,49 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         />
       )}
 
-      {/* Main Canvas Area: Single View or Side-by-Side Split View */}
-      {mode === 'split' ? (
+      {/* Main Canvas Area: Locked State OR Single View OR Side-by-Side Split View */}
+      {note.isLocked ? (
+        <div className="locked-note-view">
+          <div className="locked-note-card">
+            <div className="locked-note-shield">
+              <Lock size={44} color="var(--color-warning)" />
+            </div>
+            <h2>Protected Note</h2>
+            <p className="locked-note-desc">
+              This note is encrypted with zero-knowledge <strong>AES-256-GCM</strong> authenticated encryption.
+              Plaintext is withheld from persistent storage until unlocked with your passphrase.
+            </p>
+
+            {note.encryptedData?.hint && (
+              <div className="locked-note-hint">
+                <span>Hint: <strong>{note.encryptedData.hint}</strong></span>
+              </div>
+            )}
+
+            <div className="locked-note-actions">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => {
+                  setCryptoModalMode('unlock');
+                  setIsCryptoModalOpen(true);
+                }}
+                leftIcon={<Unlock size={18} />}
+              >
+                Unlock Note
+              </Button>
+            </div>
+
+            <div className="locked-note-specs">
+              <span>PBKDF2-SHA256 (600K iterations)</span>
+              <span>•</span>
+              <span>AES-256-GCM AEAD Tag</span>
+              <span>•</span>
+              <span>Anti-MITM Bound</span>
+            </div>
+          </div>
+        </div>
+      ) : mode === 'split' ? (
         <div className="split-view-container">
           {/* Left Pane: Raw Markdown Editor */}
           <div className="split-pane-editor">
@@ -1185,6 +1281,40 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           )}
         </div>
       )}
+
+      {/* Zero-Knowledge Note Encryption / Unlock Modal */}
+      <LockNoteModal
+        isOpen={isCryptoModalOpen}
+        note={note}
+        mode={cryptoModalMode}
+        onClose={() => setIsCryptoModalOpen(false)}
+        onLockSuccess={(payload) => {
+          onUpdateNote({
+            ...note,
+            isLocked: true,
+            encryptedData: payload,
+            content: '', // wipes plaintext from storage
+            updatedAt: new Date().toISOString()
+          });
+        }}
+        onUnlockSuccess={(decryptedContent) => {
+          onUpdateNote({
+            ...note,
+            isLocked: false,
+            content: decryptedContent,
+            updatedAt: new Date().toISOString()
+          });
+        }}
+        onRemoveLock={() => {
+          onUpdateNote({
+            ...note,
+            isLocked: false,
+            encryptedData: null,
+            updatedAt: new Date().toISOString()
+          });
+          setIsCryptoModalOpen(false);
+        }}
+      />
     </main>
   );
 };

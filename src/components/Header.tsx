@@ -6,29 +6,44 @@ import {
   GitFork, 
   Sun, 
   Moon, 
-  Menu
+  Menu,
+  GraduationCap,
+  Timer,
+  Settings
 } from 'lucide-react';
-import type { ThemeMode, Workspace } from '../types';
+import type { ThemeMode, Workspace, PomodoroMode } from '../types';
 
 interface HeaderProps {
   theme: ThemeMode;
   activeWorkspace?: Workspace;
+  pomodoroSecondsLeft?: number;
+  isPomodoroRunning?: boolean;
+  pomodoroMode?: PomodoroMode;
   onToggleTheme: () => void;
   onOpenSearch: () => void;
   onOpenKnowledgeBase: () => void;
   onOpenLinkTree: () => void;
   onOpenProfile: () => void;
+  onOpenSettings?: () => void;
+  onOpenStudyMode: () => void;
+  onOpenPomodoro: () => void;
   onToggleMobileSidebar: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   theme,
   activeWorkspace,
+  pomodoroSecondsLeft,
+  isPomodoroRunning,
+  pomodoroMode,
   onToggleTheme,
   onOpenSearch,
   onOpenKnowledgeBase,
   onOpenLinkTree,
   onOpenProfile,
+  onOpenSettings,
+  onOpenStudyMode,
+  onOpenPomodoro,
   onToggleMobileSidebar
 }) => {
   return (
@@ -74,8 +89,32 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Knowledge Base Button, Link Tree Button, Day/Night Theme */}
+      {/* Right: Study Mode, Focus Pomodoro, Knowledge Base, Link Tree, Day/Night Theme */}
       <div className="header-right">
+        {/* Pomodoro Focus Chip */}
+        <button
+          className={`header-pomo-btn ${isPomodoroRunning ? 'running' : ''}`}
+          onClick={onOpenPomodoro}
+          title={`Focus Pomodoro (${pomodoroMode || 'work'}) & Ambient Soundscapes`}
+        >
+          <Timer size={14} />
+          <span>
+            {pomodoroSecondsLeft !== undefined
+              ? `${Math.floor(pomodoroSecondsLeft / 60).toString().padStart(2, '0')}:${(pomodoroSecondsLeft % 60).toString().padStart(2, '0')}`
+              : '25:00'}
+          </span>
+        </button>
+
+        {/* Study Cards Button */}
+        <button 
+          className="header-btn highlight-study"
+          onClick={onOpenStudyMode}
+          title="Interactive Flashcards & Spaced Repetition (Study Mode)"
+        >
+          <GraduationCap size={15} />
+          <span>Study Cards</span>
+        </button>
+
         {/* Knowledge Base Button */}
         <button 
           className="header-btn highlight"
@@ -104,6 +143,16 @@ export const Header: React.FC<HeaderProps> = ({
           aria-label="Toggle Day and Night Theme"
         >
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
+
+        {/* Settings & Vault Hub Button */}
+        <button 
+          className="header-btn"
+          onClick={onOpenSettings || onOpenProfile}
+          title="Settings, Vault Backup & Tutorial"
+        >
+          <Settings size={15} />
+          <span>Settings</span>
         </button>
 
         {/* Local Persona / Profile Settings Button */}

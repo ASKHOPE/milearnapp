@@ -31,6 +31,15 @@ export interface Book {
   createdAt: string;
 }
 
+export interface EncryptedPayload {
+  salt: string;       // Base64 16-byte salt
+  iv: string;         // Base64 12-byte IV
+  ciphertext: string; // Base64 ciphertext with AES-GCM tag
+  hint?: string;      // Optional reminder
+  algorithm: 'AES-GCM-256';
+  kdf: 'PBKDF2-SHA256-600K';
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -49,6 +58,8 @@ export interface Note {
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
+  isLocked?: boolean;
+  encryptedData?: EncryptedPayload | null;
 }
 
 export interface Folder {
@@ -82,4 +93,38 @@ export interface GraphLink {
   source: string;
   target: string;
   type: 'wikilink' | 'folder';
+}
+
+// --- Flashcard & Spaced Repetition Types (SM-2) ---
+export interface Flashcard {
+  id: string;
+  noteId: string;
+  noteTitle: string;
+  question: string;
+  answer: string;
+  type: 'qa' | 'concept' | 'cloze' | 'cornell';
+  repetition: number;
+  interval: number; // in days
+  easeFactor: number; // default 2.5
+  nextReviewDate: string; // YYYY-MM-DD
+  lastReviewed?: string;
+  gradeHistory?: { date: string; grade: number }[];
+}
+
+// --- Pomodoro & Ambient Sound Types ---
+export type PomodoroMode = 'work' | 'shortBreak' | 'longBreak';
+
+export interface PomodoroSettings {
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
+  longBreakInterval: number;
+}
+
+export interface AmbientSoundTrack {
+  id: 'rain' | 'waves' | 'fireplace' | 'binaural' | 'brownNoise';
+  name: string;
+  icon: string;
+  isPlaying: boolean;
+  volume: number; // 0 to 1
 }

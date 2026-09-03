@@ -29,195 +29,15 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-// Starter Workspaces
-const SAMPLE_WORKSPACES: Workspace[] = [
-  {
-    id: 'ws-personal',
-    name: 'Personal Vault',
-    icon: '🏠',
-    color: '#4f46e5',
-    description: 'Personal journal, goals, reading notes, and daily life',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'ws-work',
-    name: 'Work & Startup',
-    icon: '💼',
-    color: '#0ea5e9',
-    description: 'Engineering specs, sprint planning, and architecture',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'ws-creative',
-    name: 'Creative Studio',
-    icon: '🎨',
-    color: '#8b5cf6',
-    description: 'Design inspirations, hand sketches, and brainstorms',
-    createdAt: new Date().toISOString()
-  }
-];
+// Import Rich Seed Dataset
+import {
+  SAMPLE_WORKSPACES,
+  SAMPLE_BOOKS,
+  SAMPLE_FOLDERS,
+  SAMPLE_NOTES
+} from './seedData';
 
-// Starter Books
-const SAMPLE_BOOKS: Book[] = [
-  {
-    id: 'book-architecture',
-    workspaceId: 'ws-work',
-    title: 'Modern Software Architecture',
-    icon: '📖',
-    color: '#0ea5e9',
-    description: 'Guide to local-first architecture and performance patterns',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'book-journal',
-    workspaceId: 'ws-personal',
-    title: 'Life Journal 2026',
-    icon: '📓',
-    color: '#10b981',
-    description: 'Daily reflections, milestones, and habit tracker',
-    createdAt: new Date().toISOString()
-  }
-];
-
-// Starter Folders
-const SAMPLE_FOLDERS: Folder[] = [
-  {
-    id: 'f-work',
-    workspaceId: 'ws-work',
-    name: 'Work & Projects',
-    parentId: null,
-    color: '#4f46e5',
-    icon: 'briefcase',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'f-research',
-    workspaceId: 'ws-work',
-    name: 'AI Research',
-    parentId: 'f-work',
-    color: '#0ea5e9',
-    icon: 'cpu',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'f-personal',
-    workspaceId: 'ws-personal',
-    name: 'Personal & Life',
-    parentId: null,
-    color: '#10b981',
-    icon: 'smile',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'f-ideas',
-    workspaceId: 'ws-personal',
-    name: 'Ideas & Innovation',
-    parentId: null,
-    color: '#f59e0b',
-    icon: 'lightbulb',
-    createdAt: new Date().toISOString()
-  }
-];
-
-// Starter Notes
-const SAMPLE_NOTES: Note[] = [
-  {
-    id: 'n-welcome',
-    workspaceId: 'ws-personal',
-    title: 'Welcome to Noteflow ⚡',
-    folderId: 'f-personal',
-    bookId: null,
-    parentPageId: null,
-    pageOrder: 1,
-    tags: ['welcome', 'guide', 'features'],
-    isFavorite: true,
-    isPinned: true,
-    isArchived: false,
-    isTrashed: false,
-    content: `# Welcome to Noteflow ⚡
-
-Noteflow is a local-first, privacy-respecting power note taking system built for Mac, iOS, and Web.
-
-### 🌟 Key Power Features
-- **Workspaces & Personas**: Switch between **Personal**, **Work**, and **Creative** spaces seamlessly.
-- **Books & Pages**: Organize your thinking into structured books with ordered chapters and page-turn reader navigation.
-- **Archive & Trash Bin**: Soft-delete items to the Trash Bin with 1-click restore or empty trash.
-- **Omni-Format Export**: Export to PDF, Apple-grade Social PNG Cards, Standalone HTML, Markdown, and Plain Text.
-- **Microphone Privacy**: Complete toggle to enable or disable audio features.
-- **Infinite Knowledge Graph**: Zoom from a macro 5% galaxy overview to a 3000% micro card view.
-- **Apple Sketchpad**: Draw freehand diagrams with stylus, touch, or mouse.
-
-> [!TIP]
-> Try typing \`/\` on an empty line for quick commands, or \`[[\` to link notes together!`,
-    attachments: [],
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'n-book-page-1',
-    workspaceId: 'ws-work',
-    title: 'Chapter 1: Local-First Foundations',
-    folderId: 'f-work',
-    bookId: 'book-architecture',
-    parentPageId: null,
-    pageOrder: 1,
-    tags: ['book', 'architecture', 'local-first'],
-    isFavorite: true,
-    isPinned: false,
-    isArchived: false,
-    isTrashed: false,
-    content: `# Chapter 1: Local-First Foundations
-**Book**: [[Modern Software Architecture]] • **Page 1 of 2**
-
-### 🏛️ The Seven Ideals of Local-First Software
-1. **No spinners**: Your work at your fingertips with zero network latency.
-2. **Your work is not trapped on one device**: Seamless sync across personal hardware.
-3. **The network is optional**: Full functionality offline on trains or airplanes.
-4. **Seamless collaboration**: Conflict-free resolution.
-5. **Long-term data preservation**: Transparent formats (IndexedDB, Markdown, JSON).
-6. **Security and privacy by default**: Zero cloud requirement.
-7. **Ultimate user agency**: You own your files completely.
-
-> [!NOTE]
-> All Noteflow data is stored directly on your machine in IndexedDB.`,
-    attachments: [],
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'n-book-page-2',
-    workspaceId: 'ws-work',
-    title: 'Chapter 2: Storage & Compression Strategies',
-    folderId: 'f-work',
-    bookId: 'book-architecture',
-    parentPageId: null,
-    pageOrder: 2,
-    tags: ['book', 'storage', 'webp'],
-    isFavorite: false,
-    isPinned: false,
-    isArchived: false,
-    isTrashed: false,
-    content: `# Chapter 2: Storage & Compression Strategies
-**Book**: [[Modern Software Architecture]] • **Page 2 of 2**
-
-### 📦 Client-Side Canvas WebP Pipeline
-When users attach diagrams, photos, or sketches, we process them client-side:
-\`\`\`typescript
-const webpUrl = canvas.toDataURL('image/webp', 0.82);
-\`\`\`
-
-### 📊 Benchmark Results
-- **PNG Original**: 3.2 MB
-- **WebP Optimized**: 240 KB (**92.5% reduction**)
-- **Decode Speed**: < 12ms in browser memory
-
-> [!TIP]
-> Use the "Storage & Health" panel in Settings to view your browser quota!`,
-    attachments: [],
-    createdAt: new Date(Date.now() - 3600000 * 6).toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
+export { SAMPLE_WORKSPACES, SAMPLE_BOOKS, SAMPLE_FOLDERS, SAMPLE_NOTES };
 
 export const storage = {
   async init(): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
@@ -293,6 +113,41 @@ export const storage = {
     }
 
     return { notes, folders, workspaces, books };
+  },
+
+  /**
+   * Resets and re-seeds the entire database with the full interactive tutorial dataset
+   */
+  async reseedTutorialVault(): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
+    const db = await openDB();
+    const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
+
+    const wsStore = tx.objectStore('workspaces');
+    const bStore = tx.objectStore('books');
+    const fStore = tx.objectStore('folders');
+    const nStore = tx.objectStore('notes');
+
+    wsStore.clear();
+    bStore.clear();
+    fStore.clear();
+    nStore.clear();
+
+    for (const ws of SAMPLE_WORKSPACES) wsStore.put(ws);
+    for (const b of SAMPLE_BOOKS) bStore.put(b);
+    for (const f of SAMPLE_FOLDERS) fStore.put(f);
+    for (const n of SAMPLE_NOTES) nStore.put(n);
+
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+    return {
+      workspaces: [...SAMPLE_WORKSPACES],
+      books: [...SAMPLE_BOOKS],
+      folders: [...SAMPLE_FOLDERS],
+      notes: [...SAMPLE_NOTES]
+    };
   },
 
   // --- Workspaces ---

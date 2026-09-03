@@ -14,7 +14,8 @@ import {
   Folder as FolderIcon,
   Music,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  Lock
 } from 'lucide-react';
 
 interface NoteListProps {
@@ -258,6 +259,11 @@ export const NoteList: React.FC<NoteListProps> = ({
                 <div className="card-top-row">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
                     {note.isPinned && <Pin size={12} className="card-pin-icon" />}
+                    {note.isLocked && (
+                      <span title="Encrypted with AES-256-GCM" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <Lock size={12} color="var(--color-warning)" />
+                      </span>
+                    )}
                     <span className="card-title">{note.title || 'Untitled Note'}</span>
                   </div>
 
@@ -289,7 +295,7 @@ export const NoteList: React.FC<NoteListProps> = ({
 
                 {/* Content Snippet */}
                 <p className="card-snippet">
-                  {snippet || 'Empty note...'}
+                  {note.isLocked ? '🔒 Encrypted (AES-256-GCM authenticated)' : snippet || 'Empty note...'}
                 </p>
 
                 {/* Footer Metadata */}

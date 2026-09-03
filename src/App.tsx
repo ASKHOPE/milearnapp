@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Note, Folder, ViewFilter, ThemeMode, Workspace, Book } from './types';
+import type { Note, Folder, ViewFilter, ThemeMode, Workspace, Book, PomodoroMode } from './types';
 import { storage } from './services/storage';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -8,7 +8,9 @@ import { NoteEditor } from './components/NoteEditor';
 import { KnowledgeBaseModal } from './components/KnowledgeBaseModal';
 import { FolderLinkTreeModal } from './components/FolderLinkTreeModal';
 import { SearchModal } from './components/SearchModal';
-import { LocalProfileModal } from './components/LocalProfileModal';
+import { SettingsModal } from './components/SettingsModal';
+import { StudyModeModal } from './components/StudyModeModal';
+import { FocusPomodoroModal } from './components/FocusPomodoroModal';
 import { NOTE_TEMPLATES } from './services/templates';
 import './styles/main.css';
 
@@ -27,13 +29,18 @@ export const App: React.FC = () => {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
-  // Modals & Privacy
+  // Modals, Study & Focus
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
   const [isLinkTreeOpen, setIsLinkTreeOpen] = useState(false);
-  const [isLocalProfileOpen, setIsLocalProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isStudyModeOpen, setIsStudyModeOpen] = useState(false);
+  const [isPomodoroOpen, setIsPomodoroOpen] = useState(false);
+  const [pomodoroSecondsLeft, setPomodoroSecondsLeft] = useState(25 * 60);
+  const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
+  const [pomodoroMode, setPomodoroMode] = useState<PomodoroMode>('work');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +105,9 @@ export const App: React.FC = () => {
         setIsSearchOpen(false);
         setIsKnowledgeBaseOpen(false);
         setIsLinkTreeOpen(false);
-        setIsLocalProfileOpen(false);
+        setIsSettingsOpen(false);
+        setIsStudyModeOpen(false);
+        setIsPomodoroOpen(false);
         if (isZenMode) setIsZenMode(false);
       }
     };
@@ -484,6 +493,19 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleReseedTutorialVault = async () => {
+    const seeded = await storage.reseedTutorialVault();
+    setNotes(seeded.notes);
+    setFolders(seeded.folders);
+    setWorkspaces(seeded.workspaces);
+    setBooks(seeded.books);
+    setActiveWorkspaceId('ws-personal');
+    setSelectedNoteId('n-welcome');
+    setOpenNoteIds(['n-welcome']);
+    setCurrentFolderId(null);
+    setCurrentFilter('all');
+  };
+
   // Active Workspace Filtering
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
   const workspaceNotes = notes.filter((n) => (n.workspaceId || 'ws-personal') === activeWorkspaceId);
@@ -506,11 +528,17 @@ export const App: React.FC = () => {
       <Header
         theme={theme}
         activeWorkspace={activeWorkspace}
+        pomodoroSecondsLeft={pomodoroSecondsLeft}
+        isPomodoroRunning={isPomodoroRunning}
+        pomodoroMode={pomodoroMode}
         onToggleTheme={handleToggleTheme}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
         onOpenLinkTree={() => setIsLinkTreeOpen(true)}
-        onOpenProfile={() => setIsLocalProfileOpen(true)}
+        onOpenProfile={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenStudyMode={() => setIsStudyModeOpen(true)}
+        onOpenPomodoro={() => setIsPomodoroOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
       />
 
@@ -597,16 +625,22 @@ export const App: React.FC = () => {
         />
       </div>
 
-      {/* Local Profile, Privacy & Zero-Cloud Sync Modal */}
-      <LocalProfileModal
-        isOpen={isLocalProfileOpen}
+      {/* Settings, Backup, Security & Tutorial Hub */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        theme={theme}
         activeWorkspace={activeWorkspace}
         allNotes={notes}
+        allFolders={folders}
+        allBooks={books}
         isMicEnabled={isMicEnabled}
+        onToggleTheme={handleToggleTheme}
         onToggleMic={handleToggleMic}
         onExportVault={handleExportData}
         onImportVault={handleImportData}
-        onClose={() => setIsLocalProfileOpen(false)}
+        onReseedTutorialVault={handleReseedTutorialVault}
+        onSelectNote={handleOpenNote}
+        onClose={() => setIsSettingsOpen(false)}
       />
 
       {/* Knowledge Base Modal: Infinite Galaxy Force-Directed Graph */}
@@ -638,6 +672,25 @@ export const App: React.FC = () => {
         folders={workspaceFolders}
         onClose={() => setIsSearchOpen(false)}
         onSelectNote={handleOpenNote}
+      />
+
+      {/* Interactive Flashcards & Spaced Repetition (Study Mode) */}
+      <StudyModeModal
+        isOpen={isStudyModeOpen}
+        notes={workspaceNotes.filter((n) => !n.isTrashed)}
+        currentNote={currentNote}
+        onClose={() => setIsStudyModeOpen(false)}
+      />
+
+      {/* Focus Pomodoro & Ambient Soundscapes Modal */}
+      <FocusPomodoroModal
+        isOpen={isPomodoroOpen}
+        onClose={() => setIsPomodoroOpen(false)}
+        onTimerTick={(seconds, running, m) => {
+          setPomodoroSecondsLeft(seconds);
+          setIsPomodoroRunning(running);
+          setPomodoroMode(m);
+        }}
       />
     </div>
   );

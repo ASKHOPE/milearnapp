@@ -9,16 +9,17 @@ import {
   Tag, 
   ChevronRight, 
   ChevronDown, 
+  ChevronUp,
   Trash2, 
   Edit2, 
   Paperclip,
-  Download,
-  Upload,
-  Archive
+  Archive,
+  Calendar as CalendarIcon,
+  PanelLeftOpen,
+  BookOpen
 } from 'lucide-react';
 
 import { CalendarWidget } from './CalendarWidget';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { BookShelf } from './BookShelf';
 
 interface SidebarProps {
@@ -32,6 +33,8 @@ interface SidebarProps {
   currentFolderId: string | null;
   selectedTag: string | null;
   isOpenMobile: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   onSelectWorkspace: (id: string) => void;
   onCreateWorkspace: (name: string, icon: string, color: string, description: string) => void;
   onDeleteWorkspace: (id: string) => void;
@@ -47,8 +50,8 @@ interface SidebarProps {
   onCreateFolder: (name: string, parentId?: string | null) => void;
   onRenameFolder: (folderId: string, newName: string) => void;
   onDeleteFolder: (folderId: string) => void;
-  onExportData: () => void;
-  onImportData: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onExportData?: () => void;
+  onImportData?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onCloseMobile: () => void;
 }
 
@@ -63,9 +66,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentFolderId,
   selectedTag,
   isOpenMobile,
-  onSelectWorkspace,
-  onCreateWorkspace,
-  onDeleteWorkspace,
+  isCollapsed = false,
+  onToggleCollapse,
   onCreateBook,
   onDeleteBook,
   onAddPageToBook,
@@ -78,8 +80,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  onExportData,
-  onImportData,
   onCloseMobile
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
@@ -91,6 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [subfolderName, setSubfolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
+  const [isCalendarExpanded, setIsCalendarExpanded] = useState(true);
 
   // Counts (Filtered to active/non-trashed unless viewing trash)
   const activeNotes = notes.filter((n) => !n.isTrashed && !n.isArchived);
@@ -99,6 +100,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const withAttachments = activeNotes.filter((n) => n.attachments && n.attachments.length > 0).length;
   const archivedNotesCount = notes.filter((n) => n.isArchived && !n.isTrashed).length;
   const trashedNotesCount = notes.filter((n) => n.isTrashed).length;
+
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
 
   // Compute notes count per workspace
   const notesCountByWorkspace = new Map<string, number>();
@@ -122,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleCreateRootFolder = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim()) return;
-    onCreateFolder(newFolderName.trim(), null);
+    onCreateFolder(newFolderName.trim());
     setNewFolderName('');
     setIsCreatingFolder(false);
   };
@@ -136,64 +139,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setExpandedFolders((prev) => ({ ...prev, [parentId]: true }));
   };
 
-  const handleSaveRename = (folderId: string) => {
-    if (editFolderName.trim()) {
-      onRenameFolder(folderId, editFolderName.trim());
-    }
+  const handleRename = (folderId: string, e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFolderName.trim()) return;
+    onRenameFolder(folderId, editFolderName.trim());
     setEditingFolderId(null);
+    setEditFolderName('');
   };
 
-  // Render Folders Recursively
+  // Render Folders Tree Recursively
   const renderFolderItem = (folder: FolderType, depth = 0) => {
-    const subfolders = folders.filter((f) => f.parentId === folder.id);
-    const hasSubfolders = subfolders.length > 0;
     const isExpanded = expandedFolders[folder.id];
     const isSelected = currentFolderId === folder.id;
-    const isEditing = editingFolderId === folder.id;
+    const subfolders = folders.filter((f) => f.parentId === folder.id);
+    const hasSubfolders = subfolders.length > 0;
     const folderNoteCount = activeNotes.filter((n) => n.folderId === folder.id).length;
 
     return (
-      <li key={folder.id} className="folder-tree-item">
+      <li key={folder.id} className="folder-item-wrap">
         <div 
-          className={`sidebar-nav-item folder-row ${isSelected ? 'active' : ''}`}
-          style={{ paddingLeft: `${8 + depth * 12}px` }}
+          className={`folder-item-row ${isSelected ? 'active' : ''}`}
+          style={{ paddingLeft: `${10 + depth * 12}px` }}
           onClick={() => {
             onSelectFolder(folder.id);
             onCloseMobile();
           }}
         >
-          <div className="nav-item-left" style={{ flex: 1, minWidth: 0 }}>
-            {hasSubfolders ? (
-              <button 
-                className="folder-chevron-btn" 
-                onClick={(e) => toggleFolder(folder.id, e)}
-                title={isExpanded ? 'Collapse folder' : 'Expand folder'}
-              >
-                {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              </button>
-            ) : (
-              <span style={{ width: '13px', display: 'inline-block' }} />
-            )}
+          <div className="folder-item-left">
+            <button 
+              className="folder-toggle-chevron"
+              onClick={(e) => toggleFolder(folder.id, e)}
+            >
+              {hasSubfolders ? (
+                isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />
+              ) : (
+                <span style={{ width: 12, display: 'inline-block' }} />
+              )}
+            </button>
 
-            <Folder 
-              size={14} 
-              style={{ color: folder.color || 'var(--accent-primary)', flexShrink: 0 }} 
-            />
+            <Folder size={14} style={{ color: folder.color || 'var(--text-muted)' }} />
 
-            {isEditing ? (
-              <input
-                type="text"
-                className="folder-rename-input"
-                autoFocus
-                value={editFolderName}
-                onChange={(e) => setEditFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveRename(folder.id);
-                  if (e.key === 'Escape') setEditingFolderId(null);
-                }}
-                onBlur={() => handleSaveRename(folder.id)}
-                onClick={(e) => e.stopPropagation()}
-              />
+            {editingFolderId === folder.id ? (
+              <form onSubmit={(e) => handleRename(folder.id, e)} onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  autoFocus
+                  className="folder-input inline-edit"
+                  value={editFolderName}
+                  onChange={(e) => setEditFolderName(e.target.value)}
+                  onBlur={() => setEditingFolderId(null)}
+                />
+              </form>
             ) : (
               <span className="folder-name-label">{folder.name}</span>
             )}
@@ -258,6 +254,106 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const rootFolders = folders.filter((f) => !f.parentId);
 
+  // If collapsed on desktop, render the sleek icon rail
+  if (isCollapsed) {
+    return (
+      <aside className="app-sidebar collapsed">
+        <div className="sidebar-collapsed-rail">
+          {onToggleCollapse && (
+            <button 
+              className="btn-rail-expand"
+              onClick={onToggleCollapse}
+              title="Expand Sidebar"
+            >
+              <PanelLeftOpen size={16} />
+            </button>
+          )}
+
+          <div 
+            className="rail-ws-badge" 
+            title={`Workspace: ${activeWorkspace?.name || 'Personal'}`}
+            onClick={onToggleCollapse}
+          >
+            <span>{activeWorkspace?.icon || '🏠'}</span>
+          </div>
+
+          <div className="rail-nav-group">
+            <button 
+              className={`rail-nav-btn ${currentFilter === 'all' && !currentFolderId && !selectedTag ? 'active' : ''}`}
+              onClick={() => onSelectFilter('all')}
+              title={`All Notes (${totalNotes})`}
+            >
+              <FileText size={16} />
+              <span className="rail-pill-badge">{totalNotes}</span>
+            </button>
+
+            <button 
+              className={`rail-nav-btn ${currentFilter === 'favorites' ? 'active' : ''}`}
+              onClick={() => onSelectFilter('favorites')}
+              title={`Favorites (${favoriteNotes})`}
+            >
+              <Star size={16} color="#f59e0b" />
+            </button>
+
+            <button 
+              className={`rail-nav-btn ${currentFilter === 'recent' ? 'active' : ''}`}
+              onClick={() => onSelectFilter('recent')}
+              title="Recent Notes"
+            >
+              <Clock size={16} color="#0ea5e9" />
+            </button>
+
+            <button 
+              className={`rail-nav-btn ${currentFilter === 'attachments' ? 'active' : ''}`}
+              onClick={() => onSelectFilter('attachments')}
+              title={`Files & Media (${withAttachments})`}
+            >
+              <Paperclip size={16} color="#10b981" />
+            </button>
+
+            {books.length > 0 && (
+              <button
+                className="rail-nav-btn"
+                onClick={onToggleCollapse}
+                title={`Books & Notebooks (${books.length})`}
+              >
+                <BookOpen size={16} color="var(--accent-primary)" />
+              </button>
+            )}
+
+            <button
+              className="rail-nav-btn"
+              onClick={onToggleCollapse}
+              title={`Folders (${folders.length})`}
+            >
+              <Folder size={16} color="var(--text-secondary)" />
+            </button>
+          </div>
+
+          <div className="rail-bottom-group">
+            <button 
+              className={`rail-nav-btn ${currentFilter === 'archive' ? 'active' : ''}`}
+              onClick={() => onSelectFilter('archive')}
+              title={`Archived Notes (${archivedNotesCount})`}
+            >
+              <Archive size={16} color="#8b5cf6" />
+              {archivedNotesCount > 0 && <span className="rail-pill-badge">{archivedNotesCount}</span>}
+            </button>
+
+            <button 
+              className={`rail-nav-btn danger ${currentFilter === 'trash' ? 'active' : ''}`}
+              onClick={() => onSelectFilter('trash')}
+              title={`Trash Bin (${trashedNotesCount})`}
+            >
+              <Trash2 size={16} color="#ef4444" />
+              {trashedNotesCount > 0 && <span className="rail-pill-badge danger">{trashedNotesCount}</span>}
+            </button>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <>
       {isOpenMobile && (
@@ -266,17 +362,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <aside className={`app-sidebar ${isOpenMobile ? 'open' : ''}`}>
         <div className="sidebar-scroll">
-          {/* Workspace / Persona Switcher at Top */}
-          <WorkspaceSwitcher
-            workspaces={workspaces}
-            activeWorkspaceId={activeWorkspaceId}
-            notesCountByWorkspace={notesCountByWorkspace}
-            onSelectWorkspace={onSelectWorkspace}
-            onCreateWorkspace={onCreateWorkspace}
-            onDeleteWorkspace={onDeleteWorkspace}
-          />
 
-          {/* Section: Quick Views & Lifecycle */}
+          {/* Section: Quick Views */}
           <div>
             <div className="sidebar-section-title">Navigation</div>
             <ul className="sidebar-nav-list">
@@ -334,42 +421,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="badge-count">{withAttachments}</span>
               </li>
-
-              {/* Archive Navigation */}
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'archive' ? 'active' : ''}`}
-                onClick={() => {
-                  onSelectFilter('archive');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <Archive size={15} style={{ color: '#8b5cf6' }} />
-                  <span>Archived Notes</span>
-                </div>
-                {archivedNotesCount > 0 && (
-                  <span className="badge-count">{archivedNotesCount}</span>
-                )}
-              </li>
-
-              {/* Trash Bin Navigation */}
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'trash' ? 'active' : ''}`}
-                onClick={() => {
-                  onSelectFilter('trash');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <Trash2 size={15} style={{ color: '#ef4444' }} />
-                  <span>Trash Bin</span>
-                </div>
-                {trashedNotesCount > 0 && (
-                  <span className="badge-count" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
-                    {trashedNotesCount}
-                  </span>
-                )}
-              </li>
             </ul>
           </div>
 
@@ -383,18 +434,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onDeleteBook={onDeleteBook}
             onAddPageToBook={onAddPageToBook}
           />
-
-          {/* Section: Calendar & Daily Log */}
-          <div>
-            <div className="sidebar-section-title">Calendar & Daily Notes</div>
-            <div style={{ padding: '0 4px' }}>
-              <CalendarWidget
-                notes={notes}
-                onSelectDate={onSelectDate}
-                onOpenTodayNote={onOpenTodayNote}
-              />
-            </div>
-          </div>
 
           {/* Section: Folders Hierarchy */}
           <div>
@@ -449,33 +488,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           )}
+
+          {/* Section: Calendar & Daily Notes (with Click up/down to expand button) */}
+          <div className="sidebar-calendar-accordion">
+            <div 
+              className="cal-accordion-header"
+              onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+              title="Click to expand or collapse Calendar"
+            >
+              <div className="cal-header-left">
+                <CalendarIcon size={14} color="var(--accent-primary)" />
+                <span>Calendar & Daily Log</span>
+              </div>
+              <button 
+                type="button" 
+                className="btn-cal-chevron"
+                aria-label={isCalendarExpanded ? 'Collapse Calendar' : 'Expand Calendar'}
+              >
+                {isCalendarExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+
+            {isCalendarExpanded && (
+              <div className="cal-accordion-body">
+                <CalendarWidget
+                  notes={notes}
+                  onSelectDate={onSelectDate}
+                  onOpenTodayNote={onOpenTodayNote}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Sidebar Footer: Backup & Local Vault Export */}
-        <div className="sidebar-footer">
+        {/* Sidebar Footer: Archive & Bin Buttons (Restore & Vault Removed) */}
+        <div className="sidebar-footer-bins">
           <button 
-            className="sidebar-footer-btn"
-            onClick={onExportData}
-            title="Export local vault package (.noteflow)"
+            className={`sidebar-bin-pill ${currentFilter === 'archive' ? 'active' : ''}`}
+            onClick={() => {
+              onSelectFilter('archive');
+              onCloseMobile();
+            }}
+            title="View Archived Notes"
           >
-            <Download size={13} />
-            <span>Vault Backup</span>
+            <Archive size={14} color="#8b5cf6" />
+            <span className="bin-label">Archive</span>
+            {archivedNotesCount > 0 && (
+              <span className="bin-count-chip">{archivedNotesCount}</span>
+            )}
           </button>
 
-          <label 
-            className="sidebar-footer-btn"
-            title="Restore local vault package"
-            style={{ cursor: 'pointer' }}
+          <button 
+            className={`sidebar-bin-pill danger ${currentFilter === 'trash' ? 'active' : ''}`}
+            onClick={() => {
+              onSelectFilter('trash');
+              onCloseMobile();
+            }}
+            title="View Trash Bin"
           >
-            <Upload size={13} />
-            <span>Restore</span>
-            <input 
-              type="file" 
-              accept=".json,.noteflow" 
-              onChange={onImportData} 
-              style={{ display: 'none' }} 
-            />
-          </label>
+            <Trash2 size={14} color="#ef4444" />
+            <span className="bin-label">Bin</span>
+            {trashedNotesCount > 0 && (
+              <span className="bin-count-chip danger">{trashedNotesCount}</span>
+            )}
+          </button>
         </div>
       </aside>
     </>

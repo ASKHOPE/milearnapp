@@ -439,7 +439,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="settings-card-panel" style={{ maxWidth: '640px', margin: '0 auto' }}>
           <h4 className="panel-section-title">Theme Preferences</h4>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            Choose whether Noteflow matches your operating system appearance or stays locked to Day or Night mode.
+            Choose whether MiLEARNAPP matches your operating system appearance or stays locked to Day or Night mode.
           </p>
 
           <div className="theme-selector-3way">

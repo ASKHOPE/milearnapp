@@ -89,7 +89,13 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
         </div>
 
         {/* Diagram Display or Error */}
-        <div className="mermaid-viewport" ref={containerRef}>
+        <div 
+          className="mermaid-viewport" 
+          ref={containerRef}
+          onClick={() => setIsExpanded(true)}
+          title="Click to expand & zoom diagram"
+          style={{ cursor: 'zoom-in' }}
+        >
           {error ? (
             <div className="mermaid-error">
               <AlertCircle size={16} />

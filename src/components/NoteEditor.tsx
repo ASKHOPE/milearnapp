@@ -288,7 +288,26 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const insertFormatting = (prefix: string, suffix = '') => {
     if (note.isTrashed) return;
     const textarea = textareaRef.current;
-    if (!textarea) return;
+    if (!textarea) {
+      let textToAppend = '';
+      if (prefix.startsWith('```mermaid')) {
+        textToAppend = `\n\n${prefix}\n`;
+      } else if (prefix === '- [ ] ') {
+        textToAppend = `\n\n- [ ] New Checklist Item\n`;
+      } else if (prefix.includes('|')) {
+        textToAppend = `\n${prefix}\n`;
+      } else if (prefix === '[[') {
+        textToAppend = ` [[New Note]] `;
+      } else {
+        textToAppend = `\n\n${prefix}Text${suffix}\n`;
+      }
+      onUpdateNote({
+        ...note,
+        content: (note.content ? note.content + textToAppend : textToAppend).trim(),
+        updatedAt: new Date().toISOString()
+      });
+      return;
+    }
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -494,7 +513,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   // Scroll to heading from Outline
   const handleScrollToHeading = (lineIndex: number) => {
-    setIsOutlineOpen(false);
+    const headingEl = document.getElementById(`heading-${lineIndex}`);
+    if (headingEl) {
+      headingEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     if (textareaRef.current && (mode === 'source' || mode === 'split')) {
       const lines = note.content.split('\n');
       let charCount = 0;
@@ -502,7 +524,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         charCount += lines[i].length + 1;
       }
       textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(charCount, charCount + lines[lineIndex].length);
+      textareaRef.current.setSelectionRange(charCount, charCount + (lines[lineIndex]?.length || 0));
     }
   };
 
@@ -782,15 +804,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       }
 
       if (line.startsWith('# ')) {
-        elements.push(<h1 key={`h1-${index}`}>{parseInlineSpans(line.slice(2))}</h1>);
+        elements.push(<h1 id={`heading-${index}`} key={`h1-${index}`}>{parseInlineSpans(line.slice(2))}</h1>);
         return;
       }
       if (line.startsWith('## ')) {
-        elements.push(<h2 key={`h2-${index}`}>{parseInlineSpans(line.slice(3))}</h2>);
+        elements.push(<h2 id={`heading-${index}`} key={`h2-${index}`}>{parseInlineSpans(line.slice(3))}</h2>);
         return;
       }
       if (line.startsWith('### ')) {
-        elements.push(<h3 key={`h3-${index}`}>{parseInlineSpans(line.slice(4))}</h3>);
+        elements.push(<h3 id={`heading-${index}`} key={`h3-${index}`}>{parseInlineSpans(line.slice(4))}</h3>);
         return;
       }
 

@@ -35,8 +35,10 @@ describe('Zero-Knowledge Cryptographic Integrity & Anti-MITM Tests', () => {
   it('INTEGRITY CHECK (MITM Detection): Rejects ciphertext if even a single bit is modified', async () => {
     const encrypted = await cryptoService.encrypt(secretContent, passphrase, noteId);
 
-    // Tamper with ciphertext by flipping characters
-    const tamperedCiphertext = encrypted.ciphertext.slice(0, 10) + 'X' + encrypted.ciphertext.slice(11);
+    // Tamper with ciphertext by flipping characters guaranteed
+    const charToFlip = encrypted.ciphertext.charAt(10);
+    const flipped = charToFlip === 'X' ? 'Y' : 'X';
+    const tamperedCiphertext = encrypted.ciphertext.slice(0, 10) + flipped + encrypted.ciphertext.slice(11);
     const tamperedPayload = { ...encrypted, ciphertext: tamperedCiphertext };
 
     // AES-GCM 128-bit authentication tag MUST fail

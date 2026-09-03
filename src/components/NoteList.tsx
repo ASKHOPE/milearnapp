@@ -16,8 +16,11 @@ import {
   Trash2,
   RotateCcw,
   Lock,
+  Archive,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  X,
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface NoteListProps {
@@ -34,6 +37,9 @@ interface NoteListProps {
   onToggleFavorite: (noteId: string, e: React.MouseEvent) => void;
   onEmptyTrash: () => void;
   onRestoreNote: (noteId: string, e: React.MouseEvent) => void;
+  onArchiveNote?: (noteId: string, e: React.MouseEvent) => void;
+  onDeleteNote?: (noteId: string, e: React.MouseEvent) => void;
+  onPermanentDeleteNote?: (noteId: string, e: React.MouseEvent) => void;
 }
 
 export const NoteList: React.FC<NoteListProps> = ({
@@ -49,7 +55,10 @@ export const NoteList: React.FC<NoteListProps> = ({
   onCreateNote,
   onToggleFavorite,
   onEmptyTrash,
-  onRestoreNote
+  onRestoreNote,
+  onArchiveNote,
+  onDeleteNote,
+  onPermanentDeleteNote
 }) => {
   const [listSearch, setListSearch] = useState('');
   const [sortBy, setSortBy] = useState<'updated' | 'created' | 'title'>('updated');
@@ -190,71 +199,85 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   return (
     <section className="notes-list-pane">
-      {/* List Header */}
-      <div className="list-header-row">
-        <div className="list-title-group">
-          {onToggleCollapse && (
-            <button
-              className="btn-collapse-notes-pane"
-              onClick={onToggleCollapse}
-              title="Collapse notes panel"
-            >
-              <ChevronLeft size={14} />
-            </button>
-          )}
-          <span className="list-column-title">{columnTitle}</span>
-          <span className="list-count-badge">{filteredNotes.length}</span>
+      {/* Sleek Modern List Header */}
+      <div className="notelist-sleek-header">
+        <div className="notelist-header-top">
+          <div className="notelist-heading-group">
+            {onToggleCollapse && (
+              <button
+                className="btn-collapse-notes-pane"
+                onClick={onToggleCollapse}
+                title="Collapse notes panel"
+              >
+                <ChevronLeft size={14} />
+              </button>
+            )}
+            <h3 className="notelist-heading-title">{columnTitle}</h3>
+            <span className="notelist-count-chip">{filteredNotes.length}</span>
+          </div>
+
+          <div className="notelist-actions-group">
+            {currentFilter === 'trash' && filteredNotes.length > 0 && (
+              <button
+                className="btn-trash-empty"
+                onClick={onEmptyTrash}
+                title="Permanently empty trash"
+              >
+                <Trash2 size={12} />
+                <span>Empty</span>
+              </button>
+            )}
+
+            {currentFilter !== 'trash' && currentFilter !== 'archive' && (
+              <button
+                className="btn-create-note-compact"
+                onClick={onCreateNote}
+                title="Create New Note (Cmd+N)"
+              >
+                <Plus size={14} />
+                <span>New Note</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {/* Empty Trash Button in Trash View */}
-          {currentFilter === 'trash' && filteredNotes.length > 0 && (
-            <button
-              className="btn-small-ghost danger"
-              onClick={onEmptyTrash}
-              title="Permanently delete all items in trash"
+        {/* Compact Integrated Search & Sort Toolbar */}
+        <div className="notelist-toolbar-row">
+          <div className="notelist-search-wrapper">
+            <Search size={13} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search notes in list..."
+              value={listSearch}
+              onChange={(e) => setListSearch(e.target.value)}
+              className="notelist-search-input"
+            />
+            {listSearch && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setListSearch('')}
+                title="Clear filter"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div className="notelist-sort-wrapper">
+            <SlidersHorizontal size={12} className="sort-icon" />
+            <select
+              className="notelist-sort-dropdown"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              title="Sort notes"
             >
-              <Trash2 size={12} />
-              <span>Empty</span>
-            </button>
-          )}
-
-          {/* New Note Button (only in normal views) */}
-          {currentFilter !== 'trash' && currentFilter !== 'archive' && (
-            <button
-              className="btn-new-note"
-              onClick={onCreateNote}
-              title="Create New Note (Cmd+N)"
-            >
-              <Plus size={14} />
-              <span>Note</span>
-            </button>
-          )}
+              <option value="updated">Recent</option>
+              <option value="created">Created</option>
+              <option value="title">A–Z</option>
+            </select>
+          </div>
         </div>
-      </div>
-
-      {/* Search & Sort Row */}
-      <div className="list-search-sort-row">
-        <div className="list-search-box">
-          <Search size={14} color="var(--text-muted)" />
-          <input
-            type="text"
-            placeholder="Filter list..."
-            value={listSearch}
-            onChange={(e) => setListSearch(e.target.value)}
-          />
-        </div>
-
-        <select
-          className="list-sort-select"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as any)}
-          title="Sort Notes By"
-        >
-          <option value="updated">Updated</option>
-          <option value="created">Created</option>
-          <option value="title">Title</option>
-        </select>
       </div>
 
       {/* Notes List Cards */}
@@ -300,25 +323,58 @@ export const NoteList: React.FC<NoteListProps> = ({
 
                   <div className="card-actions" onClick={(e) => e.stopPropagation()}>
                     {note.isTrashed ? (
-                      <button
-                        className="card-icon-btn"
-                        title="Restore Note"
-                        onClick={(e) => onRestoreNote(note.id, e)}
-                      >
-                        <RotateCcw size={12} color="var(--color-success)" />
-                      </button>
+                      <>
+                        <button
+                          className="card-icon-btn restore"
+                          title="Restore Note"
+                          onClick={(e) => onRestoreNote(note.id, e)}
+                        >
+                          <RotateCcw size={12} color="var(--color-success)" />
+                        </button>
+                        {onPermanentDeleteNote && (
+                          <button
+                            className="card-icon-btn danger"
+                            title="Permanently Delete Note"
+                            onClick={(e) => onPermanentDeleteNote(note.id, e)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </>
                     ) : (
-                      <button
-                        className="card-icon-btn"
-                        onClick={(e) => onToggleFavorite(note.id, e)}
-                        title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                      >
-                        <Star 
-                          size={12} 
-                          fill={note.isFavorite ? '#f59e0b' : 'none'} 
-                          color={note.isFavorite ? '#f59e0b' : 'var(--text-muted)'} 
-                        />
-                      </button>
+                      <>
+                        {onArchiveNote && (
+                          <button
+                            className={`card-icon-btn archive ${note.isArchived ? 'active' : ''}`}
+                            onClick={(e) => onArchiveNote(note.id, e)}
+                            title={note.isArchived ? 'Unarchive Note' : 'Archive Note'}
+                          >
+                            <Archive size={12} color={note.isArchived ? '#8b5cf6' : undefined} />
+                          </button>
+                        )}
+
+                        <button
+                          className="card-icon-btn star"
+                          onClick={(e) => onToggleFavorite(note.id, e)}
+                          title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <Star 
+                            size={12} 
+                            fill={note.isFavorite ? '#f59e0b' : 'none'} 
+                            color={note.isFavorite ? '#f59e0b' : 'var(--text-muted)'} 
+                          />
+                        </button>
+
+                        {onDeleteNote && (
+                          <button
+                            className="card-icon-btn trash danger"
+                            onClick={(e) => onDeleteNote(note.id, e)}
+                            title="Move to Trash Bin"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

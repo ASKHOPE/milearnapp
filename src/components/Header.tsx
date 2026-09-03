@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  FileText, 
   Search, 
   Network, 
   GitFork, 
@@ -11,14 +10,25 @@ import {
   Timer,
   Settings,
   Brain,
-  Monitor
+  Monitor,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 interface HeaderProps {
   theme: ThemeMode;
   activeWorkspace?: Workspace;
   userProfile?: UserProfile;
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string;
+  notesCountByWorkspace?: Map<string, number>;
+  onSelectWorkspace?: (id: string) => void;
+  onCreateWorkspace?: (name: string, icon: string, color: string, description: string) => void;
+  onDeleteWorkspace?: (id: string) => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
   pomodoroSecondsLeft?: number;
   isPomodoroRunning?: boolean;
   pomodoroMode?: PomodoroMode;
@@ -38,6 +48,14 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   activeWorkspace,
   userProfile,
+  workspaces,
+  activeWorkspaceId,
+  notesCountByWorkspace,
+  onSelectWorkspace,
+  onCreateWorkspace,
+  onDeleteWorkspace,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
   pomodoroSecondsLeft,
   isPomodoroRunning,
   pomodoroMode,
@@ -66,18 +84,33 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu size={18} />
         </button>
 
-        <div className="mac-traffic-lights" title="Noteflow Mac Controls">
-          <span className="traffic-light close" />
-          <span className="traffic-light minimize" />
-          <span className="traffic-light maximize" />
+        {onToggleSidebar && (
+          <button 
+            type="button"
+            className="header-sidebar-toggle-btn"
+            onClick={onToggleSidebar}
+            title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </button>
+        )}
+
+        <div className="app-brand-text">
+          <span className="brand-title-logo">MiLEARNAPP</span>
         </div>
 
-        <div className="app-brand">
-          <div className="brand-icon">
-            <FileText size={16} />
+        {workspaces && activeWorkspaceId && onSelectWorkspace && onCreateWorkspace && onDeleteWorkspace && (
+          <div className="header-workspace-wrapper">
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+              notesCountByWorkspace={notesCountByWorkspace || new Map()}
+              onSelectWorkspace={onSelectWorkspace}
+              onCreateWorkspace={onCreateWorkspace}
+              onDeleteWorkspace={onDeleteWorkspace}
+            />
           </div>
-          <span>Noteflow</span>
-        </div>
+        )}
       </div>
 
       {/* Center: Global Search Trigger */}

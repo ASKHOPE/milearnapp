@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Note, Folder, ViewFilter, ThemeMode, Workspace, Book, PomodoroMode, UserProfile } from './types';
 import { storage } from './services/storage';
 import { shortcutManager } from './services/shortcutManager';
@@ -33,6 +33,7 @@ export const App: React.FC = () => {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [isNotesCollapsed, setIsNotesCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Modals, Study, Inactivity & Focus
   const [theme, setTheme] = useState<ThemeMode>('system');
@@ -560,10 +561,21 @@ export const App: React.FC = () => {
   if (isLoading) {
     return (
       <div className="app-container" style={{ alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading Noteflow...</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading MiLEARNAPP...</p>
       </div>
     );
   }
+
+  const notesCountByWorkspace = useMemo(() => {
+    const map = new Map<string, number>();
+    notes.forEach((n) => {
+      if (!n.isTrashed) {
+        const wsId = n.workspaceId || 'ws-personal';
+        map.set(wsId, (map.get(wsId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [notes]);
 
   return (
     <div className={`app-container ${isZenMode ? 'zen-mode' : ''}`}>
@@ -572,6 +584,14 @@ export const App: React.FC = () => {
         theme={theme}
         activeWorkspace={activeWorkspace}
         userProfile={userProfile}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        notesCountByWorkspace={notesCountByWorkspace}
+        onSelectWorkspace={handleSelectWorkspace}
+        onCreateWorkspace={handleCreateWorkspace}
+        onDeleteWorkspace={handleDeleteWorkspace}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         pomodoroSecondsLeft={pomodoroSecondsLeft}
         isPomodoroRunning={isPomodoroRunning}
         pomodoroMode={pomodoroMode}
@@ -589,7 +609,7 @@ export const App: React.FC = () => {
 
       {/* 3-Pane Main Application Layout */}
       <div className="app-main">
-        {/* Pane 1: Sidebar with Workspace Switcher, Books, Folders, Quick Views & Calendar */}
+        {/* Pane 1: Sidebar with Books, Folders, Quick Views, Calendar Accordion & Archive/Bin Footer */}
         <Sidebar
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
@@ -601,6 +621,8 @@ export const App: React.FC = () => {
           currentFolderId={currentFolderId}
           selectedTag={selectedTag}
           isOpenMobile={isMobileSidebarOpen}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onSelectWorkspace={handleSelectWorkspace}
           onCreateWorkspace={handleCreateWorkspace}
           onDeleteWorkspace={handleDeleteWorkspace}
@@ -624,8 +646,6 @@ export const App: React.FC = () => {
           onCreateFolder={handleCreateFolder}
           onRenameFolder={handleRenameFolder}
           onDeleteFolder={handleDeleteFolder}
-          onExportData={handleExportData}
-          onImportData={handleImportData}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
@@ -644,6 +664,9 @@ export const App: React.FC = () => {
           onToggleFavorite={handleToggleFavorite}
           onEmptyTrash={handleEmptyTrash}
           onRestoreNote={handleRestoreNote}
+          onArchiveNote={handleToggleArchiveNote}
+          onDeleteNote={handleSoftDeleteNote}
+          onPermanentDeleteNote={handlePermanentDeleteNote}
         />
 
         {/* Pane 3: Rich Note Editor with Live View, Books Paging, Floated Images & Tables */}

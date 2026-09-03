@@ -10,6 +10,7 @@ import {
   Music, 
   Folder as FolderIcon 
 } from 'lucide-react';
+import { BookLoader } from './ui/BookLoader';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -174,10 +175,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         {/* Results List */}
         <div className="search-results-list">
           {results.length === 0 ? (
-            <div className="empty-state" style={{ padding: '32px' }}>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                No notes match "{query}"
-              </p>
+            <div className="empty-state" style={{ padding: '28px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <BookLoader 
+                size="sm" 
+                text={query.trim() ? `No notes match "${query}"` : 'Type keywords to explore notes, tags & media...'} 
+              />
             </div>
           ) : (
             results.map((note, idx) => {

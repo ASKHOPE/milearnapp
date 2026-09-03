@@ -1,19 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { Copy, Check, Maximize2, AlertCircle } from 'lucide-react';
+import { Copy, Check, Maximize2, AlertCircle, Edit2 } from 'lucide-react';
 import { Modal } from './ui/Modal';
+import { MermaidEditorModal } from './editor/MermaidEditorModal';
 
 interface MermaidRendererProps {
   chart: string;
   id: string;
+  onEditChart?: (newChart: string) => void;
 }
 
-export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) => {
+export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id, onEditChart }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgContent, setSvgContent] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,6 +70,18 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
         <div className="mermaid-header">
           <span className="mermaid-tag">📊 Mermaid Diagram</span>
           <div className="mermaid-actions">
+            {onEditChart && (
+              <button
+                type="button"
+                className="btn-mermaid-action"
+                onClick={() => setIsEditorOpen(true)}
+                title="Edit Diagram Code and Visuals"
+              >
+                <Edit2 size={13} color="var(--accent-primary)" />
+                <span>Edit Diagram</span>
+              </button>
+            )}
+
             <button
               type="button"
               className="btn-mermaid-action"
@@ -76,6 +91,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
               {isCopied ? <Check size={13} color="var(--color-success)" /> : <Copy size={13} />}
               <span>{isCopied ? 'Copied' : 'Copy'}</span>
             </button>
+
             <button
               type="button"
               className="btn-mermaid-action"
@@ -99,32 +115,69 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id }) =
           {error ? (
             <div className="mermaid-error">
               <AlertCircle size={16} />
-              <div>
-                <strong>Mermaid Syntax Preview</strong>
-                <pre>{chart}</pre>
-              </div>
+              <span>Diagram Syntax Warning: {error}</span>
             </div>
           ) : (
             <div 
-              className="mermaid-svg-container"
+              className="mermaid-svg-wrapper"
               dangerouslySetInnerHTML={{ __html: svgContent }} 
             />
           )}
         </div>
       </div>
 
-      {/* Expanded Modal for Large Diagrams */}
-      <Modal
-        isOpen={isExpanded}
-        onClose={() => setIsExpanded(false)}
-        title="Mermaid Diagram View"
-        maxWidth={920}
-      >
-        <div 
-          className="mermaid-svg-expanded"
-          dangerouslySetInnerHTML={{ __html: svgContent }} 
+      {/* Expanded Modal */}
+      {isExpanded && (
+        <Modal 
+          isOpen={isExpanded} 
+          onClose={() => setIsExpanded(false)}
+          title="Diagram View"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '80vh', overflow: 'auto' }}>
+            <div 
+              style={{ display: 'flex', justifyContent: 'center', padding: '20px', background: 'var(--bg-editor)', borderRadius: 'var(--radius-md)' }}
+              dangerouslySetInnerHTML={{ __html: svgContent }} 
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              {onEditChart && (
+                <button 
+                  type="button"
+                  className="btn-mermaid-action"
+                  onClick={() => {
+                    setIsExpanded(false);
+                    setIsEditorOpen(true);
+                  }}
+                >
+                  <Edit2 size={14} color="var(--accent-primary)" />
+                  <span>Edit Diagram Code</span>
+                </button>
+              )}
+              <button 
+                type="button"
+                className="btn-mermaid-action" 
+                onClick={handleCopy}
+              >
+                {isCopied ? <Check size={14} color="var(--color-success)" /> : <Copy size={14} />}
+                <span>{isCopied ? 'Copied' : 'Copy Definition'}</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Interactive Diagram Studio Modal */}
+      {isEditorOpen && (
+        <MermaidEditorModal
+          isOpen={isEditorOpen}
+          initialCode={chart}
+          onClose={() => setIsEditorOpen(false)}
+          onSave={(newCode) => {
+            if (onEditChart) {
+              onEditChart(newCode);
+            }
+          }}
         />
-      </Modal>
+      )}
     </>
   );
 };

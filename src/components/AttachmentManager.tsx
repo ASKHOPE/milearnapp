@@ -11,8 +11,11 @@ import {
   X, 
   UploadCloud,
   FileSpreadsheet,
-  FileCode
+  FileCode,
+  BookOpen
 } from 'lucide-react';
+import { PdfViewerModal } from './PdfViewerModal';
+import { EpubViewerModal } from './EpubViewerModal';
 
 interface AttachmentManagerProps {
   attachments: Attachment[];
@@ -27,7 +30,8 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfViewerAtt, setPdfViewerAtt] = useState<Attachment | null>(null);
+  const [epubViewerAtt, setEpubViewerAtt] = useState<Attachment | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper: Format byte size
@@ -44,6 +48,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     if (file.type.startsWith('image/')) return 'image';
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) return 'pdf';
     if (file.type.startsWith('audio/')) return 'audio';
+    if (file.name.endsWith('.epub') || file.type === 'application/epub+zip') return 'document';
     if (
       file.type.includes('document') || 
       file.type.includes('text') || 
@@ -57,6 +62,8 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     }
     return 'document';
   };
+
+  const isEpub = (att: Attachment) => att.name.endsWith('.epub');
 
   // Process selected or dropped files
   const processFiles = (files: FileList | null) => {
@@ -119,6 +126,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     if (att.type === 'image') return <ImageIcon size={18} color="#4f46e5" />;
     if (att.type === 'pdf') return <FileText size={18} color="#ef4444" />;
     if (att.type === 'audio') return <Music size={18} color="#10b981" />;
+    if (isEpub(att)) return <BookOpen size={18} color="#8b5cf6" />;
     if (att.name.endsWith('.csv') || att.name.endsWith('.xlsx')) return <FileSpreadsheet size={18} color="#10b981" />;
     if (att.name.endsWith('.ts') || att.name.endsWith('.js') || att.name.endsWith('.json')) return <FileCode size={18} color="#f59e0b" />;
     return <FileText size={18} color="#6366f1" />;
@@ -188,14 +196,16 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
               ) : (
                 <div 
                   className="attachment-preview-box"
-                  style={{ cursor: att.type === 'pdf' ? 'pointer' : 'default', flexDirection: 'column', gap: '6px' }}
+                  style={{ cursor: (att.type === 'pdf' || isEpub(att)) ? 'pointer' : 'default', flexDirection: 'column', gap: '6px' }}
                   onClick={() => {
-                    if (att.type === 'pdf') setPdfPreviewUrl(att.dataUrl);
+                    if (att.type === 'pdf') setPdfViewerAtt(att);
+                    else if (isEpub(att)) setEpubViewerAtt(att);
                   }}
+                  title={att.type === 'pdf' ? 'Open PDF Viewer' : isEpub(att) ? 'Open ePub Reader' : ''}
                 >
                   {getFileIcon(att)}
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {att.type.toUpperCase()}
+                    {isEpub(att) ? 'EPUB' : att.type.toUpperCase()}
                   </span>
                 </div>
               )}
@@ -218,10 +228,19 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                     {att.type === 'pdf' && (
                       <button 
                         className="attachment-btn" 
-                        title="Preview PDF"
-                        onClick={() => setPdfPreviewUrl(att.dataUrl)}
+                        title="Open PDF Viewer with OCR"
+                        onClick={() => setPdfViewerAtt(att)}
                       >
                         <Eye size={13} />
+                      </button>
+                    )}
+                    {isEpub(att) && (
+                      <button
+                        className="attachment-btn"
+                        title="Open ePub Reader"
+                        onClick={() => setEpubViewerAtt(att)}
+                      >
+                        <BookOpen size={13} />
                       </button>
                     )}
                     <button 
@@ -258,28 +277,24 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         </div>
       )}
 
-      {/* In-app PDF Viewer Modal */}
-      {pdfPreviewUrl && (
-        <div className="modal-overlay" onClick={() => setPdfPreviewUrl(null)}>
-          <div className="modal-card" style={{ maxWidth: '900px', height: '85vh' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <span className="modal-title">
-                <FileText size={18} color="#ef4444" />
-                <span>PDF Document Preview</span>
-              </span>
-              <button className="modal-close-btn" onClick={() => setPdfPreviewUrl(null)}>
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
-              <iframe 
-                src={pdfPreviewUrl} 
-                title="PDF Preview"
-                style={{ width: '100%', height: '100%', border: 'none' }} 
-              />
-            </div>
-          </div>
-        </div>
+      {/* Full PDF Viewer with OCR */}
+      {pdfViewerAtt && (
+        <PdfViewerModal
+          isOpen={true}
+          src={pdfViewerAtt.dataUrl}
+          filename={pdfViewerAtt.name}
+          onClose={() => setPdfViewerAtt(null)}
+        />
+      )}
+
+      {/* Full ePub Reader */}
+      {epubViewerAtt && (
+        <EpubViewerModal
+          isOpen={true}
+          src={epubViewerAtt.dataUrl}
+          filename={epubViewerAtt.name}
+          onClose={() => setEpubViewerAtt(null)}
+        />
       )}
     </div>
   );

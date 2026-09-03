@@ -16,6 +16,7 @@ import { FocusPomodoroModal } from './components/FocusPomodoroModal';
 import { InternalMindModal } from './components/InternalMindModal';
 import { InactivityOverlay } from './components/InactivityOverlay';
 import { LibraryFileManager } from './components/LibraryFileManager';
+import { SplitWindowManager } from './components/editor/SplitWindowManager';
 import { NOTE_TEMPLATES } from './services/templates';
 import './styles/main.css';
 
@@ -799,8 +800,16 @@ export const App: React.FC = () => {
 
         {/* Pane 3: Rich Note Editor / Dual Side-by-Side Split View */}
         {secondaryNoteId && notes.find((n) => n.id === secondaryNoteId) ? (
-          <div className="split-editors-container">
-            <div className="split-editor-pane">
+          <SplitWindowManager
+            leftTitle={currentNote?.title || 'Left Note'}
+            rightTitle={notes.find((n) => n.id === secondaryNoteId)?.title || 'Right Note'}
+            onCloseSplit={handleCloseSplit}
+            onSwapPanes={() => {
+              const temp = selectedNoteId;
+              setSelectedNoteId(secondaryNoteId);
+              setSecondaryNoteId(temp);
+            }}
+            leftPane={
               <NoteEditor
                 note={currentNote}
                 folders={workspaceFolders}
@@ -829,8 +838,8 @@ export const App: React.FC = () => {
                 onDuplicateNote={handleDuplicateNote}
                 onMoveNote={handleMoveNote}
               />
-            </div>
-            <div className="split-editor-pane">
+            }
+            rightPane={
               <NoteEditor
                 note={notes.find((n) => n.id === secondaryNoteId) || null}
                 folders={workspaceFolders}
@@ -859,8 +868,8 @@ export const App: React.FC = () => {
                 onDuplicateNote={handleDuplicateNote}
                 onMoveNote={handleMoveNote}
               />
-            </div>
-          </div>
+            }
+          />
         ) : (
           <NoteEditor
             note={currentNote}

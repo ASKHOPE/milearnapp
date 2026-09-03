@@ -19,6 +19,7 @@ import {
   Heading3, 
   Code, 
   Link, 
+  ExternalLink,
   Edit3, 
   Columns, 
   ArrowLeft,
@@ -70,8 +71,11 @@ import { NOTE_TEMPLATES } from '../services/templates';
 import { Image as ImageIcon, Sparkles } from 'lucide-react';
 import { InteractiveTable } from './editor/InteractiveTable';
 import { InteractiveTasks, type TaskItem } from './editor/InteractiveTasks';
-import { WrappedImage } from './editor/WrappedImage';
+import { WrappedImage, type ImageAlignMode, type ImageSizeMode } from './editor/WrappedImage';
 import { InsertImageModal } from './editor/InsertImageModal';
+import { LinkInsertModal } from './editor/LinkInsertModal';
+import { MermaidEditorModal } from './editor/MermaidEditorModal';
+import { scanTextToDiagram } from '../services/textToDiagram';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -147,6 +151,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [moveFolderChoice, setMoveFolderChoice] = useState<string>('');
   const [moveBookChoice, setMoveBookChoice] = useState<string>('');
+
+  // Smart Link & Mermaid Studio Modal states
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkInitialText, setLinkInitialText] = useState('');
+  const [isMermaidModalOpen, setIsMermaidModalOpen] = useState(false);
+  const [mermaidInitialCode, setMermaidInitialCode] = useState('');
+  const [activeMermaidBlock, setActiveMermaidBlock] = useState<{ startLine: number; endLine: number } | null>(null);
 
   useEffect(() => {
     if (note) {
@@ -477,8 +488,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     });
   };
 
-  // Image alignment updater
-  const handleUpdateImageAlignment = (lineIndex: number, newAlign: 'left' | 'right' | 'center') => {
+  // Image properties updater (alignment, size, custom pixel width)
+  const handleUpdateImageProps = (
+    lineIndex: number, 
+    newAlign: ImageAlignMode, 
+    newSize: ImageSizeMode, 
+    customWidth?: number
+  ) => {
     if (note.isTrashed) return;
     const allLines = note.content.split('\n');
     const line = allLines[lineIndex] || '';
@@ -487,10 +503,135 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       const rawAlt = match[1];
       const cleanAlt = rawAlt.split('|')[0].trim();
       const url = match[2];
-      allLines[lineIndex] = `![${cleanAlt}|${newAlign}](${url})`;
+      let meta = `${cleanAlt}|${newAlign}|${newSize}`;
+      if (newSize === 'custom' && customWidth) {
+        meta += `|${customWidth}px`;
+      }
+      allLines[lineIndex] = `![${meta}](${url})`;
       onUpdateNote({
         ...note,
         content: allLines.join('\n'),
+        updatedAt: new Date().toISOString()
+      });
+    }
+  };
+
+  // Move image up or down across paragraphs
+  const handleMoveImage = (lineIndex: number, direction: 'up' | 'down') => {
+    if (note.isTrashed) return;
+    const allLines = note.content.split('\n');
+    const targetLine = allLines[lineIndex];
+    if (!targetLine) return;
+
+    if (direction === 'up' && lineIndex > 0) {
+      let prevIdx = lineIndex - 1;
+      while (prevIdx > 0 && allLines[prevIdx].trim() === '') {
+        prevIdx--;
+      }
+      allLines.splice(lineIndex, 1);
+      allLines.splice(prevIdx, 0, targetLine);
+    } else if (direction === 'down' && lineIndex < allLines.length - 1) {
+      let nextIdx = lineIndex + 1;
+      while (nextIdx < allLines.length - 1 && allLines[nextIdx].trim() === '') {
+        nextIdx++;
+      }
+      allLines.splice(lineIndex, 1);
+      allLines.splice(nextIdx, 0, targetLine);
+    }
+
+    onUpdateNote({
+      ...note,
+      content: allLines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  // Diagram Toolbar & Scanner Handler
+  const handleToolbarDiagramClick = () => {
+    if (note.isTrashed) return;
+    const textarea = textareaRef.current;
+    let selected = '';
+    if (textarea) {
+      selected = note.content.slice(textarea.selectionStart, textarea.selectionEnd).trim();
+    }
+
+    if (selected) {
+      const result = scanTextToDiagram(selected);
+      setMermaidInitialCode(result.chartCode);
+    } else {
+      setMermaidInitialCode('');
+    }
+    setActiveMermaidBlock(null);
+    setIsMermaidModalOpen(true);
+  };
+
+  // Save Diagram (either insert new block or update existing block)
+  const handleSaveMermaidDiagram = (chartCode: string) => {
+    if (note.isTrashed) return;
+
+    // Case 1: Editing existing block in note
+    if (activeMermaidBlock) {
+      const { startLine, endLine } = activeMermaidBlock;
+      const allLines = note.content.split('\n');
+      allLines.splice(startLine + 1, endLine - startLine - 1, ...chartCode.split('\n'));
+      onUpdateNote({
+        ...note,
+        content: allLines.join('\n'),
+        updatedAt: new Date().toISOString()
+      });
+      setActiveMermaidBlock(null);
+      return;
+    }
+
+    // Case 2: Inserting new diagram at cursor position
+    const textarea = textareaRef.current;
+    const block = `\n\`\`\`mermaid\n${chartCode}\n\`\`\`\n`;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent = note.content.slice(0, start) + block + note.content.slice(end);
+      onUpdateNote({
+        ...note,
+        content: newContent,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      onUpdateNote({
+        ...note,
+        content: note.content + block,
+        updatedAt: new Date().toISOString()
+      });
+    }
+  };
+
+  // Smart Link Toolbar Handler
+  const handleToolbarLinkClick = () => {
+    if (note.isTrashed) return;
+    const textarea = textareaRef.current;
+    let selected = '';
+    if (textarea) {
+      selected = note.content.slice(textarea.selectionStart, textarea.selectionEnd).trim();
+    }
+    setLinkInitialText(selected);
+    setIsLinkModalOpen(true);
+  };
+
+  const handleInsertLink = (markdownLink: string) => {
+    if (note.isTrashed) return;
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent = note.content.slice(0, start) + markdownLink + note.content.slice(end);
+      onUpdateNote({
+        ...note,
+        content: newContent,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      onUpdateNote({
+        ...note,
+        content: note.content + ' ' + markdownLink,
         updatedAt: new Date().toISOString()
       });
     }
@@ -681,6 +822,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       insideCallout = false;
     };
 
+    let codeBlockStartIndex = 0;
+
     lines.forEach((line, index) => {
       // Code Block parsing
       if (line.startsWith('```')) {
@@ -693,10 +836,21 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           const blockId = `code-block-${index}`;
           const isCopied = copiedCodeId === blockId;
 
-          // Mermaid Diagram
+          // Mermaid Diagram with interactive Edit callback
           if (codeLanguage === 'mermaid') {
+            const startLine = codeBlockStartIndex;
+            const endLine = index;
             elements.push(
-              <MermaidRenderer key={blockId} chart={codeText} id={blockId} />
+              <MermaidRenderer 
+                key={blockId} 
+                chart={codeText} 
+                id={blockId}
+                onEditChart={(newChart) => {
+                  setActiveMermaidBlock({ startLine, endLine });
+                  setMermaidInitialCode(newChart);
+                  setIsMermaidModalOpen(true);
+                }}
+              />
             );
           } else if (codeLanguage === 'math' || codeLanguage === 'latex') {
             elements.push(
@@ -726,7 +880,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           insideCodeBlock = false;
         } else {
           insideCodeBlock = true;
-          codeLanguage = line.slice(3).trim() || 'code';
+          codeBlockStartIndex = index;
+          codeLanguage = line.slice(3).trim().toLowerCase() || 'code';
         }
         return;
       }
@@ -748,7 +903,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         return;
       }
 
-      // Image with optional text wrap: ![caption|align](url) or ![caption](url)
+      // Image with optional text wrap & sizing: ![caption|align|size|width](url)
       const imgMatch = line.match(/^!\[(.*?)\]\((.*?)\)/);
       if (imgMatch) {
         if (insideTable) flushTable(index);
@@ -757,24 +912,38 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
         const rawAlt = imgMatch[1];
         const url = imgMatch[2];
-        let align: 'left' | 'right' | 'center' = 'center';
+        let align: ImageAlignMode = 'center';
+        let size: ImageSizeMode = 'normal';
+        let customWidth: number | undefined = undefined;
         let caption = rawAlt;
+
         if (rawAlt.includes('|')) {
           const parts = rawAlt.split('|');
           caption = parts[0].trim();
-          const a = parts[1].trim().toLowerCase();
-          if (a === 'left' || a === 'right' || a === 'center') {
-            align = a;
+          for (let p = 1; p < parts.length; p++) {
+            const part = parts[p].trim().toLowerCase();
+            if (['left', 'right', 'center', 'full'].includes(part)) {
+              align = part as ImageAlignMode;
+            } else if (['small', 'normal', 'large', 'original', 'custom'].includes(part)) {
+              size = part as ImageSizeMode;
+            } else if (part.endsWith('px')) {
+              customWidth = parseInt(part, 10) || undefined;
+              if (customWidth) size = 'custom';
+            }
           }
         }
+
         elements.push(
           <WrappedImage
             key={`img-${index}`}
             src={url}
             alt={caption}
             align={align}
+            size={size}
+            customWidth={customWidth}
             lineIndex={index}
-            onUpdateAlign={handleUpdateImageAlignment}
+            onUpdateImageProps={handleUpdateImageProps}
+            onMoveImage={handleMoveImage}
             isReadOnly={note.isTrashed}
           />
         );
@@ -1189,19 +1358,48 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <button className="toolbar-btn" onClick={() => insertFormatting('```typescript\n', '\n```')} disabled={note.isTrashed} title="Code Block">
           <Code size={14} />
         </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('[[', ']]')} disabled={note.isTrashed} title="Link to Note [[Wiki]]">
+        <button 
+          className="toolbar-btn" 
+          onClick={() => insertFormatting('[[', ']]')} 
+          disabled={note.isTrashed} 
+          title="Internal Note Link ([[Wiki-Link]] to another note in your workspace)"
+        >
           <Link size={14} />
-          <span>[[Link]]</span>
+          <span>[[Wiki]]</span>
         </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('$$ ', ' $$')} disabled={note.isTrashed} title="LaTeX Math Formula ($$)">
+        <button 
+          className="toolbar-btn" 
+          onClick={handleToolbarLinkClick} 
+          disabled={note.isTrashed} 
+          title="Insert Web Link (Dialog to enter URL & Title with smart website title derivation)"
+        >
+          <ExternalLink size={14} />
+          <span>[Link]</span>
+        </button>
+        <button 
+          className="toolbar-btn" 
+          onClick={() => insertFormatting('$$ ', ' $$')} 
+          disabled={note.isTrashed} 
+          title="LaTeX Math Formula ($$ Formula $$)"
+        >
           <Sigma size={14} />
           <span>Math</span>
         </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('```mermaid\nflowchart TD\n  A[Start] --> B(Task)\n  B --> C{Decision}\n  C -->|Yes| D[Done]\n  C -->|No| B\n```\n')} disabled={note.isTrashed} title="Insert Mermaid Diagram">
-          <GitBranch size={14} />
+        <button 
+          className="toolbar-btn" 
+          onClick={handleToolbarDiagramClick} 
+          disabled={note.isTrashed} 
+          title="Interactive Mermaid Diagram Studio (Click to design or highlight text to auto-convert text to diagram)"
+        >
+          <GitBranch size={14} color="#8b5cf6" />
           <span>Diagram</span>
         </button>
-        <button className="toolbar-btn" onClick={() => setIsInsertImageOpen(true)} disabled={note.isTrashed} title="Insert & Position Image (Wrap Text)">
+        <button 
+          className="toolbar-btn" 
+          onClick={() => setIsInsertImageOpen(true)} 
+          disabled={note.isTrashed} 
+          title="Insert Image with Text Wrapping & Pixel Width Control"
+        >
           <ImageIcon size={14} color="var(--accent-primary)" />
           <span>Image</span>
         </button>
@@ -1530,24 +1728,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             />
           ) : (
             <div className="live-document-wrapper">
-              <div className="live-view-quick-action-bar">
-                <span className="live-badge">✨ Live Interactive View</span>
-                <button
-                  type="button"
-                  className="btn-quick-edit-source"
-                  onClick={() => setMode('split')}
-                  title="Open Split View to write markdown"
-                >
-                  <Columns size={11} />
-                  <span>Open Split View</span>
-                </button>
-              </div>
-
-              <div 
-                className="markdown-body live-rich-document selectable-text"
-                onDoubleClick={() => setMode('split')}
-                title="Double-click to write or edit note"
-              >
+              <div className="markdown-body live-rich-document selectable-text">
                 {renderMarkdownPreview(note.content)}
               </div>
             </div>
@@ -1685,6 +1866,25 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       )}
+
+      {/* Smart Web Link Insertion Modal */}
+      <LinkInsertModal
+        isOpen={isLinkModalOpen}
+        initialSelectedText={linkInitialText}
+        onClose={() => setIsLinkModalOpen(false)}
+        onInsert={handleInsertLink}
+      />
+
+      {/* Interactive Mermaid Diagram Studio Modal */}
+      <MermaidEditorModal
+        isOpen={isMermaidModalOpen}
+        initialCode={mermaidInitialCode}
+        onClose={() => {
+          setIsMermaidModalOpen(false);
+          setActiveMermaidBlock(null);
+        }}
+        onSave={handleSaveMermaidDiagram}
+      />
     </main>
   );
 };

@@ -6709,6 +6709,9 @@ input:checked + .slider-round:before {
 }
 
 .tray-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 6px 10px;
   font-size: 11px;
   font-weight: 700;
@@ -6717,11 +6720,25 @@ input:checked + .slider-round:before {
   color: var(--text-muted);
 }
 
+.tray-pin-hint {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: none;
+}
+
+.tray-item-row-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
 .tray-item-btn {
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
+  flex: 1;
   padding: 8px 10px;
   border-radius: 9px;
   background: transparent;
@@ -6730,6 +6747,68 @@ input:checked + .slider-round:before {
   cursor: pointer;
   transition: all 0.14s ease;
   color: var(--text-primary);
+}
+
+.btn-tool-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.btn-tool-pin:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.btn-tool-pin.pinned {
+  color: var(--accent-primary);
+  background: var(--accent-light);
+}
+
+/* Header Pinned Quick Access Tools */
+.header-pinned-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-pinned-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.header-pinned-tool-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+  transform: translateY(-1px);
+}
+
+.header-pinned-tool-btn.running {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.pinned-pomo-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ef4444;
 }
 
 .tray-item-btn:hover {
@@ -7362,4 +7441,2208 @@ input:checked + .slider-round:before {
 
 .btn-confirm:hover {
   filter: brightness(1.1);
+}
+
+/* =========================================================
+   1. Advanced Image Sizing, Text Wrapping & Dock
+   ========================================================= */
+.markdown-body::after,
+.editor-scroll-area::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+.wrapped-image-figure {
+  margin: 12px 0;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.wrapped-image-figure.align-left {
+  float: left !important;
+  margin: 6px 22px 14px 0 !important;
+  clear: left;
+}
+
+.wrapped-image-figure.align-right {
+  float: right !important;
+  margin: 6px 0 14px 22px !important;
+  clear: right;
+}
+
+.wrapped-image-figure.align-center {
+  margin: 16px auto !important;
+  display: table !important;
+  clear: both !important;
+  text-align: center;
+}
+
+.wrapped-image-figure.align-full {
+  width: 100% !important;
+  margin: 20px 0 !important;
+  clear: both !important;
+}
+
+.image-content-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.image-content-wrapper:hover .image-hover-dock {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.image-hover-dock {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: rgba(12, 18, 36, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 40;
+  min-width: 280px;
+  white-space: nowrap;
+}
+
+.dock-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-row-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+.dock-row-buttons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+}
+
+.dock-row-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin: 0;
+}
+
+/* Keep legacy group/divider for any other uses */
+.dock-button-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dock-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 3px;
+}
+
+.btn-image-dock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.btn-image-dock:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.btn-image-dock.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.btn-image-dock.size-pill {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 30px;
+  justify-content: center;
+  padding: 4px 6px;
+  letter-spacing: 0.2px;
+}
+
+/* Custom Width Popover */
+.custom-width-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-modal);
+  border: 1px solid var(--border-active);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: modalFadeIn 0.14s ease-out;
+}
+
+.custom-width-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.btn-close-popover {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.custom-width-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-width-slider {
+  width: 100%;
+  accent-color: var(--accent-primary);
+}
+
+.custom-width-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-width-number-input {
+  width: 70px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.btn-apply-width {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--accent-primary);
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* =========================================================
+   2. Interactive Mermaid Diagram Studio Modal
+   ========================================================= */
+.mermaid-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(5px);
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.mermaid-editor-container {
+  width: 100%;
+  max-width: 1120px;
+  height: 84vh;
+  max-height: 860px;
+  background: var(--bg-modal);
+  border: 1px solid var(--border-active);
+  border-radius: 16px;
+  box-shadow: var(--shadow-2xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalFadeIn 0.16s ease-out;
+}
+
+.mermaid-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-title-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal-subtitle-text {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.modal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-scan-text-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.btn-scan-text-toggle:hover,
+.btn-scan-text-toggle.active {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #f59e0b;
+}
+
+/* Text-to-Diagram Scanner Drawer */
+.diagram-scanner-drawer {
+  background: var(--bg-editor);
+  border-bottom: 1px solid var(--border-color);
+  padding: 14px 20px;
+  animation: slideDown 0.15s ease-out;
+}
+
+.scanner-prompt-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  margin-bottom: 8px;
+}
+
+.scanner-hint {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.scanner-input-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.scanner-btn-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-scanner-cancel {
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-scanner-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  background: #f59e0b;
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scanner-result-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 20px;
+  background: var(--accent-light);
+  color: var(--accent-primary);
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.scanner-result-banner button {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* Template Strip */
+.diagram-template-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.template-strip-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.btn-template-chip {
+  padding: 4px 10px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+
+.btn-template-chip:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-primary);
+}
+
+.mermaid-studio-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.studio-editor-pane,
+.studio-preview-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.studio-editor-pane {
+  border-right: 1px solid var(--border-color);
+}
+
+.studio-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.syntax-status-indicator {
+  font-size: 11px;
+}
+
+.status-valid {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.status-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.studio-code-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 14px;
+  background: var(--bg-editor);
+  color: var(--text-primary);
+  border: none;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+.studio-syntax-error-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border-top: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  font-size: 11.5px;
+}
+
+.studio-preview-viewport {
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-svg-rendered {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.studio-svg-rendered svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.studio-empty-preview {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.mermaid-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.btn-footer-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.studio-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-footer-cancel {
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-footer-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 8px;
+  background: var(--accent-primary);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-footer-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   3. Smart Web Link Insertion Modal
+   ========================================================= */
+.link-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1350;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.link-modal-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-modal);
+  border: 1px solid var(--border-active);
+  border-radius: 14px;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  animation: modalFadeIn 0.15s ease-out;
+}
+
+.link-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.link-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.link-modal-form {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.link-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.link-input-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+}
+
+.link-favicon-preview {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.link-input-wrap input {
+  width: 100%;
+  padding: 8px 105px 8px 34px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.btn-fetch-metadata {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-preview-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.link-preview-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.link-modal-actions {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.btn-test-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.btn-test-link:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   4. Dual Note Split Window Manager
+   ========================================================= */
+.split-wm-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-editor);
+}
+
+.split-wm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  z-index: 20;
+}
+
+.wm-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wm-badge {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-titles-preview {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.wm-titles-preview strong {
+  color: var(--text-primary);
+}
+
+.wm-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wm-ratio-buttons {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border-radius: 6px;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+}
+
+.wm-ratio-btn {
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.wm-ratio-btn:hover {
+  color: var(--text-primary);
+}
+
+.wm-ratio-btn.active {
+  background: var(--bg-card);
+  color: var(--accent-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.wm-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-color);
+  margin: 0 3px;
+}
+
+.wm-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.wm-icon-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.wm-icon-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.split-wm-body {
+  flex: 1;
+  height: calc(100% - 38px);
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.split-wm-body.resizing {
+  user-select: none;
+  cursor: col-resize;
+}
+
+.split-wm-body.horizontal.resizing {
+  cursor: row-resize;
+}
+
+.split-wm-pane {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-editor);
+}
+
+.split-wm-divider-bar {
+  background: var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  z-index: 10;
+}
+
+.split-wm-divider-bar.vertical {
+  width: 6px;
+  cursor: col-resize;
+}
+
+.split-wm-divider-bar.horizontal {
+  height: 6px;
+  cursor: row-resize;
+}
+
+.split-wm-divider-bar:hover,
+.split-wm-body.resizing .split-wm-divider-bar {
+  background: var(--accent-primary);
+}
+
+.divider-grip-indicator {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.split-wm-divider-bar:hover .divider-grip-indicator {
+  color: #fff;
+}
+
+/* =========================================================
+   Animated Book Loader (for Searching & Note Loading)
+   ========================================================= */
+.book-loader-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.book-loader-wrapper.size-sm {
+  font-size: 8px;
+}
+
+.book-loader-wrapper.size-md {
+  font-size: 12px;
+}
+
+.book-loader-wrapper.size-lg {
+  font-size: 16px;
+}
+
+.book-loader-text {
+  margin-top: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.book,
+.book__pg-shadow,
+.book__pg {
+  animation: cover 5s ease-in-out infinite;
+}
+
+.book {
+  background-color: hsl(268, 90%, 65%);
+  border-radius: 0.25em;
+  box-shadow:
+    0 0.25em 0.5em hsla(0, 0%, 0%, 0.3),
+    0 0 0 0.25em hsl(278, 100%, 57%) inset;
+  padding: 0.25em;
+  perspective: 37.5em;
+  position: relative;
+  width: 8em;
+  height: 6em;
+  transform: translate3d(0, 0, 0);
+  transform-style: preserve-3d;
+}
+
+.book__pg-shadow,
+.book__pg {
+  position: absolute;
+  left: 0.25em;
+  width: calc(50% - 0.25em);
+}
+
+.book__pg-shadow {
+  animation-name: shadow;
+  background-image: linear-gradient(
+    -45deg,
+    hsla(0, 0%, 0%, 0) 50%,
+    hsla(0, 0%, 0%, 0.3) 50%
+  );
+  filter: blur(0.25em);
+  top: calc(100% - 0.25em);
+  height: 3.75em;
+  transform: scaleY(0);
+  transform-origin: 100% 0%;
+}
+
+.book__pg {
+  animation-name: pg1;
+  background-color: hsl(223, 10%, 100%);
+  background-image: linear-gradient(
+    90deg,
+    hsla(223, 10%, 90%, 0) 87.5%,
+    hsl(223, 10%, 90%)
+  );
+  height: calc(100% - 0.5em);
+  transform-origin: 100% 50%;
+}
+
+.book__pg--2,
+.book__pg--3,
+.book__pg--4 {
+  background-image: repeating-linear-gradient(
+      hsl(223, 10%, 10%) 0 0.125em,
+      hsla(223, 10%, 10%, 0) 0.125em 0.5em
+    ),
+    linear-gradient(90deg, hsla(223, 10%, 90%, 0) 87.5%, hsl(223, 10%, 90%));
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size:
+    2.5em 4.125em,
+    100% 100%;
+}
+
+.book__pg--2 {
+  animation-name: pg2;
+}
+
+.book__pg--3 {
+  animation-name: pg3;
+}
+
+.book__pg--4 {
+  animation-name: pg4;
+}
+
+.book__pg--5 {
+  animation-name: pg5;
+}
+
+@keyframes cover {
+  from,
+  5%,
+  45%,
+  55%,
+  95%,
+  to {
+    animation-timing-function: ease-out;
+    background-color: hsl(278, 84%, 67%);
+  }
+  10%,
+  40%,
+  60%,
+  90% {
+    animation-timing-function: ease-in;
+    background-color: hsl(271, 90%, 45%);
+  }
+}
+
+@keyframes shadow {
+  from,
+  10.01%,
+  20.01%,
+  30.01%,
+  40.01% {
+    animation-timing-function: ease-in;
+    transform: translate3d(0, 0, 1px) scaleY(0) rotateY(0);
+  }
+  5%,
+  15%,
+  25%,
+  35%,
+  45%,
+  55%,
+  65%,
+  75%,
+  85%,
+  95% {
+    animation-timing-function: ease-out;
+    transform: translate3d(0, 0, 1px) scaleY(0.2) rotateY(90deg);
+  }
+  10%,
+  20%,
+  30%,
+  40%,
+  50%,
+  to {
+    animation-timing-function: ease-out;
+    transform: translate3d(0, 0, 1px) scaleY(0) rotateY(180deg);
+  }
+  50.01%,
+  60.01%,
+  70.01%,
+  80.01%,
+  90.01% {
+    animation-timing-function: ease-in;
+    transform: translate3d(0, 0, 1px) scaleY(0) rotateY(180deg);
+  }
+  60%,
+  70%,
+  80%,
+  90%,
+  to {
+    animation-timing-function: ease-out;
+    transform: translate3d(0, 0, 1px) scaleY(0) rotateY(0);
+  }
+}
+
+@keyframes pg1 {
+  from,
+  to {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.4deg);
+  }
+  10%,
+  15% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(180deg);
+  }
+  20%,
+  80% {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(180deg);
+  }
+  85%,
+  90% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(180deg);
+  }
+}
+
+@keyframes pg2 {
+  from,
+  to {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(0.3deg);
+  }
+  5%,
+  10% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.3deg);
+  }
+  20%,
+  25% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.9deg);
+  }
+  30%,
+  70% {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(179.9deg);
+  }
+  75%,
+  80% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.9deg);
+  }
+  90%,
+  95% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.3deg);
+  }
+}
+
+@keyframes pg3 {
+  from,
+  10%,
+  90%,
+  to {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(0.2deg);
+  }
+  15%,
+  20% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.2deg);
+  }
+  30%,
+  35% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.8deg);
+  }
+  40%,
+  60% {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(179.8deg);
+  }
+  65%,
+  70% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.8deg);
+  }
+  80%,
+  85% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.2deg);
+  }
+}
+
+@keyframes pg4 {
+  from,
+  20%,
+  80%,
+  to {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(0.1deg);
+  }
+  25%,
+  30% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.1deg);
+  }
+  40%,
+  45% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.7deg);
+  }
+  50% {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(179.7deg);
+  }
+  55%,
+  60% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.7deg);
+  }
+  70%,
+  75% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0.1deg);
+  }
+}
+
+@keyframes pg5 {
+  from,
+  30%,
+  70%,
+  to {
+    animation-timing-function: ease-in;
+    background-color: hsl(223, 10%, 45%);
+    transform: translate3d(0, 0, 1px) rotateY(0);
+  }
+  35%,
+  40% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0deg);
+  }
+  50% {
+    animation-timing-function: ease-in-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(179.6deg);
+  }
+  60%,
+  65% {
+    animation-timing-function: ease-out;
+    background-color: hsl(223, 10%, 100%);
+    transform: translate3d(0, 0, 1px) rotateY(0);
+  }
+}
+
+/* =========================================================
+   3D Animated Hourglass (Pomodoro Icon & Loader)
+   ========================================================= */
+.hourglass-pomodoro-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hourglass-pomodoro-wrapper.paused * {
+  animation-play-state: paused !important;
+}
+
+.hourglassBackground {
+  position: relative;
+  background-color: rgb(30, 27, 46);
+  height: 120px;
+  width: 120px;
+  border-radius: 50%;
+  margin: 10px auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.hourglassContainer {
+  position: absolute;
+  top: 25px;
+  left: 35px;
+  width: 50px;
+  height: 70px;
+  animation: hourglassRotate 2s ease-in 0s infinite;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.hourglassContainer div,
+.hourglassContainer div:before,
+.hourglassContainer div:after {
+  transform-style: preserve-3d;
+}
+
+@keyframes hourglassRotate {
+  0% { transform: rotateX(0deg); }
+  50% { transform: rotateX(180deg); }
+  100% { transform: rotateX(180deg); }
+}
+
+.hourglassCapTop { top: 0; }
+.hourglassCapTop:before { top: -25px; }
+.hourglassCapTop:after { top: -20px; }
+
+.hourglassCapBottom { bottom: 0; }
+.hourglassCapBottom:before { bottom: -25px; }
+.hourglassCapBottom:after { bottom: -20px; }
+
+.hourglassGlassTop {
+  transform: rotateX(90deg);
+  position: absolute;
+  top: -16px;
+  left: 3px;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  background-color: #ef4444;
+}
+
+.hourglassGlass {
+  perspective: 100px;
+  position: absolute;
+  top: 32px;
+  left: 20px;
+  width: 10px;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.6);
+  opacity: 0.5;
+}
+
+.hourglassGlass:before,
+.hourglassGlass:after {
+  content: '';
+  display: block;
+  position: absolute;
+  background-color: rgba(255, 255, 255, 0.45);
+  left: -17px;
+  width: 44px;
+  height: 28px;
+}
+
+.hourglassGlass:before {
+  top: -27px;
+  border-radius: 0 0 25px 25px;
+}
+
+.hourglassGlass:after {
+  bottom: -27px;
+  border-radius: 25px 25px 0 0;
+}
+
+.hourglassCurves:before,
+.hourglassCurves:after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 32px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #222;
+  animation: hideCurves 2s ease-in 0s infinite;
+}
+
+.hourglassCurves:before { left: 15px; }
+.hourglassCurves:after { left: 29px; }
+
+@keyframes hideCurves {
+  0% { opacity: 1; }
+  25% { opacity: 0; }
+  30% { opacity: 0; }
+  40% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+.hourglassSandStream:before {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 24px;
+  width: 3px;
+  background-color: #fbbf24;
+  animation: sandStream1 2s ease-in 0s infinite;
+}
+
+.hourglassSandStream:after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 36px;
+  left: 19px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #fbbf24;
+  animation: sandStream2 2s ease-in 0s infinite;
+}
+
+@keyframes sandStream1 {
+  0% { height: 0; top: 35px; }
+  50% { height: 0; top: 45px; }
+  60% { height: 35px; top: 8px; }
+  85% { height: 35px; top: 8px; }
+  100% { height: 0; top: 8px; }
+}
+
+@keyframes sandStream2 {
+  0% { opacity: 0; }
+  50% { opacity: 0; }
+  51% { opacity: 1; }
+  90% { opacity: 1; }
+  91% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.hourglassSand:before,
+.hourglassSand:after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 6px;
+  background-color: #fbbf24;
+  perspective: 500px;
+}
+
+.hourglassSand:before {
+  top: 8px;
+  width: 39px;
+  border-radius: 3px 3px 30px 30px;
+  animation: sandFillup 2s ease-in 0s infinite;
+}
+
+.hourglassSand:after {
+  border-radius: 30px 30px 3px 3px;
+  animation: sandDeplete 2s ease-in 0s infinite;
+}
+
+@keyframes sandFillup {
+  0% { opacity: 0; height: 0; }
+  60% { opacity: 1; height: 0; }
+  100% { opacity: 1; height: 17px; }
+}
+
+@keyframes sandDeplete {
+  0% { opacity: 0; top: 45px; height: 17px; width: 38px; left: 6px; }
+  1% { opacity: 1; top: 45px; height: 17px; width: 38px; left: 6px; }
+  24% { opacity: 1; top: 45px; height: 17px; width: 38px; left: 6px; }
+  25% { opacity: 1; top: 41px; height: 17px; width: 38px; left: 6px; }
+  50% { opacity: 1; top: 41px; height: 17px; width: 38px; left: 6px; }
+  90% { opacity: 1; top: 41px; height: 0; width: 10px; left: 20px; }
+}
+
+/* =========================================================
+   Floating Folder Loader (Library & File Management)
+   ========================================================= */
+.folder-loader-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+}
+
+.folder-container {
+  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.folder-floating {
+  width: min-content;
+  margin: auto;
+  animation: folderFloat 2s infinite linear;
+}
+
+.folder-floating .folder-top {
+  background-color: #FF8F56;
+  width: 60px;
+  height: 12px;
+  border-top-right-radius: 10px;
+}
+
+.folder-floating .folder-bottom {
+  background-color: #FFCE63;
+  width: 100px;
+  height: 70px;
+  box-shadow: 5px 5px 0 0 #283149;
+  border-top-right-radius: 8px;
+}
+
+.folder-container .folder-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 15px;
+  letter-spacing: 0.2px;
+}
+
+@keyframes folderFloat {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-22px); }
+  100% { transform: translateY(0px); }
+}
+
+/* ==========================================================================
+   Global Tooltip System — [title] attribute enhanced tooltips
+   ========================================================================== */
+[title]:not(iframe):not(.no-tooltip) {
+  position: relative;
+}
+
+/* Native title tooltips are styled by the browser — we enhance with custom ones */
+.tooltip-host {
+  position: relative;
+}
+
+.tooltip-host::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.88);
+  background: rgba(10, 12, 24, 0.97);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.12s ease;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  letter-spacing: 0.2px;
+}
+
+.tooltip-host:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* ==========================================================================
+   Sidebar Folder Action Buttons — visible on hover
+   ========================================================================== */
+.folder-actions-hover {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.folder-item-row:hover .folder-actions-hover,
+.folder-item-row.active .folder-actions-hover {
+  opacity: 1;
+}
+
+.folder-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+}
+
+.folder-icon-btn:hover {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.folder-icon-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+/* ==========================================================================
+   Sidebar BOOKS & NOTEBOOKS Section
+   ========================================================================== */
+.sidebar-books-section {
+  margin-bottom: 8px;
+}
+
+.sidebar-books-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 6px;
+}
+
+.sidebar-books-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar-books-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.sidebar-book-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sidebar-book-item:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-book-item.active {
+  background: var(--accent-light);
+  color: var(--accent-primary);
+}
+
+.sidebar-book-icon {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-book-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sidebar-book-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.sidebar-book-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+/* ==========================================================================
+   PDF Viewer Modal
+   ========================================================================== */
+.pdf-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  animation: modalFadeIn 0.18s ease-out;
+}
+
+.pdf-viewer-overlay.fullscreen {
+  background: #0a0c18;
+}
+
+.pdf-viewer-modal {
+  background: var(--bg-base);
+  border-radius: 16px;
+  margin: 24px;
+  width: 100%;
+  max-width: 1000px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.pdf-viewer-overlay.fullscreen .pdf-viewer-modal {
+  margin: 0;
+  border-radius: 0;
+  max-width: 100%;
+}
+
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.pdf-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pdf-file-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.pdf-page-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pdf-toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.pdf-nav-btn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.pdf-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pdf-page-input {
+  width: 48px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pdf-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pdf-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.pdf-icon-btn:hover {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.pdf-icon-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.pdf-icon-btn.ocr {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.2);
+  color: var(--accent-primary);
+}
+
+.pdf-icon-btn.ocr:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.pdf-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+.pdf-scale-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: center;
+}
+
+.pdf-lang-select {
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.pdf-canvas-wrapper {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+  background: #1a1a2e;
+}
+
+.pdf-canvas {
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  max-width: 100%;
+}
+
+.pdf-loading-state,
+.pdf-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.pdf-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.pdf-ocr-panel {
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  flex-shrink: 0;
+}
+
+.pdf-ocr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pdf-ocr-textarea {
+  flex: 1;
+  resize: none;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: var(--font-sans);
+}
+
+/* ==========================================================================
+   ePub Reader Modal
+   ========================================================================== */
+.epub-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.epub-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.epub-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.epub-book-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.epub-progress-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: rgba(99,102,241,0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(99,102,241,0.2);
+}
+
+.epub-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.epub-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.epub-icon-btn:hover {
+  background: rgba(255,255,255,0.08);
+  color: #e2e8f0;
+}
+
+.epub-icon-btn.danger:hover {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
+
+.epub-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.epub-toc-panel {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.epub-toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.epub-toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.epub-toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all 0.12s ease;
+}
+
+.epub-toc-item:hover {
+  color: #e2e8f0;
+  background: rgba(255,255,255,0.05);
+}
+
+.epub-toc-item.sub {
+  padding-left: 28px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.epub-render-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.epub-canvas-container {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.epub-container {
+  width: 100%;
+  height: 100%;
+}
+
+.epub-container iframe {
+  border: none !important;
+}
+
+.epub-page-nav {
+  width: 48px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.epub-page-nav:hover {
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.7);
+}
+
+.epub-loading,
+.epub-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 13px;
+  height: 100%;
+}
+
+.epub-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(99,102,241,0.2);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.epub-settings-panel {
+  width: 220px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.epub-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.epub-setting-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.epub-theme-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.epub-theme-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.epub-theme-btn.dark { background: #0f172a; color: #e2e8f0; }
+.epub-theme-btn.light { background: #ffffff; color: #1e293b; }
+.epub-theme-btn.sepia { background: #f5efe6; color: #433422; }
+
+.epub-theme-btn.active {
+  border-color: var(--accent-primary);
+}
+
+.epub-progress-bar-track {
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+
+.epub-progress-bar-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.4s ease;
 }

@@ -18,6 +18,7 @@ import {
   Coffee, 
   Sparkles
 } from 'lucide-react';
+import { HourglassPomodoro } from './ui/HourglassPomodoro';
 
 interface FocusPomodoroModalProps {
   isOpen: boolean;
@@ -239,6 +240,7 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
 
             {/* Time readout in center */}
             <div className="pomo-dial-center">
+              <HourglassPomodoro scale={0.55} isRunning={isRunning} className="pomo-hourglass-icon" />
               <span className="pomo-time-display">{timeFormatted}</span>
               <span className="pomo-mode-tag">
                 {mode === 'work' ? 'FOCUS TIME' : 'REST & RECHARGE'}

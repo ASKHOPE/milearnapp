@@ -15,7 +15,9 @@ import {
   PanelLeftOpen,
   Zap,
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Pin,
+  PinOff
 } from 'lucide-react';
 import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
@@ -62,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   pomodoroSecondsLeft,
   isPomodoroRunning,
-  pomodoroMode,
+  pomodoroMode = 'work',
   onToggleTheme,
   onOpenSearch,
   onOpenKnowledgeBase,
@@ -76,6 +78,25 @@ export const Header: React.FC<HeaderProps> = ({
   onQuickNote
 }) => {
   const [isToolsTrayOpen, setIsToolsTrayOpen] = useState(false);
+  const [pinnedTools, setPinnedTools] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('milearnapp_pinned_tools');
+      return saved ? JSON.parse(saved) : ['pomodoro', 'study'];
+    } catch {
+      return ['pomodoro', 'study'];
+    }
+  });
+
+  const togglePin = (toolId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinnedTools((prev) => {
+      const next = prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId];
+      try {
+        localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const formattedPomoTime = pomodoroSecondsLeft !== undefined
     ? `${Math.floor(pomodoroSecondsLeft / 60).toString().padStart(2, '0')}:${(pomodoroSecondsLeft % 60).toString().padStart(2, '0')}`
@@ -83,12 +104,12 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="app-header">
-      {/* Left: Sidebar Toggle, MiLEARNAPP Brand, Persona Switcher & Quick Note */}
+      {/* Left: Sidebar Toggle, MiLEARNAPP Brand & Persona Switcher */}
       <div className="header-left">
         <button 
           className="mobile-only-btn editor-icon-btn" 
           onClick={onToggleMobileSidebar}
-          title="Toggle Sidebar"
+          title="Toggle Sidebar Navigation"
           aria-label="Toggle Sidebar"
           style={{ display: 'none' }}
         >
@@ -100,14 +121,15 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             className="header-sidebar-toggle-btn"
             onClick={onToggleSidebar}
-            title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            title={isSidebarCollapsed ? 'Expand Sidebar (Cmd+\\)' : 'Collapse Sidebar (Cmd+\\)'}
+            aria-label={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
           </button>
         )}
 
         <div className="app-brand-text">
-          <span className="brand-title-logo">MiLEARNAPP</span>
+          <span className="brand-title-logo" title="MiLEARNAPP - Knowledge & Learning Hub">MiLEARNAPP</span>
         </div>
 
         {workspaces && activeWorkspaceId && onSelectWorkspace && onCreateWorkspace && onDeleteWorkspace && (
@@ -122,18 +144,6 @@ export const Header: React.FC<HeaderProps> = ({
             />
           </div>
         )}
-
-        {onQuickNote && (
-          <button
-            type="button"
-            className="header-quick-note-btn"
-            onClick={onQuickNote}
-            title="Instant Quick Scratchpad (Alt+Q)"
-          >
-            <Zap size={13} color="#f59e0b" />
-            <span>Quick Note</span>
-          </button>
-        )}
       </div>
 
       {/* Center: Global Search Trigger */}
@@ -141,7 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button 
           className="search-trigger-btn" 
           onClick={onOpenSearch}
-          title="Search all notes, tags, attachments (Cmd+K)"
+          title="Global Spotlight Search across all notes, tags, books & media (Cmd+K)"
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Search size={14} />
@@ -151,8 +161,82 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Collapsible Tools Tray, 3-Way Theme, Combined Profile Tablet with Settings */}
+      {/* Right: Quick Note (Moved here next to Tools), Pinned Tools, Tools Tray, Theme, Profile Tablet */}
       <div className="header-right">
+
+        {/* ⚡ Quick Note Button (Moved to right next to tools) */}
+        {onQuickNote && (
+          <button
+            type="button"
+            className="header-quick-note-btn"
+            onClick={onQuickNote}
+            title="Instant Quick Scratchpad (Alt+Q or Option+Q)"
+          >
+            <Zap size={13} color="#f59e0b" />
+            <span>Quick Note</span>
+          </button>
+        )}
+
+        {/* Pinned Nav Quick Access Tools */}
+        <div className="header-pinned-tools">
+          {pinnedTools.includes('pomodoro') && (
+            <button
+              type="button"
+              className={`header-pinned-tool-btn ${isPomodoroRunning ? 'running' : ''}`}
+              onClick={onOpenPomodoro}
+              title={`Focus Pomodoro (${isPomodoroRunning ? formattedPomoTime : '25m Timer'})`}
+            >
+              <Timer size={14} color="#ef4444" />
+              {isPomodoroRunning && (
+                <span className="pinned-pomo-text">{formattedPomoTime}</span>
+              )}
+            </button>
+          )}
+
+          {pinnedTools.includes('study') && (
+            <button
+              type="button"
+              className="header-pinned-tool-btn"
+              onClick={onOpenStudyMode}
+              title="Study Cards (Spaced Repetition Flashcards)"
+            >
+              <GraduationCap size={14} color="var(--accent-primary)" />
+            </button>
+          )}
+
+          {pinnedTools.includes('knowledge') && (
+            <button
+              type="button"
+              className="header-pinned-tool-btn"
+              onClick={onOpenKnowledgeBase}
+              title="Knowledge Base Graph (Galaxy View)"
+            >
+              <Network size={14} color="#0ea5e9" />
+            </button>
+          )}
+
+          {pinnedTools.includes('mind') && onOpenInternalMind && (
+            <button
+              type="button"
+              className="header-pinned-tool-btn"
+              onClick={onOpenInternalMind}
+              title="Internal Mind Lexicon (Autonomous Dictionary)"
+            >
+              <Brain size={14} color="#8b5cf6" />
+            </button>
+          )}
+
+          {pinnedTools.includes('linktree') && (
+            <button
+              type="button"
+              className="header-pinned-tool-btn"
+              onClick={onOpenLinkTree}
+              title="Folder Link Tree Visualizer"
+            >
+              <GitFork size={14} color="#10b981" />
+            </button>
+          )}
+        </div>
 
         {/* Collapsible Tools Tray (Windows / Mac Taskbar Tray style) */}
         <div className="tools-tray-container">
@@ -160,7 +244,7 @@ export const Header: React.FC<HeaderProps> = ({
             type="button"
             className={`tools-tray-trigger-btn ${isToolsTrayOpen ? 'active' : ''} ${isPomodoroRunning ? 'running' : ''}`}
             onClick={() => setIsToolsTrayOpen(!isToolsTrayOpen)}
-            title="Open Power Tools & Study Hub"
+            title="Open Power Tools, Study Hub & Utilities"
           >
             <Sparkles size={14} color="var(--accent-primary)" />
             <span>Tools</span>
@@ -180,69 +264,125 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="tools-tray-dropdown-menu">
                 <div className="tray-menu-header">
                   <span>Workspace Utilities</span>
+                  <span className="tray-pin-hint">Pin to Nav</span>
                 </div>
 
-                <button
-                  type="button"
-                  className="tray-item-btn"
-                  onClick={() => { onOpenPomodoro(); setIsToolsTrayOpen(false); }}
-                >
-                  <Timer size={15} color="#ef4444" />
-                  <div className="tray-item-text">
-                    <strong>Focus Pomodoro</strong>
-                    <span>{isPomodoroRunning ? `Running · ${formattedPomoTime}` : '25m Timer & Soundscapes'}</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className="tray-item-btn"
-                  onClick={() => { onOpenStudyMode(); setIsToolsTrayOpen(false); }}
-                >
-                  <GraduationCap size={15} color="var(--accent-primary)" />
-                  <div className="tray-item-text">
-                    <strong>Study Cards</strong>
-                    <span>Spaced repetition & flashcards</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  className="tray-item-btn"
-                  onClick={() => { onOpenKnowledgeBase(); setIsToolsTrayOpen(false); }}
-                >
-                  <Network size={15} color="#0ea5e9" />
-                  <div className="tray-item-text">
-                    <strong>Knowledge Base Graph</strong>
-                    <span>Visual connections & cluster map</span>
-                  </div>
-                </button>
-
-                {onOpenInternalMind && (
+                <div className="tray-item-row-wrap">
                   <button
                     type="button"
                     className="tray-item-btn"
-                    onClick={() => { onOpenInternalMind(); setIsToolsTrayOpen(false); }}
+                    onClick={() => { onOpenPomodoro(); setIsToolsTrayOpen(false); }}
+                    title="Open Focus Pomodoro & Ambient Soundscapes"
                   >
-                    <Brain size={15} color="#8b5cf6" />
+                    <Timer size={15} color="#ef4444" />
                     <div className="tray-item-text">
-                      <strong>Internal Mind Lexicon</strong>
-                      <span>Autonomous dictionary & concept index</span>
+                      <strong>Focus Pomodoro</strong>
+                      <span>{isPomodoroRunning ? `Running · ${formattedPomoTime}` : '25m Timer & Soundscapes'}</span>
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    className={`btn-tool-pin ${pinnedTools.includes('pomodoro') ? 'pinned' : ''}`}
+                    onClick={(e) => togglePin('pomodoro', e)}
+                    title={pinnedTools.includes('pomodoro') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                  >
+                    {pinnedTools.includes('pomodoro') ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                </div>
+
+                <div className="tray-item-row-wrap">
+                  <button
+                    type="button"
+                    className="tray-item-btn"
+                    onClick={() => { onOpenStudyMode(); setIsToolsTrayOpen(false); }}
+                    title="Open Study Flashcards & SuperMemo-2 Spaced Repetition"
+                  >
+                    <GraduationCap size={15} color="var(--accent-primary)" />
+                    <div className="tray-item-text">
+                      <strong>Study Cards</strong>
+                      <span>Spaced repetition & flashcards</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-tool-pin ${pinnedTools.includes('study') ? 'pinned' : ''}`}
+                    onClick={(e) => togglePin('study', e)}
+                    title={pinnedTools.includes('study') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                  >
+                    {pinnedTools.includes('study') ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                </div>
+
+                <div className="tray-item-row-wrap">
+                  <button
+                    type="button"
+                    className="tray-item-btn"
+                    onClick={() => { onOpenKnowledgeBase(); setIsToolsTrayOpen(false); }}
+                    title="Open Visual Knowledge Graph of all note connections"
+                  >
+                    <Network size={15} color="#0ea5e9" />
+                    <div className="tray-item-text">
+                      <strong>Knowledge Base Graph</strong>
+                      <span>Visual connections & cluster map</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-tool-pin ${pinnedTools.includes('knowledge') ? 'pinned' : ''}`}
+                    onClick={(e) => togglePin('knowledge', e)}
+                    title={pinnedTools.includes('knowledge') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                  >
+                    {pinnedTools.includes('knowledge') ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                </div>
+
+                {onOpenInternalMind && (
+                  <div className="tray-item-row-wrap">
+                    <button
+                      type="button"
+                      className="tray-item-btn"
+                      onClick={() => { onOpenInternalMind(); setIsToolsTrayOpen(false); }}
+                      title="Open Autonomous Internal Mind Lexicon & Concept Index"
+                    >
+                      <Brain size={15} color="#8b5cf6" />
+                      <div className="tray-item-text">
+                        <strong>Internal Mind Lexicon</strong>
+                        <span>Autonomous dictionary & concept index</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-tool-pin ${pinnedTools.includes('mind') ? 'pinned' : ''}`}
+                      onClick={(e) => togglePin('mind', e)}
+                      title={pinnedTools.includes('mind') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                    >
+                      {pinnedTools.includes('mind') ? <PinOff size={13} /> : <Pin size={13} />}
+                    </button>
+                  </div>
                 )}
 
-                <button
-                  type="button"
-                  className="tray-item-btn"
-                  onClick={() => { onOpenLinkTree(); setIsToolsTrayOpen(false); }}
-                >
-                  <GitFork size={15} color="#10b981" />
-                  <div className="tray-item-text">
-                    <strong>Folder Link Tree</strong>
-                    <span>Directory tree structure graph</span>
-                  </div>
-                </button>
+                <div className="tray-item-row-wrap">
+                  <button
+                    type="button"
+                    className="tray-item-btn"
+                    onClick={() => { onOpenLinkTree(); setIsToolsTrayOpen(false); }}
+                    title="Open Directory Hierarchy & Link Tree"
+                  >
+                    <GitFork size={15} color="#10b981" />
+                    <div className="tray-item-text">
+                      <strong>Folder Link Tree</strong>
+                      <span>Directory tree structure graph</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-tool-pin ${pinnedTools.includes('linktree') ? 'pinned' : ''}`}
+                    onClick={(e) => togglePin('linktree', e)}
+                    title={pinnedTools.includes('linktree') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                  >
+                    {pinnedTools.includes('linktree') ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -256,8 +396,8 @@ export const Header: React.FC<HeaderProps> = ({
             theme === 'system'
               ? 'Theme: System Default (Click for Day Theme)'
               : theme === 'light'
-              ? 'Theme: Day (Click for Night Theme)'
-              : 'Theme: Night (Click for System Default)'
+              ? 'Theme: Day Theme (Click for Night Theme)'
+              : 'Theme: Night Theme (Click for System Default)'
           }
           aria-label="Toggle Theme"
         >
@@ -274,7 +414,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div 
           className="header-profile-tablet"
           onClick={onOpenSettings || onOpenProfile}
-          title="Account, Profile & Settings"
+          title="Account, Identity & Settings (Cmd+,)"
         >
           <div className="profile-tablet-avatar">
             {userProfile?.avatarType === 'image' || userProfile?.avatarType === 'gif' ? (
@@ -290,7 +430,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="profile-tablet-name">
             {userProfile?.name || activeWorkspace?.name || 'Personal'}
           </span>
-          <div className="profile-tablet-gear-box" title="Open Settings">
+          <div className="profile-tablet-gear-box" title="Open Settings (Cmd+,)">
             <Settings size={13} className="profile-tablet-gear" />
           </div>
         </div>

@@ -15,6 +15,7 @@ import { StudyModeModal } from './components/StudyModeModal';
 import { FocusPomodoroModal } from './components/FocusPomodoroModal';
 import { InternalMindModal } from './components/InternalMindModal';
 import { InactivityOverlay } from './components/InactivityOverlay';
+import { LibraryFileManager } from './components/LibraryFileManager';
 import { NOTE_TEMPLATES } from './services/templates';
 import './styles/main.css';
 
@@ -26,6 +27,7 @@ export const App: React.FC = () => {
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('ws-personal');
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [secondaryNoteId, setSecondaryNoteId] = useState<string | null>(null);
   const [openNoteIds, setOpenNoteIds] = useState<string[]>([]);
 
   // Filters & Navigation
@@ -34,6 +36,7 @@ export const App: React.FC = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [isNotesCollapsed, setIsNotesCollapsed] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // Modals, Study, Inactivity & Focus
   const [theme, setTheme] = useState<ThemeMode>('system');
@@ -53,6 +56,17 @@ export const App: React.FC = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const notesCountByWorkspace = useMemo(() => {
+    const map = new Map<string, number>();
+    notes.forEach((n) => {
+      if (!n.isTrashed) {
+        const wsId = n.workspaceId || 'ws-personal';
+        map.set(wsId, (map.get(wsId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [notes]);
 
   // Initialize DB & Seed Data
   useEffect(() => {
@@ -137,6 +151,9 @@ export const App: React.FC = () => {
       } else if (shortcutManager.matchesEvent(e, hotkeys.settings)) {
         e.preventDefault();
         setIsSettingsOpen((prev) => !prev);
+      } else if ((e.altKey || e.metaKey) && e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+        handleCreateQuickNote();
       }
 
       if (e.key === 'Escape') {
@@ -147,6 +164,7 @@ export const App: React.FC = () => {
         setIsSettingsOpen(false);
         setIsStudyModeOpen(false);
         setIsPomodoroOpen(false);
+        setIsLibraryOpen(false);
         if (isZenMode) setIsZenMode(false);
       }
     };
@@ -282,13 +300,38 @@ export const App: React.FC = () => {
     await storage.saveNote(newPageNote);
   };
 
-  // Note Handlers
+  // Note Handlers: Auto-assign unassigned notes to "Uncategorized" folder
+  const ensureUncategorizedFolder = async (wsId: string): Promise<string> => {
+    let uncatFolder = folders.find(
+      (f) => (f.workspaceId || 'ws-personal') === wsId && f.name.toLowerCase() === 'uncategorized'
+    );
+    if (!uncatFolder) {
+      uncatFolder = {
+        id: 'f-uncat-' + wsId,
+        workspaceId: wsId,
+        name: 'Uncategorized',
+        parentId: null,
+        color: '#64748b',
+        icon: 'folder',
+        createdAt: new Date().toISOString()
+      };
+      setFolders((prev) => [...prev, uncatFolder!]);
+      await storage.saveFolder(uncatFolder);
+    }
+    return uncatFolder.id;
+  };
+
   const handleCreateNote = async () => {
+    let targetFolder = currentFolderId;
+    if (!targetFolder) {
+      targetFolder = await ensureUncategorizedFolder(activeWorkspaceId);
+    }
+
     const newNote: Note = {
       id: 'n-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
       title: 'Untitled Note',
       content: '',
-      folderId: currentFolderId || null,
+      folderId: targetFolder,
       workspaceId: activeWorkspaceId,
       tags: selectedTag ? [selectedTag] : [],
       isFavorite: false,
@@ -303,6 +346,98 @@ export const App: React.FC = () => {
     setNotes((prev) => [newNote, ...prev]);
     handleOpenNote(newNote.id);
     await storage.saveNote(newNote);
+  };
+
+  // Instant Quick Note Scratchpad
+  const handleCreateQuickNote = async () => {
+    const timeStr = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const targetFolder = await ensureUncategorizedFolder(activeWorkspaceId);
+
+    const quickNote: Note = {
+      id: 'n-quick-' + Date.now().toString(36),
+      title: `⚡ Quick Scratchpad (${dateStr}, ${timeStr})`,
+      content: `# ⚡ Quick Scratchpad\n\n- [ ] `,
+      folderId: targetFolder,
+      workspaceId: activeWorkspaceId,
+      tags: ['quick-note'],
+      isFavorite: false,
+      isPinned: false,
+      isArchived: false,
+      isTrashed: false,
+      attachments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setNotes((prev) => [quickNote, ...prev]);
+    handleOpenNote(quickNote.id);
+    await storage.saveNote(quickNote);
+  };
+
+  // Duplicate Note Handler
+  const handleDuplicateNote = async (sourceNote: Note) => {
+    const cloned: Note = {
+      ...sourceNote,
+      id: 'n-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+      title: `${sourceNote.title || 'Untitled Note'} (Copy)`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    setNotes((prev) => [cloned, ...prev]);
+    handleOpenNote(cloned.id);
+    await storage.saveNote(cloned);
+  };
+
+  // Move Note Handler
+  const handleMoveNote = async (noteId: string, folderId: string | null, bookId: string | null) => {
+    const updatedNotes = notes.map((n) =>
+      n.id === noteId ? { ...n, folderId, bookId, updatedAt: new Date().toISOString() } : n
+    );
+    setNotes(updatedNotes);
+    const target = updatedNotes.find((n) => n.id === noteId);
+    if (target) await storage.saveNote(target);
+  };
+
+  // Duplicate Book Handler
+  const handleDuplicateBook = async (sourceBook: Book) => {
+    const newBookId = 'b-' + Date.now().toString(36);
+    const clonedBook: Book = {
+      ...sourceBook,
+      id: newBookId,
+      title: `${sourceBook.title} (Copy)`,
+      createdAt: new Date().toISOString()
+    };
+    setBooks((prev) => [...prev, clonedBook]);
+    await storage.saveBook(clonedBook);
+
+    // Also clone all pages belonging to the book
+    const pages = notes.filter((n) => n.bookId === sourceBook.id);
+    for (const page of pages) {
+      const clonedPage: Note = {
+        ...page,
+        id: 'n-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+        bookId: newBookId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      setNotes((prev) => [clonedPage, ...prev]);
+      await storage.saveNote(clonedPage);
+    }
+  };
+
+  // Split View Handlers
+  const handleOpenNoteSplit = (noteId: string) => {
+    setSecondaryNoteId(noteId);
+  };
+
+  const handleCloseSplit = () => {
+    setSecondaryNoteId(null);
+  };
+
+  // Exit Note Handler
+  const handleCloseNote = () => {
+    setSelectedNoteId(null);
   };
 
   const handleOpenTodayNote = async () => {
@@ -566,17 +701,6 @@ export const App: React.FC = () => {
     );
   }
 
-  const notesCountByWorkspace = useMemo(() => {
-    const map = new Map<string, number>();
-    notes.forEach((n) => {
-      if (!n.isTrashed) {
-        const wsId = n.workspaceId || 'ws-personal';
-        map.set(wsId, (map.get(wsId) || 0) + 1);
-      }
-    });
-    return map;
-  }, [notes]);
-
   return (
     <div className={`app-container ${isZenMode ? 'zen-mode' : ''}`}>
       {/* Top Header Navigation */}
@@ -605,6 +729,7 @@ export const App: React.FC = () => {
         onOpenStudyMode={() => setIsStudyModeOpen(true)}
         onOpenPomodoro={() => setIsPomodoroOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        onQuickNote={handleCreateQuickNote}
       />
 
       {/* 3-Pane Main Application Layout */}
@@ -630,6 +755,8 @@ export const App: React.FC = () => {
           onDeleteBook={handleDeleteBook}
           onAddPageToBook={handleAddPageToBook}
           onSelectNote={handleOpenNote}
+          onOpenLibrary={() => setIsLibraryOpen(true)}
+          isLibraryOpen={isLibraryOpen}
           onSelectFilter={(filter) => {
             setCurrentFilter(filter);
             setCurrentFolderId(null);
@@ -660,6 +787,7 @@ export const App: React.FC = () => {
           isCollapsed={isNotesCollapsed}
           onToggleCollapse={() => setIsNotesCollapsed(!isNotesCollapsed)}
           onSelectNote={handleOpenNote}
+          onSelectNoteSplit={handleOpenNoteSplit}
           onCreateNote={handleCreateNote}
           onToggleFavorite={handleToggleFavorite}
           onEmptyTrash={handleEmptyTrash}
@@ -669,30 +797,100 @@ export const App: React.FC = () => {
           onPermanentDeleteNote={handlePermanentDeleteNote}
         />
 
-        {/* Pane 3: Rich Note Editor with Live View, Books Paging, Floated Images & Tables */}
-        <NoteEditor
-          note={currentNote}
-          folders={workspaceFolders}
-          allNotes={workspaceNotes}
-          books={workspaceBooks}
-          activeWorkspace={activeWorkspace}
-          openNoteIds={openNoteIds}
-          activeNoteId={selectedNoteId}
-          isMicEnabled={isMicEnabled}
-          onSelectTab={handleOpenNote}
-          onCloseTab={handleCloseTab}
-          onNewTab={handleCreateNote}
-          isZenMode={isZenMode}
-          onToggleZenMode={() => setIsZenMode((z) => !z)}
-          onUpdateNote={handleUpdateNote}
-          onDeleteNote={handleSoftDeleteNote}
-          onRestoreNote={handleRestoreNote}
-          onPermanentDeleteNote={handlePermanentDeleteNote}
-          onToggleArchiveNote={handleToggleArchiveNote}
-          onAddPageToBook={handleAddPageToBook}
-          onNavigateToNote={handleNavigateToNote}
-          onBackMobile={() => setSelectedNoteId(null)}
-        />
+        {/* Pane 3: Rich Note Editor / Dual Side-by-Side Split View */}
+        {secondaryNoteId && notes.find((n) => n.id === secondaryNoteId) ? (
+          <div className="split-editors-container">
+            <div className="split-editor-pane">
+              <NoteEditor
+                note={currentNote}
+                folders={workspaceFolders}
+                allNotes={workspaceNotes}
+                books={workspaceBooks}
+                activeWorkspace={activeWorkspace}
+                openNoteIds={openNoteIds}
+                activeNoteId={selectedNoteId}
+                isMicEnabled={isMicEnabled}
+                onSelectTab={handleOpenNote}
+                onCloseTab={handleCloseTab}
+                onNewTab={handleCreateNote}
+                isZenMode={isZenMode}
+                onToggleZenMode={() => setIsZenMode((z) => !z)}
+                onUpdateNote={handleUpdateNote}
+                onDeleteNote={handleSoftDeleteNote}
+                onRestoreNote={handleRestoreNote}
+                onPermanentDeleteNote={handlePermanentDeleteNote}
+                onToggleArchiveNote={handleToggleArchiveNote}
+                onAddPageToBook={handleAddPageToBook}
+                onNavigateToNote={handleNavigateToNote}
+                onBackMobile={() => setSelectedNoteId(null)}
+                isSplitView={true}
+                onCloseSplit={handleCloseSplit}
+                onCloseNote={handleCloseNote}
+                onDuplicateNote={handleDuplicateNote}
+                onMoveNote={handleMoveNote}
+              />
+            </div>
+            <div className="split-editor-pane">
+              <NoteEditor
+                note={notes.find((n) => n.id === secondaryNoteId) || null}
+                folders={workspaceFolders}
+                allNotes={workspaceNotes}
+                books={workspaceBooks}
+                activeWorkspace={activeWorkspace}
+                openNoteIds={openNoteIds}
+                activeNoteId={secondaryNoteId}
+                isMicEnabled={isMicEnabled}
+                onSelectTab={handleOpenNote}
+                onCloseTab={handleCloseTab}
+                onNewTab={handleCreateNote}
+                isZenMode={isZenMode}
+                onToggleZenMode={() => setIsZenMode((z) => !z)}
+                onUpdateNote={handleUpdateNote}
+                onDeleteNote={handleSoftDeleteNote}
+                onRestoreNote={handleRestoreNote}
+                onPermanentDeleteNote={handlePermanentDeleteNote}
+                onToggleArchiveNote={handleToggleArchiveNote}
+                onAddPageToBook={handleAddPageToBook}
+                onNavigateToNote={handleNavigateToNote}
+                onBackMobile={() => setSecondaryNoteId(null)}
+                isSplitView={true}
+                onCloseSplit={handleCloseSplit}
+                onCloseNote={() => setSecondaryNoteId(null)}
+                onDuplicateNote={handleDuplicateNote}
+                onMoveNote={handleMoveNote}
+              />
+            </div>
+          </div>
+        ) : (
+          <NoteEditor
+            note={currentNote}
+            folders={workspaceFolders}
+            allNotes={workspaceNotes}
+            books={workspaceBooks}
+            activeWorkspace={activeWorkspace}
+            openNoteIds={openNoteIds}
+            activeNoteId={selectedNoteId}
+            isMicEnabled={isMicEnabled}
+            onSelectTab={handleOpenNote}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleCreateNote}
+            isZenMode={isZenMode}
+            onToggleZenMode={() => setIsZenMode((z) => !z)}
+            onUpdateNote={handleUpdateNote}
+            onDeleteNote={handleSoftDeleteNote}
+            onRestoreNote={handleRestoreNote}
+            onPermanentDeleteNote={handlePermanentDeleteNote}
+            onToggleArchiveNote={handleToggleArchiveNote}
+            onAddPageToBook={handleAddPageToBook}
+            onNavigateToNote={handleNavigateToNote}
+            onBackMobile={() => setSelectedNoteId(null)}
+            isSplitView={false}
+            onOpenSplit={handleOpenNoteSplit}
+            onCloseNote={handleCloseNote}
+            onDuplicateNote={handleDuplicateNote}
+            onMoveNote={handleMoveNote}
+          />
+        )}
       </div>
 
       {/* Settings, Backup, Security, Hotkeys & Identity Hub */}
@@ -780,6 +978,32 @@ export const App: React.FC = () => {
         profileAvatar={userProfile.avatarValue}
         avatarType={userProfile.avatarType}
         onUnlock={() => setIsVaultLockedDueToInactivity(false)}
+      />
+
+      {/* Full Library & File Manager Modal Overlay */}
+      <LibraryFileManager
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        books={workspaceBooks}
+        folders={workspaceFolders}
+        notes={workspaceNotes}
+        onSelectNote={(noteId) => {
+          handleOpenNote(noteId);
+          setIsLibraryOpen(false);
+        }}
+        onSelectNoteSplit={(noteId) => {
+          handleOpenNoteSplit(noteId);
+          setIsLibraryOpen(false);
+        }}
+        onCreateBook={handleCreateBook}
+        onDeleteBook={handleDeleteBook}
+        onDuplicateBook={handleDuplicateBook}
+        onCreateFolder={handleCreateFolder}
+        onDeleteFolder={handleDeleteFolder}
+        onMoveNote={handleMoveNote}
+        onDuplicateNote={handleDuplicateNote}
+        onAddPageToBook={handleAddPageToBook}
+        onCreateNote={handleCreateNote}
       />
     </div>
   );

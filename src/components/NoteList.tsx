@@ -20,7 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Columns2
 } from 'lucide-react';
 
 interface NoteListProps {
@@ -33,6 +34,7 @@ interface NoteListProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onSelectNote: (noteId: string) => void;
+  onSelectNoteSplit?: (noteId: string) => void;
   onCreateNote: () => void;
   onToggleFavorite: (noteId: string, e: React.MouseEvent) => void;
   onEmptyTrash: () => void;
@@ -52,6 +54,7 @@ export const NoteList: React.FC<NoteListProps> = ({
   isCollapsed = false,
   onToggleCollapse,
   onSelectNote,
+  onSelectNoteSplit,
   onCreateNote,
   onToggleFavorite,
   onEmptyTrash,
@@ -365,8 +368,23 @@ export const NoteList: React.FC<NoteListProps> = ({
                           />
                         </button>
 
+                        {onSelectNoteSplit && (
+                          <button
+                            type="button"
+                            className="card-icon-btn split"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectNoteSplit(note.id);
+                            }}
+                            title="Open Side-by-Side (Split View)"
+                          >
+                            <Columns2 size={12} />
+                          </button>
+                        )}
+
                         {onDeleteNote && (
                           <button
+                            type="button"
                             className="card-icon-btn trash danger"
                             onClick={(e) => onDeleteNote(note.id, e)}
                             title="Move to Trash Bin"

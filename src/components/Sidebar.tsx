@@ -15,7 +15,6 @@ import {
   Paperclip,
   Archive,
   Calendar as CalendarIcon,
-  PanelLeftOpen,
   BookOpen
 } from 'lucide-react';
 
@@ -53,6 +52,8 @@ interface SidebarProps {
   onExportData?: () => void;
   onImportData?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onCloseMobile: () => void;
+  onOpenLibrary?: () => void;
+  isLibraryOpen?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -73,6 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddPageToBook,
   onSelectNote,
   onSelectFilter,
+  onOpenLibrary,
+  isLibraryOpen = false,
   onSelectFolder,
   onSelectTag,
   onSelectDate,
@@ -259,26 +262,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
       <aside className="app-sidebar collapsed">
         <div className="sidebar-collapsed-rail">
-          {onToggleCollapse && (
-            <button 
-              className="btn-rail-expand"
-              onClick={onToggleCollapse}
-              title="Expand Sidebar"
-            >
-              <PanelLeftOpen size={16} />
-            </button>
-          )}
-
           <div 
             className="rail-ws-badge" 
             title={`Workspace: ${activeWorkspace?.name || 'Personal'}`}
-            onClick={onToggleCollapse}
           >
             <span>{activeWorkspace?.icon || '🏠'}</span>
           </div>
 
           <div className="rail-nav-group">
             <button 
+              type="button"
               className={`rail-nav-btn ${currentFilter === 'all' && !currentFolderId && !selectedTag ? 'active' : ''}`}
               onClick={() => onSelectFilter('all')}
               title={`All Notes (${totalNotes})`}
@@ -288,6 +281,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button 
+              type="button"
               className={`rail-nav-btn ${currentFilter === 'favorites' ? 'active' : ''}`}
               onClick={() => onSelectFilter('favorites')}
               title={`Favorites (${favoriteNotes})`}
@@ -296,6 +290,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button 
+              type="button"
               className={`rail-nav-btn ${currentFilter === 'recent' ? 'active' : ''}`}
               onClick={() => onSelectFilter('recent')}
               title="Recent Notes"
@@ -304,6 +299,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button 
+              type="button"
               className={`rail-nav-btn ${currentFilter === 'attachments' ? 'active' : ''}`}
               onClick={() => onSelectFilter('attachments')}
               title={`Files & Media (${withAttachments})`}
@@ -311,20 +307,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Paperclip size={16} color="#10b981" />
             </button>
 
-            {books.length > 0 && (
+            {onOpenLibrary && (
               <button
-                className="rail-nav-btn"
-                onClick={onToggleCollapse}
-                title={`Books & Notebooks (${books.length})`}
+                type="button"
+                className={`rail-nav-btn ${isLibraryOpen ? 'active' : ''}`}
+                onClick={onOpenLibrary}
+                title={`Open Library & File Manager (${books.length} Books, ${folders.length} Folders)`}
               >
                 <BookOpen size={16} color="var(--accent-primary)" />
               </button>
             )}
 
             <button
+              type="button"
               className="rail-nav-btn"
               onClick={onToggleCollapse}
-              title={`Folders (${folders.length})`}
+              title={`Folders (${folders.length}) - Click to expand`}
             >
               <Folder size={16} color="var(--text-secondary)" />
             </button>
@@ -332,6 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <div className="rail-bottom-group">
             <button 
+              type="button"
               className={`rail-nav-btn ${currentFilter === 'archive' ? 'active' : ''}`}
               onClick={() => onSelectFilter('archive')}
               title={`Archived Notes (${archivedNotesCount})`}
@@ -341,6 +340,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             <button 
+              type="button"
               className={`rail-nav-btn danger ${currentFilter === 'trash' ? 'active' : ''}`}
               onClick={() => onSelectFilter('trash')}
               title={`Trash Bin (${trashedNotesCount})`}
@@ -421,6 +421,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
                 <span className="badge-count">{withAttachments}</span>
               </li>
+
+              {onOpenLibrary && (
+                <li 
+                  className={`sidebar-nav-item ${isLibraryOpen ? 'active' : ''}`}
+                  onClick={() => {
+                    onOpenLibrary();
+                    onCloseMobile();
+                  }}
+                  style={{ marginTop: '4px', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.18)' }}
+                >
+                  <div className="nav-item-left">
+                    <BookOpen size={15} color="var(--accent-primary)" />
+                    <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Library & Files</span>
+                  </div>
+                  <span className="badge-count" style={{ background: 'rgba(79, 70, 229, 0.2)', color: 'var(--accent-primary)' }}>
+                    {books.length}b · {folders.length}f
+                  </span>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -488,37 +507,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           )}
+        </div>
 
-          {/* Section: Calendar & Daily Notes (with Click up/down to expand button) */}
-          <div className="sidebar-calendar-accordion">
-            <div 
-              className="cal-accordion-header"
-              onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-              title="Click to expand or collapse Calendar"
-            >
-              <div className="cal-header-left">
-                <CalendarIcon size={14} color="var(--accent-primary)" />
-                <span>Calendar & Daily Log</span>
-              </div>
-              <button 
-                type="button" 
-                className="btn-cal-chevron"
-                aria-label={isCalendarExpanded ? 'Collapse Calendar' : 'Expand Calendar'}
-              >
-                {isCalendarExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-              </button>
+        {/* Section: Calendar & Daily Notes (Pinned directly above Bin & Archive footer) */}
+        <div className="sidebar-calendar-accordion pinned-above-bins">
+          <div 
+            className="cal-accordion-header"
+            onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+            title="Click to expand or collapse Calendar"
+          >
+            <div className="cal-header-left">
+              <CalendarIcon size={14} color="var(--accent-primary)" />
+              <span>Calendar & Daily Log</span>
             </div>
-
-            {isCalendarExpanded && (
-              <div className="cal-accordion-body">
-                <CalendarWidget
-                  notes={notes}
-                  onSelectDate={onSelectDate}
-                  onOpenTodayNote={onOpenTodayNote}
-                />
-              </div>
-            )}
+            <button 
+              type="button" 
+              className="btn-cal-chevron"
+              aria-label={isCalendarExpanded ? 'Collapse Calendar' : 'Expand Calendar'}
+            >
+              {isCalendarExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+            </button>
           </div>
+
+          {isCalendarExpanded && (
+            <div className="cal-accordion-body">
+              <CalendarWidget
+                notes={notes}
+                onSelectDate={onSelectDate}
+                onOpenTodayNote={onOpenTodayNote}
+              />
+            </div>
+          )}
         </div>
 
         {/* Sidebar Footer: Archive & Bin Buttons (Restore & Vault Removed) */}

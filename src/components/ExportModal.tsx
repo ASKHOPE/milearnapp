@@ -82,7 +82,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     ctx.font = 'bold 18px Inter, -apple-system, sans-serif';
     ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
     ctx.textAlign = 'left';
-    const wsLabel = activeWorkspace ? `${activeWorkspace.icon} ${activeWorkspace.name}` : '⚡ Noteflow';
+    const wsLabel = activeWorkspace ? `${activeWorkspace.icon} ${activeWorkspace.name}` : '⚡ MiLEARNAPP';
     ctx.fillText(wsLabel, cardX + 36, cardY + 48);
 
     // Date & Words Count
@@ -143,7 +143,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     ctx.font = '14px Inter, sans-serif';
     ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.4)';
     ctx.textAlign = 'left';
-    ctx.fillText('Noteflow — Power Notes for Mac, iOS & Web', cardX + 36, cardY + cardH - 24);
+    ctx.fillText('MiLEARNAPP — Power Notes for Mac, iOS & Web', cardX + 36, cardY + cardH - 24);
 
     setImagePreviewUrl(canvas.toDataURL('image/png'));
   }, [isOpen, note, imageTheme, activeWorkspace]);

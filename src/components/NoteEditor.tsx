@@ -46,7 +46,11 @@ import {
   Unlock,
   KeyRound,
   Sigma,
-  GitBranch
+  GitBranch,
+  Columns2,
+  Move,
+  LogOut,
+  XCircle
 } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -91,6 +95,12 @@ interface NoteEditorProps {
   onAddPageToBook: (bookId: string) => void;
   onNavigateToNote: (noteTitle: string) => void;
   onBackMobile: () => void;
+  isSplitView?: boolean;
+  onCloseSplit?: () => void;
+  onOpenSplit?: (noteId: string) => void;
+  onCloseNote?: () => void;
+  onDuplicateNote?: (note: Note) => void;
+  onMoveNote?: (noteId: string, folderId: string | null, bookId: string | null) => void;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -114,7 +124,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onToggleArchiveNote,
   onAddPageToBook,
   onNavigateToNote,
-  onBackMobile
+  onBackMobile,
+  isSplitView = false,
+  onCloseSplit,
+  onOpenSplit,
+  onCloseNote,
+  onDuplicateNote,
+  onMoveNote
 }) => {
   const [mode, setMode] = useState<'live' | 'split' | 'source'>('live');
   const [isInsertImageOpen, setIsInsertImageOpen] = useState(false);
@@ -128,6 +144,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [isCryptoModalOpen, setIsCryptoModalOpen] = useState(false);
   const [cryptoModalMode, setCryptoModalMode] = useState<'lock' | 'unlock'>('lock');
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [moveFolderChoice, setMoveFolderChoice] = useState<string>('');
+  const [moveBookChoice, setMoveBookChoice] = useState<string>('');
+
+  useEffect(() => {
+    if (note) {
+      setMoveFolderChoice(note.folderId || '');
+      setMoveBookChoice(note.bookId || '');
+    }
+  }, [note?.id, note?.folderId, note?.bookId]);
 
   // Suggestions state (Slash command & Wiki-link)
   const [suggestionState, setSuggestionState] = useState<{
@@ -997,6 +1023,53 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             </button>
           )}
 
+          {/* Dual Split-View Trigger */}
+          {onOpenSplit && !isSplitView && (
+            <button
+              type="button"
+              className="editor-icon-btn"
+              onClick={() => onOpenSplit(note.id)}
+              title="Open Split View (Side-by-Side)"
+            >
+              <Columns2 size={16} color="var(--accent-primary)" />
+            </button>
+          )}
+
+          {isSplitView && onCloseSplit && (
+            <button
+              type="button"
+              className="editor-icon-btn danger"
+              onClick={onCloseSplit}
+              title="Close Split View"
+            >
+              <XCircle size={16} />
+            </button>
+          )}
+
+          {/* Duplicate Note Trigger */}
+          {onDuplicateNote && (
+            <button
+              type="button"
+              className="editor-icon-btn"
+              onClick={() => onDuplicateNote(note)}
+              title="Duplicate Note (Copy)"
+            >
+              <Copy size={16} />
+            </button>
+          )}
+
+          {/* Move to Folder / Book Trigger */}
+          {onMoveNote && (
+            <button
+              type="button"
+              className="editor-icon-btn"
+              onClick={() => setIsMoveModalOpen(true)}
+              title="Move Note (Folder & Book Organizer)"
+            >
+              <Move size={16} />
+            </button>
+          )}
+
           {/* Omni-Format Presentable Export Trigger */}
           <button
             className="editor-icon-btn"
@@ -1064,6 +1137,18 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           >
             <Trash2 size={16} />
           </button>
+
+          {/* Exit Note Button */}
+          {onCloseNote && (
+            <button
+              type="button"
+              className="editor-icon-btn exit-btn"
+              onClick={onCloseNote}
+              title="Exit Note (Deselect and return to workspace)"
+            >
+              <LogOut size={16} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -1341,7 +1426,20 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       ) : (
-        <div className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''}`} ref={scrollAreaRef}>
+        <div 
+          className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''}`} 
+          ref={scrollAreaRef}
+          onClick={(e) => {
+            if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('editor-scroll-area') || (e.target as HTMLElement).classList.contains('live-document-wrapper')) {
+              if (mode === 'live') {
+                setMode('split');
+              } else if (textareaRef.current) {
+                textareaRef.current.focus();
+                textareaRef.current.setSelectionRange(note.content.length, note.content.length);
+              }
+            }
+          }}
+        >
           {/* Hierarchy Breadcrumb Trail */}
           <nav className="editor-hierarchy-breadcrumbs" aria-label="Hierarchy">
             {activeWorkspace && (
@@ -1445,7 +1543,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 </button>
               </div>
 
-              <div className="markdown-body live-rich-document selectable-text">
+              <div 
+                className="markdown-body live-rich-document selectable-text"
+                onDoubleClick={() => setMode('split')}
+                title="Double-click to write or edit note"
+              >
                 {renderMarkdownPreview(note.content)}
               </div>
             </div>
@@ -1534,6 +1636,55 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onClose={() => setIsInsertImageOpen(false)}
         onInsert={handleInsertImageTag}
       />
+
+      {/* Move Note Modal */}
+      {isMoveModalOpen && (
+        <div className="library-submodal-backdrop" onClick={() => setIsMoveModalOpen(false)}>
+          <div className="library-submodal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 className="submodal-title">Move Note: {note.title || 'Untitled'}</h3>
+            
+            <div className="form-group">
+              <label>Destination Folder</label>
+              <select 
+                value={moveFolderChoice} 
+                onChange={(e) => setMoveFolderChoice(e.target.value)}
+              >
+                <option value="">(No Folder / Root)</option>
+                {folders.map(f => (
+                  <option key={f.id} value={f.id}>📁 {f.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Organize into Book / Notebook</label>
+              <select 
+                value={moveBookChoice} 
+                onChange={(e) => setMoveBookChoice(e.target.value)}
+              >
+                <option value="">(Not in a Book)</option>
+                {books.map(b => (
+                  <option key={b.id} value={b.id}>{b.icon} {b.title}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="submodal-btn-row">
+              <button type="button" className="btn-cancel" onClick={() => setIsMoveModalOpen(false)}>Cancel</button>
+              <button 
+                type="button" 
+                className="btn-confirm" 
+                onClick={() => {
+                  if (onMoveNote) onMoveNote(note.id, moveFolderChoice || null, moveBookChoice || null);
+                  setIsMoveModalOpen(false);
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

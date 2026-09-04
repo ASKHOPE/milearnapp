@@ -51,7 +51,12 @@ import {
   Columns2,
   Move,
   LogOut,
-  XCircle
+  XCircle,
+  Video as VideoIcon,
+  Highlighter as HighlighterIcon,
+  Strikethrough as StrikethroughIcon,
+  Underline as UnderlineIcon,
+  ChevronRight
 } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -76,6 +81,9 @@ import { InsertImageModal } from './editor/InsertImageModal';
 import { LinkInsertModal } from './editor/LinkInsertModal';
 import { MermaidEditorModal } from './editor/MermaidEditorModal';
 import { scanTextToDiagram } from '../services/textToDiagram';
+import { FloatingBubbleToolbar, type FloatingBubblePosition } from './editor/FloatingBubbleToolbar';
+import { BlockActionsMenu } from './editor/BlockActionsMenu';
+import { VideoEmbedModal } from './editor/VideoEmbedModal';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -159,6 +167,20 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [mermaidInitialCode, setMermaidInitialCode] = useState('');
   const [activeMermaidBlock, setActiveMermaidBlock] = useState<{ startLine: number; endLine: number } | null>(null);
 
+  // Video Embed Modal state
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+
+  // Typography settings (RoosterJS / SunEditor)
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
+
+  // Floating Contextual Bubble Toolbar state (Froala / Editor.js)
+  const [bubblePosition, setBubblePosition] = useState<FloatingBubblePosition>({
+    top: 0,
+    left: 0,
+    visible: false
+  });
+  const [activeSelectionRange, setActiveSelectionRange] = useState<{ start: number; end: number; selectedText: string } | null>(null);
+
   useEffect(() => {
     if (note) {
       setMoveFolderChoice(note.folderId || '');
@@ -198,6 +220,54 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Selection change listener for Floating Bubble Toolbar (Froala / RoosterJS / Editor.js)
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.rangeCount) {
+        setBubblePosition((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        return;
+      }
+
+      const text = selection.toString().trim();
+      if (!text) {
+        setBubblePosition((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        return;
+      }
+
+      // Ensure selection is inside our note editor pane
+      const editorPane = document.querySelector('.note-editor-pane');
+      const anchorNode = selection.anchorNode;
+      if (!editorPane || !anchorNode || !editorPane.contains(anchorNode)) {
+        setBubblePosition((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        return;
+      }
+
+      // Calculate bounding rect
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setBubblePosition({
+          top: rect.top,
+          left: rect.left + rect.width / 2 - 120,
+          visible: true
+        });
+
+        // If in textarea mode, track cursor start/end
+        if (textareaRef.current) {
+          const start = textareaRef.current.selectionStart;
+          const end = textareaRef.current.selectionEnd;
+          setActiveSelectionRange({ start, end, selectedText: text });
+        } else {
+          setActiveSelectionRange({ start: -1, end: -1, selectedText: text });
+        }
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, []);
 
   if (!note) {
@@ -371,6 +441,211 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       textarea.focus();
       textarea.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
     }, 10);
+  };
+
+  // Floating Bubble Formatting Action Handler (Froala / Quill / SunEditor / RoosterJS)
+  const handleApplyBubbleFormat = (formatType: string, value?: string) => {
+    if (note.isTrashed) return;
+    const selectedText = activeSelectionRange?.selectedText || '';
+
+    let prefix = '';
+    let suffix = '';
+
+    switch (formatType) {
+      case 'bold':
+        prefix = '**';
+        suffix = '**';
+        break;
+      case 'italic':
+        prefix = '*';
+        suffix = '*';
+        break;
+      case 'strikethrough':
+        prefix = '~~';
+        suffix = '~~';
+        break;
+      case 'underline':
+        prefix = '<u>';
+        suffix = '</u>';
+        break;
+      case 'code':
+        prefix = '`';
+        suffix = '`';
+        break;
+      case 'highlight':
+        prefix = value ? `<mark style="background-color: ${value}; padding: 1px 4px; border-radius: 3px;">` : '<mark>';
+        suffix = '</mark>';
+        break;
+      case 'color':
+        prefix = `<span style="color: ${value || 'inherit'};">`;
+        suffix = '</span>';
+        break;
+      case 'superscript':
+        prefix = '<sup>';
+        suffix = '</sup>';
+        break;
+      case 'subscript':
+        prefix = '<sub>';
+        suffix = '</sub>';
+        break;
+      case 'kbd':
+        prefix = '<kbd>';
+        suffix = '</kbd>';
+        break;
+      case 'link':
+        setLinkInitialText(selectedText);
+        setIsLinkModalOpen(true);
+        setBubblePosition((prev) => ({ ...prev, visible: false }));
+        return;
+      case 'align-left':
+        prefix = '\n<div align="left">\n';
+        suffix = '\n</div>\n';
+        break;
+      case 'align-center':
+        prefix = '\n<div align="center">\n';
+        suffix = '\n</div>\n';
+        break;
+      case 'align-right':
+        prefix = '\n<div align="right">\n';
+        suffix = '\n</div>\n';
+        break;
+      default:
+        break;
+    }
+
+    if (activeSelectionRange && activeSelectionRange.start !== -1 && textareaRef.current) {
+      // Direct textarea replacement
+      const { start, end } = activeSelectionRange;
+      const current = note.content;
+      const targetText = current.substring(start, end) || selectedText;
+      const replaced = `${prefix}${targetText}${suffix}`;
+      const newContent = current.substring(0, start) + replaced + current.substring(end);
+      onUpdateNote({
+        ...note,
+        content: newContent,
+        updatedAt: new Date().toISOString()
+      });
+    } else if (selectedText) {
+      // Live preview DOM selection replacement
+      const current = note.content;
+      const idx = current.indexOf(selectedText);
+      if (idx !== -1) {
+        const replaced = `${prefix}${selectedText}${suffix}`;
+        const newContent = current.slice(0, idx) + replaced + current.slice(idx + selectedText.length);
+        onUpdateNote({
+          ...note,
+          content: newContent,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
+
+    setBubblePosition((prev) => ({ ...prev, visible: false }));
+  };
+
+  // Editor.js-Style Block Actions (Move, Duplicate, Delete, Convert)
+  const handleMoveBlock = (startLine: number, endLine: number, direction: 'up' | 'down') => {
+    if (note.isTrashed) return;
+    const lines = note.content.split('\n');
+    const blockCount = endLine - startLine + 1;
+    const blockLines = lines.splice(startLine, blockCount);
+
+    if (direction === 'up' && startLine > 0) {
+      let targetIdx = startLine - 1;
+      while (targetIdx > 0 && lines[targetIdx].trim() === '') {
+        targetIdx--;
+      }
+      lines.splice(targetIdx, 0, ...blockLines);
+    } else if (direction === 'down' && startLine < lines.length) {
+      let targetIdx = startLine + 1;
+      while (targetIdx < lines.length && lines[targetIdx].trim() === '') {
+        targetIdx++;
+      }
+      lines.splice(Math.min(targetIdx + 1, lines.length), 0, ...blockLines);
+    } else {
+      // Re-insert if unable to move
+      lines.splice(startLine, 0, ...blockLines);
+      return;
+    }
+
+    onUpdateNote({
+      ...note,
+      content: lines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  const handleDuplicateBlock = (startLine: number, endLine: number) => {
+    if (note.isTrashed) return;
+    const lines = note.content.split('\n');
+    const blockLines = lines.slice(startLine, endLine + 1);
+    lines.splice(endLine + 1, 0, ...blockLines);
+
+    onUpdateNote({
+      ...note,
+      content: lines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  const handleDeleteBlock = (startLine: number, endLine: number) => {
+    if (note.isTrashed) return;
+    const lines = note.content.split('\n');
+    lines.splice(startLine, endLine - startLine + 1);
+
+    onUpdateNote({
+      ...note,
+      content: lines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  const handleConvertBlockType = (startLine: number, endLine: number, newType: string) => {
+    if (note.isTrashed) return;
+    const lines = note.content.split('\n');
+    for (let i = startLine; i <= endLine; i++) {
+      const raw = lines[i];
+      // strip existing prefixes
+      const clean = raw
+        .replace(/^#+\s*/, '')
+        .replace(/^-\s\[[ x]\]\s*/, '')
+        .replace(/^-\s*/, '')
+        .replace(/^>\s*/, '');
+
+      switch (newType) {
+        case 'h1':
+          lines[i] = `# ${clean}`;
+          break;
+        case 'h2':
+          lines[i] = `## ${clean}`;
+          break;
+        case 'h3':
+          lines[i] = `### ${clean}`;
+          break;
+        case 'task':
+          lines[i] = `- [ ] ${clean}`;
+          break;
+        case 'list':
+          lines[i] = `- ${clean}`;
+          break;
+        case 'quote':
+          lines[i] = `> ${clean}`;
+          break;
+        case 'callout':
+          lines[i] = `> [!NOTE]\n> ${clean}`;
+          break;
+        case 'paragraph':
+        default:
+          lines[i] = clean;
+          break;
+      }
+    }
+
+    onUpdateNote({
+      ...note,
+      content: lines.join('\n'),
+      updatedAt: new Date().toISOString()
+    });
   };
 
   // Insert Template into Note
@@ -738,8 +1013,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     const elements: React.ReactNode[] = [];
 
     const parseInlineSpans = (str: string) => {
-      const parts = str.split(/(\[\[.*?\]\]|\$[^$]+\$)/g);
+      // Regex splitting on WikiLinks, LaTeX, Highlights, Del/Strikethrough, Sub/Sup, Underline, Kbd, and HTML tags
+      const parts = str.split(/(\[\[.*?\]\]|\$[^$]+\$|==.*?==|~~.*?~~|<mark[\s\S]*?<\/mark>|<kbd>.*?<\/kbd>|<sub>.*?<\/sub>|<sup>.*?<\/sup>|<u>.*?<\/u>|<span[\s\S]*?<\/span>)/g);
       return parts.map((part, i) => {
+        if (!part) return null;
+
+        // Wiki-link
         if (part.startsWith('[[') && part.endsWith(']]')) {
           const targetTitle = part.slice(2, -2).trim();
           return (
@@ -754,10 +1033,83 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             </button>
           );
         }
+
+        // Inline LaTeX Math
         if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
           const mathExpr = part.slice(1, -1);
           return <MathRenderer key={i} math={mathExpr} />;
         }
+
+        // Markdown Highlight ==text==
+        if (part.startsWith('==') && part.endsWith('==') && part.length > 4) {
+          const textContent = part.slice(2, -2);
+          return (
+            <mark key={i} className="editor-text-highlight">
+              {textContent}
+            </mark>
+          );
+        }
+
+        // Markdown Strikethrough ~~text~~
+        if (part.startsWith('~~') && part.endsWith('~~') && part.length > 4) {
+          const textContent = part.slice(2, -2);
+          return <del key={i}>{textContent}</del>;
+        }
+
+        // HTML <mark ...>...</mark>
+        if (part.startsWith('<mark') && part.endsWith('</mark>')) {
+          const innerMatch = part.match(/<mark(?:\s+style="([^"]*)")?>(.*?)<\/mark>/i);
+          if (innerMatch) {
+            const inlineStyle = innerMatch[1];
+            const textContent = innerMatch[2];
+            return (
+              <mark
+                key={i}
+                className="editor-text-highlight"
+                style={inlineStyle ? { backgroundColor: inlineStyle.replace(/.*background-color:\s*([^;]+).*/, '$1') } : {}}
+              >
+                {textContent}
+              </mark>
+            );
+          }
+        }
+
+        // HTML <kbd>...</kbd>
+        if (part.startsWith('<kbd>') && part.endsWith('</kbd>')) {
+          return <kbd key={i} className="editor-inline-kbd">{part.slice(5, -6)}</kbd>;
+        }
+
+        // HTML <sub>...</sub>
+        if (part.startsWith('<sub>') && part.endsWith('</sub>')) {
+          return <sub key={i}>{part.slice(5, -6)}</sub>;
+        }
+
+        // HTML <sup>...</sup>
+        if (part.startsWith('<sup>') && part.endsWith('</sup>')) {
+          return <sup key={i}>{part.slice(5, -6)}</sup>;
+        }
+
+        // HTML <u>...</u>
+        if (part.startsWith('<u>') && part.endsWith('</u>')) {
+          return <u key={i}>{part.slice(3, -4)}</u>;
+        }
+
+        // HTML <span style="...">...</span>
+        if (part.startsWith('<span') && part.endsWith('</span>')) {
+          const spanMatch = part.match(/<span(?:\s+style="([^"]*)")?>(.*?)<\/span>/i);
+          if (spanMatch) {
+            const inlineStyle = spanMatch[1] || '';
+            const textContent = spanMatch[2];
+            const colorMatch = inlineStyle.match(/color:\s*([^;]+)/i);
+            const colorHex = colorMatch ? colorMatch[1].trim() : undefined;
+            return (
+              <span key={i} style={{ color: colorHex }}>
+                {textContent}
+              </span>
+            );
+          }
+        }
+
         return <span key={i}>{part}</span>;
       });
     };
@@ -769,13 +1121,29 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         return;
       }
       elements.push(
-        <InteractiveTable
-          key={`table-${keyIdx}`}
-          tableLines={tableBuffer}
-          startIndex={tableStartIndex}
-          onUpdateTableLines={handleUpdateTableLines}
-          isReadOnly={note.isTrashed}
-        />
+        <div key={`table-wrap-${keyIdx}`} className="editorjs-block-row">
+          <BlockActionsMenu
+            target={{
+              startLine: tableStartIndex,
+              endLine: tableStartIndex + tableBuffer.length - 1,
+              blockType: 'table',
+              rawContent: tableBuffer.join('\n')
+            }}
+            onMoveBlock={handleMoveBlock}
+            onDuplicateBlock={handleDuplicateBlock}
+            onDeleteBlock={handleDeleteBlock}
+            onConvertBlockType={handleConvertBlockType}
+            isReadOnly={note.isTrashed}
+          />
+          <div className="editorjs-block-content">
+            <InteractiveTable
+              tableLines={tableBuffer}
+              startIndex={tableStartIndex}
+              onUpdateTableLines={handleUpdateTableLines}
+              isReadOnly={note.isTrashed}
+            />
+          </div>
+        </div>
       );
       tableBuffer = [];
       insideTable = false;
@@ -783,15 +1151,33 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     const flushTasks = (keyIdx: number) => {
       if (taskBuffer.length === 0) return;
+      const startLine = taskBuffer[0].lineIndex;
+      const endLine = taskBuffer[taskBuffer.length - 1].lineIndex;
       elements.push(
-        <InteractiveTasks
-          key={`tasks-${keyIdx}`}
-          tasks={[...taskBuffer]}
-          onToggleTask={handleToggleChecklist}
-          onAddTask={handleAddTask}
-          onDeleteTask={handleDeleteTask}
-          isReadOnly={note.isTrashed}
-        />
+        <div key={`tasks-wrap-${keyIdx}`} className="editorjs-block-row">
+          <BlockActionsMenu
+            target={{
+              startLine,
+              endLine,
+              blockType: 'task',
+              rawContent: taskBuffer.map(t => `- [${t.isCompleted ? 'x' : ' '}] ${t.text}`).join('\n')
+            }}
+            onMoveBlock={handleMoveBlock}
+            onDuplicateBlock={handleDuplicateBlock}
+            onDeleteBlock={handleDeleteBlock}
+            onConvertBlockType={handleConvertBlockType}
+            isReadOnly={note.isTrashed}
+          />
+          <div className="editorjs-block-content">
+            <InteractiveTasks
+              tasks={[...taskBuffer]}
+              onToggleTask={handleToggleChecklist}
+              onAddTask={handleAddTask}
+              onDeleteTask={handleDeleteTask}
+              isReadOnly={note.isTrashed}
+            />
+          </div>
+        </div>
       );
       taskBuffer = [];
       insideTasks = false;
@@ -806,15 +1192,17 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       };
 
       elements.push(
-        <div key={`callout-${keyIdx}`} className={`callout-box callout-${calloutType}`}>
-          <div className="callout-title-row">
-            {iconMap[calloutType]}
-            <span>{calloutType.toUpperCase()}</span>
-          </div>
-          <div className="callout-content-text">
-            {calloutBuffer.map((line, idx) => (
-              <p key={idx}>{parseInlineSpans(line)}</p>
-            ))}
+        <div key={`callout-${keyIdx}`} className="editorjs-block-row">
+          <div className={`callout-box callout-${calloutType} editorjs-block-content`}>
+            <div className="callout-title-row">
+              {iconMap[calloutType]}
+              <span>{calloutType.toUpperCase()}</span>
+            </div>
+            <div className="callout-content-text">
+              {calloutBuffer.map((line, idx) => (
+                <p key={idx}>{parseInlineSpans(line)}</p>
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -824,7 +1212,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     let codeBlockStartIndex = 0;
 
-    lines.forEach((line, index) => {
+    for (let index = 0; index < lines.length; index++) {
+      const line = lines[index];
+
       // Code Block parsing
       if (line.startsWith('```')) {
         if (insideTable) flushTable(index);
@@ -858,21 +1248,36 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             );
           } else {
             elements.push(
-              <div key={blockId} className="code-block-container">
-                <div className="code-block-header">
-                  <span>{codeLanguage || 'code'}</span>
-                  <button 
-                    className="btn-copy-code"
-                    onClick={() => handleCopyCode(codeText, blockId)}
-                    title="Copy code to clipboard"
-                  >
-                    {isCopied ? <Check size={12} color="var(--color-success)" /> : <Copy size={12} />}
-                    <span>{isCopied ? 'Copied!' : 'Copy'}</span>
-                  </button>
+              <div key={blockId} className="editorjs-block-row">
+                <BlockActionsMenu
+                  target={{
+                    startLine: codeBlockStartIndex,
+                    endLine: index,
+                    blockType: 'code',
+                    rawContent: codeText
+                  }}
+                  onMoveBlock={handleMoveBlock}
+                  onDuplicateBlock={handleDuplicateBlock}
+                  onDeleteBlock={handleDeleteBlock}
+                  onConvertBlockType={handleConvertBlockType}
+                  isReadOnly={note.isTrashed}
+                />
+                <div className="code-block-container editorjs-block-content">
+                  <div className="code-block-header">
+                    <span>{codeLanguage || 'code'}</span>
+                    <button 
+                      className="btn-copy-code"
+                      onClick={() => handleCopyCode(codeText, blockId)}
+                      title="Copy code to clipboard"
+                    >
+                      {isCopied ? <Check size={12} color="var(--color-success)" /> : <Copy size={12} />}
+                      <span>{isCopied ? 'Copied!' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <pre style={{ margin: 0, padding: '12px 14px' }}>
+                    <code>{codeText}</code>
+                  </pre>
                 </div>
-                <pre style={{ margin: 0, padding: '12px 14px' }}>
-                  <code>{codeText}</code>
-                </pre>
               </div>
             );
           }
@@ -883,12 +1288,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           codeBlockStartIndex = index;
           codeLanguage = line.slice(3).trim().toLowerCase() || 'code';
         }
-        return;
+        continue;
       }
 
       if (insideCodeBlock) {
         codeBuffer.push(line);
-        return;
+        continue;
       }
 
       // Standalone Block Math ($$ ... $$)
@@ -900,7 +1305,68 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         elements.push(
           <MathRenderer key={`math-block-${index}`} math={line.slice(2, -2)} block />
         );
-        return;
+        continue;
+      }
+
+      // Embedded Video Card / iFrame detection (<div class="embedded-video-card"> or <video ...>)
+      if (line.includes('embedded-video-card') || line.includes('<video controls')) {
+        if (insideTable) flushTable(index);
+        if (insideCallout) flushCallout(index);
+        if (insideTasks) flushTasks(index);
+
+        // Gather HTML until closing tag
+        let videoHtml = line;
+        let endIdx = index;
+        if (!line.includes('</div>') && !line.includes('</video>')) {
+          while (endIdx + 1 < lines.length && !lines[endIdx].includes('</div>') && !lines[endIdx].includes('</video>')) {
+            endIdx++;
+            videoHtml += '\n' + lines[endIdx];
+          }
+          index = endIdx;
+        }
+
+        elements.push(
+          <div 
+            key={`video-${index}`} 
+            className="editor-embedded-video-wrapper"
+            dangerouslySetInnerHTML={{ __html: videoHtml }} 
+          />
+        );
+        continue;
+      }
+
+      // Collapsible / Spoiler Details (<details><summary>...</summary>...)
+      if (line.startsWith('<details>')) {
+        if (insideTable) flushTable(index);
+        if (insideCallout) flushCallout(index);
+        if (insideTasks) flushTasks(index);
+
+        let detailsContent: string[] = [];
+        let endIdx = index + 1;
+        while (endIdx < lines.length && !lines[endIdx].includes('</details>')) {
+          detailsContent.push(lines[endIdx]);
+          endIdx++;
+        }
+        index = endIdx;
+
+        let summaryText = 'Click to expand';
+        if (detailsContent[0]?.startsWith('<summary>')) {
+          summaryText = detailsContent[0].replace(/<\/?summary>/g, '').trim();
+          detailsContent.shift();
+        }
+
+        elements.push(
+          <details key={`details-${index}`} className="editor-collapsible-spoiler">
+            <summary className="spoiler-summary">
+              <ChevronRight size={14} className="summary-chevron" />
+              <span>{summaryText}</span>
+            </summary>
+            <div className="spoiler-body">
+              {renderMarkdownPreview(detailsContent.join('\n'))}
+            </div>
+          </details>
+        );
+        continue;
       }
 
       // Image with optional text wrap & sizing: ![caption|align|size|width](url)
@@ -934,20 +1400,36 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         }
 
         elements.push(
-          <WrappedImage
-            key={`img-${index}`}
-            src={url}
-            alt={caption}
-            align={align}
-            size={size}
-            customWidth={customWidth}
-            lineIndex={index}
-            onUpdateImageProps={handleUpdateImageProps}
-            onMoveImage={handleMoveImage}
-            isReadOnly={note.isTrashed}
-          />
+          <div key={`img-wrap-${index}`} className="editorjs-block-row">
+            <BlockActionsMenu
+              target={{
+                startLine: index,
+                endLine: index,
+                blockType: 'image',
+                rawContent: line
+              }}
+              onMoveBlock={handleMoveBlock}
+              onDuplicateBlock={handleDuplicateBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onConvertBlockType={handleConvertBlockType}
+              isReadOnly={note.isTrashed}
+            />
+            <div className="editorjs-block-content" style={{ width: '100%' }}>
+              <WrappedImage
+                src={url}
+                alt={caption}
+                align={align}
+                size={size}
+                customWidth={customWidth}
+                lineIndex={index}
+                onUpdateImageProps={handleUpdateImageProps}
+                onMoveImage={handleMoveImage}
+                isReadOnly={note.isTrashed}
+              />
+            </div>
+          </div>
         );
-        return;
+        continue;
       }
 
       // Markdown Tables
@@ -959,7 +1441,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           tableBuffer = [];
         }
         tableBuffer.push(line);
-        return;
+        continue;
       } else if (insideTable) {
         flushTable(index);
       }
@@ -971,13 +1453,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         if (insideCallout) flushCallout(index);
         insideCallout = true;
         calloutType = calloutMatch[1].toLowerCase() as any;
-        return;
+        continue;
       }
 
       if (insideCallout) {
         if (line.startsWith('>')) {
           calloutBuffer.push(line.replace(/^>\s?/, ''));
-          return;
+          continue;
         } else {
           flushCallout(index);
         }
@@ -993,54 +1475,142 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         const isCompleted = checkMatch[1] === 'x';
         const itemText = checkMatch[2];
         taskBuffer.push({ lineIndex: index, text: itemText, isCompleted });
-        return;
+        continue;
       } else if (insideTasks) {
         flushTasks(index);
       }
 
+      // Center-aligned div wrapper
+      if (line.startsWith('<div align="center">') || line.startsWith('<div align="right">')) {
+        const alignMode = line.includes('center') ? 'center' : 'right';
+        let innerCenterLines: string[] = [];
+        let endIdx = index + 1;
+        while (endIdx < lines.length && !lines[endIdx].includes('</div>')) {
+          innerCenterLines.push(lines[endIdx]);
+          endIdx++;
+        }
+        index = endIdx;
+        elements.push(
+          <div key={`align-${index}`} style={{ textAlign: alignMode, margin: '8px 0' }}>
+            {renderMarkdownPreview(innerCenterLines.join('\n'))}
+          </div>
+        );
+        continue;
+      }
+
+      // Headings with Editor.js Tune Handles
       if (line.startsWith('# ')) {
-        elements.push(<h1 id={`heading-${index}`} key={`h1-${index}`}>{parseInlineSpans(line.slice(2))}</h1>);
-        return;
+        elements.push(
+          <div key={`h1-row-${index}`} className="editorjs-block-row">
+            <BlockActionsMenu
+              target={{ startLine: index, endLine: index, blockType: 'heading1', rawContent: line }}
+              onMoveBlock={handleMoveBlock}
+              onDuplicateBlock={handleDuplicateBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onConvertBlockType={handleConvertBlockType}
+              isReadOnly={note.isTrashed}
+            />
+            <h1 id={`heading-${index}`} className="editorjs-block-content">{parseInlineSpans(line.slice(2))}</h1>
+          </div>
+        );
+        continue;
       }
       if (line.startsWith('## ')) {
-        elements.push(<h2 id={`heading-${index}`} key={`h2-${index}`}>{parseInlineSpans(line.slice(3))}</h2>);
-        return;
+        elements.push(
+          <div key={`h2-row-${index}`} className="editorjs-block-row">
+            <BlockActionsMenu
+              target={{ startLine: index, endLine: index, blockType: 'heading2', rawContent: line }}
+              onMoveBlock={handleMoveBlock}
+              onDuplicateBlock={handleDuplicateBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onConvertBlockType={handleConvertBlockType}
+              isReadOnly={note.isTrashed}
+            />
+            <h2 id={`heading-${index}`} className="editorjs-block-content">{parseInlineSpans(line.slice(3))}</h2>
+          </div>
+        );
+        continue;
       }
       if (line.startsWith('### ')) {
-        elements.push(<h3 id={`heading-${index}`} key={`h3-${index}`}>{parseInlineSpans(line.slice(4))}</h3>);
-        return;
+        elements.push(
+          <div key={`h3-row-${index}`} className="editorjs-block-row">
+            <BlockActionsMenu
+              target={{ startLine: index, endLine: index, blockType: 'heading3', rawContent: line }}
+              onMoveBlock={handleMoveBlock}
+              onDuplicateBlock={handleDuplicateBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onConvertBlockType={handleConvertBlockType}
+              isReadOnly={note.isTrashed}
+            />
+            <h3 id={`heading-${index}`} className="editorjs-block-content">{parseInlineSpans(line.slice(4))}</h3>
+          </div>
+        );
+        continue;
       }
 
       if (line.startsWith('> ')) {
         elements.push(
-          <blockquote key={`quote-${index}`}>
-            {parseInlineSpans(line.slice(2))}
-          </blockquote>
+          <div key={`quote-row-${index}`} className="editorjs-block-row">
+            <BlockActionsMenu
+              target={{ startLine: index, endLine: index, blockType: 'quote', rawContent: line }}
+              onMoveBlock={handleMoveBlock}
+              onDuplicateBlock={handleDuplicateBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onConvertBlockType={handleConvertBlockType}
+              isReadOnly={note.isTrashed}
+            />
+            <blockquote className="editorjs-block-content">
+              {parseInlineSpans(line.slice(2))}
+            </blockquote>
+          </div>
         );
-        return;
+        continue;
       }
 
       if (line.trim() === '---' || line.trim() === '***') {
         elements.push(<hr key={`hr-${index}`} style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '16px 0' }} />);
-        return;
+        continue;
       }
 
       if (line.startsWith('- ') || line.startsWith('* ')) {
         elements.push(
-          <ul key={`ul-${index}`}>
-            <li>{parseInlineSpans(line.slice(2))}</li>
-          </ul>
+          <div key={`ul-row-${index}`} className="editorjs-block-row">
+            <BlockActionsMenu
+              target={{ startLine: index, endLine: index, blockType: 'list', rawContent: line }}
+              onMoveBlock={handleMoveBlock}
+              onDuplicateBlock={handleDuplicateBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onConvertBlockType={handleConvertBlockType}
+              isReadOnly={note.isTrashed}
+            />
+            <ul className="editorjs-block-content" style={{ margin: '3px 0' }}>
+              <li>{parseInlineSpans(line.slice(2))}</li>
+            </ul>
+          </div>
         );
-        return;
+        continue;
       }
 
       if (!line.trim()) {
         elements.push(<div key={`br-${index}`} style={{ height: '8px' }} />);
-        return;
+        continue;
       }
 
-      elements.push(<p key={`p-${index}`}>{parseInlineSpans(line)}</p>);
-    });
+      // Paragraph with block handle
+      elements.push(
+        <div key={`p-row-${index}`} className="editorjs-block-row">
+          <BlockActionsMenu
+            target={{ startLine: index, endLine: index, blockType: 'paragraph', rawContent: line }}
+            onMoveBlock={handleMoveBlock}
+            onDuplicateBlock={handleDuplicateBlock}
+            onDeleteBlock={handleDeleteBlock}
+            onConvertBlockType={handleConvertBlockType}
+            isReadOnly={note.isTrashed}
+          />
+          <p className="editorjs-block-content">{parseInlineSpans(line)}</p>
+        </div>
+      );
+    }
 
     if (insideTable) flushTable(lines.length);
     if (insideCallout) flushCallout(lines.length);
@@ -1333,12 +1903,33 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           <Heading3 size={14} />
         </button>
         <div className="toolbar-divider" />
-        <button className="toolbar-btn" onClick={() => insertFormatting('**', '**')} disabled={note.isTrashed} title="Bold">
+        <button className="toolbar-btn" onClick={() => insertFormatting('**', '**')} disabled={note.isTrashed} title="Bold (**text**)">
           <Bold size={14} />
         </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('*', '*')} disabled={note.isTrashed} title="Italic">
+        <button className="toolbar-btn" onClick={() => insertFormatting('*', '*')} disabled={note.isTrashed} title="Italic (*text*)">
           <Italic size={14} />
         </button>
+        <button className="toolbar-btn" onClick={() => insertFormatting('<u>', '</u>')} disabled={note.isTrashed} title="Underline (<u>text</u>)">
+          <UnderlineIcon size={14} />
+        </button>
+        <button className="toolbar-btn" onClick={() => insertFormatting('~~', '~~')} disabled={note.isTrashed} title="Strikethrough (~~text~~)">
+          <StrikethroughIcon size={14} />
+        </button>
+        <button className="toolbar-btn" onClick={() => insertFormatting('<mark>', '</mark>')} disabled={note.isTrashed} title="Highlight (<mark>text</mark>)">
+          <HighlighterIcon size={14} color="#f59e0b" />
+        </button>
+        <div className="toolbar-divider" />
+        {/* Font Family Selector (RoosterJS / SunEditor) */}
+        <select 
+          className="editor-font-select"
+          value={fontFamily}
+          onChange={(e) => setFontFamily(e.target.value as any)}
+          title="Font Family"
+        >
+          <option value="sans">Sans (Inter)</option>
+          <option value="serif">Serif (Editorial)</option>
+          <option value="mono">Mono (Code)</option>
+        </select>
         <div className="toolbar-divider" />
         <button className="toolbar-btn" onClick={() => insertFormatting('- [ ] ')} disabled={note.isTrashed} title="Checklist item">
           <CheckSquare size={14} />
@@ -1402,6 +1993,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         >
           <ImageIcon size={14} color="var(--accent-primary)" />
           <span>Image</span>
+        </button>
+        <button 
+          className="toolbar-btn" 
+          onClick={() => setIsVideoModalOpen(true)} 
+          disabled={note.isTrashed} 
+          title="Embed Video (YouTube, Vimeo, HTML5 Video)"
+        >
+          <VideoIcon size={14} color="#ef4444" />
+          <span>Video</span>
         </button>
 
         {/* Templates Dropdown Button */}
@@ -1526,6 +2126,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           onTriggerDrawing={() => {
             setSuggestionState((prev) => ({ ...prev, isOpen: false }));
             setIsDrawingModalOpen(true);
+          }}
+          onTriggerVideoEmbed={() => {
+            setSuggestionState((prev) => ({ ...prev, isOpen: false }));
+            setIsVideoModalOpen(true);
           }}
           onClose={() => setSuggestionState((prev) => ({ ...prev, isOpen: false }))}
         />
@@ -1728,7 +2332,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             />
           ) : (
             <div className="live-document-wrapper">
-              <div className="markdown-body live-rich-document selectable-text">
+              <div className={`markdown-body live-rich-document font-${fontFamily} selectable-text`}>
                 {renderMarkdownPreview(note.content)}
               </div>
             </div>
@@ -1884,6 +2488,22 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           setActiveMermaidBlock(null);
         }}
         onSave={handleSaveMermaidDiagram}
+      />
+
+      {/* Video Embed Modal (YouTube / Vimeo / MP4 - Froala / Editor.js) */}
+      <VideoEmbedModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        onInsert={(embedMarkdown) => {
+          insertFormatting(embedMarkdown);
+        }}
+      />
+
+      {/* Floating Bubble Contextual Formatting Toolbar (Froala / Quill / SunEditor / RoosterJS) */}
+      <FloatingBubbleToolbar
+        position={bubblePosition}
+        onApplyFormat={handleApplyBubbleFormat}
+        onClose={() => setBubblePosition((prev) => ({ ...prev, visible: false }))}
       />
     </main>
   );

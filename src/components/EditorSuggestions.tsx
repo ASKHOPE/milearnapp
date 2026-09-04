@@ -17,7 +17,12 @@ import {
   Minus, 
   Calendar,
   FileText,
-  PenTool
+  PenTool,
+  Video,
+  ChevronRight,
+  Highlighter,
+  Keyboard,
+  AlignCenter
 } from 'lucide-react';
 
 export type SuggestionType = 'slash' | 'wikilink';
@@ -40,6 +45,7 @@ interface EditorSuggestionsProps {
   onSelectWikiLink: (noteTitle: string) => void;
   onTriggerVoiceRecorder: () => void;
   onTriggerDrawing: () => void;
+  onTriggerVideoEmbed?: () => void;
   onClose: () => void;
 }
 
@@ -53,6 +59,7 @@ export const EditorSuggestions: React.FC<EditorSuggestionsProps> = ({
   onSelectWikiLink,
   onTriggerVoiceRecorder,
   onTriggerDrawing,
+  onTriggerVideoEmbed,
   onClose
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -156,6 +163,47 @@ export const EditorSuggestions: React.FC<EditorSuggestionsProps> = ({
       sublabel: 'Draw diagram, canvas, or sketch',
       icon: <PenTool size={15} color="#8b5cf6" />,
       action: () => onTriggerDrawing()
+    },
+    {
+      id: 'video',
+      label: 'Embed Video',
+      sublabel: 'YouTube, Vimeo, or MP4 player',
+      icon: <Video size={15} color="#ef4444" />,
+      action: () => {
+        if (onTriggerVideoEmbed) {
+          onTriggerVideoEmbed();
+        } else {
+          onSelectSlashCommand('\n<div class="embedded-video-card"><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" allowfullscreen></iframe></div>\n');
+        }
+      }
+    },
+    {
+      id: 'spoiler',
+      label: 'Collapsible / Spoiler',
+      sublabel: 'Click-to-expand details accordion',
+      icon: <ChevronRight size={15} color="#8b5cf6" />,
+      action: () => onSelectSlashCommand('\n<details>\n<summary>Click to reveal spoiler / notes</summary>\n\nHidden detailed content here.\n\n</details>\n\n')
+    },
+    {
+      id: 'highlight',
+      label: 'Text Highlight',
+      sublabel: 'Yellow marker highlight tag',
+      icon: <Highlighter size={15} color="#f59e0b" />,
+      action: () => onSelectSlashCommand('<mark>highlighted text</mark> ')
+    },
+    {
+      id: 'kbd',
+      label: 'Keyboard Shortcut Tag',
+      sublabel: 'Styled keyboard key badge',
+      icon: <Keyboard size={15} color="#0284c7" />,
+      action: () => onSelectSlashCommand('<kbd>Ctrl</kbd> + <kbd>K</kbd> ')
+    },
+    {
+      id: 'align-center',
+      label: 'Center Aligned Block',
+      sublabel: 'Centered text or callout',
+      icon: <AlignCenter size={15} color="#6366f1" />,
+      action: () => onSelectSlashCommand('\n<div align="center">\n\nCentered Text Here\n\n</div>\n\n')
     },
     {
       id: 'date',

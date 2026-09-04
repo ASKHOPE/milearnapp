@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   BookOpen, 
-  Folder, 
+  Folder as FolderIcon, 
   FolderPlus, 
   Plus, 
   Search, 
@@ -15,7 +15,9 @@ import {
   ChevronDown, 
   X,
   Layers,
-  Columns2
+  Columns2,
+  Tag,
+  Paperclip
 } from 'lucide-react';
 import type { Book, Folder as FolderType, Note, Workspace } from '../types';
 
@@ -58,9 +60,10 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
   onMoveNote,
   onDuplicateBook
 }) => {
-  const [activeTab, setActiveTab] = useState<'books' | 'files'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'folders' | 'media' | 'tags'>('books');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [expandedBooks, setExpandedBooks] = useState<Record<string, boolean>>({});
   
   // Create Book Modal Form State
@@ -82,14 +85,34 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
 
   const activeNotes = notes.filter((n) => !n.isTrashed);
 
-  // Filter notes by search query
+  // Extract all media/attachments
+  const allMediaNotes = activeNotes.filter((n) => 
+    (n.attachments && n.attachments.length > 0) || 
+    n.content.includes('![') || 
+    n.content.includes('<video') || 
+    n.content.includes('```mermaid')
+  );
+
+  // Extract all tags with note counts
+  const tagCounts: Record<string, number> = {};
+  activeNotes.forEach((n) => {
+    n.tags?.forEach((t) => {
+      tagCounts[t] = (tagCounts[t] || 0) + 1;
+    });
+  });
+  const allTagsList = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]);
+
+  // Filter notes by search query, folder, tag
   const filteredNotes = activeNotes.filter((n) => {
     const matchesSearch = !searchQuery || 
       n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       n.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       n.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    
     const matchesFolder = selectedFolderId === null || n.folderId === selectedFolderId;
-    return matchesSearch && matchesFolder;
+    const matchesTag = selectedTag === null || n.tags.includes(selectedTag);
+
+    return matchesSearch && matchesFolder && matchesTag;
   });
 
   const handleOpenNoteAndExit = (noteId: string) => {
@@ -145,74 +168,94 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
               <BookOpen size={20} color="var(--accent-primary)" />
             </div>
             <div>
-              <h2 className="library-main-title">Library & File Manager</h2>
+              <h2 className="library-main-title">Library & Asset Hub</h2>
               <span className="library-subtitle">
-                {activeWorkspace ? `${activeWorkspace.icon} ${activeWorkspace.name}` : 'Personal'} · {books.length} Books · {folders.length} Folders · {activeNotes.length} Total Notes
+                {activeWorkspace ? `${activeWorkspace.icon} ${activeWorkspace.name}` : 'Personal Vault'} · {books.length} Books · {folders.length} Folders · {allMediaNotes.length} Media · {activeNotes.length} Notes
               </span>
             </div>
           </div>
 
           <div className="library-header-controls">
-            {/* Tab Switcher */}
+            {/* 4 Tabs Switcher */}
             <div className="library-tab-pills">
               <button
                 type="button"
                 className={`library-tab-pill ${activeTab === 'books' ? 'active' : ''}`}
-                onClick={() => setActiveTab('books')}
+                onClick={() => { setActiveTab('books'); setSelectedFolderId(null); setSelectedTag(null); }}
               >
                 <BookOpen size={14} />
-                <span>Books & Notebooks ({books.length})</span>
+                <span>Bookshelf ({books.length})</span>
               </button>
               <button
                 type="button"
-                className={`library-tab-pill ${activeTab === 'files' ? 'active' : ''}`}
-                onClick={() => setActiveTab('files')}
+                className={`library-tab-pill ${activeTab === 'folders' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('folders'); setSelectedTag(null); }}
               >
-                <Folder size={14} />
-                <span>File Explorer & Folders</span>
+                <FolderIcon size={14} />
+                <span>Folders & Files ({folders.length})</span>
+              </button>
+              <button
+                type="button"
+                className={`library-tab-pill ${activeTab === 'media' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('media'); setSelectedFolderId(null); setSelectedTag(null); }}
+              >
+                <Paperclip size={14} />
+                <span>Media & Files ({allMediaNotes.length})</span>
+              </button>
+              <button
+                type="button"
+                className={`library-tab-pill ${activeTab === 'tags' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('tags'); setSelectedFolderId(null); }}
+              >
+                <Tag size={14} />
+                <span>Tags Index ({allTagsList.length})</span>
               </button>
             </div>
 
-            {/* Quick Action Button */}
-            {activeTab === 'books' ? (
-              <button 
-                type="button"
-                className="library-btn-primary"
-                onClick={() => setIsCreatingBook(true)}
-              >
-                <Plus size={14} />
-                <span>New Book</span>
-              </button>
-            ) : (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  type="button"
-                  className="library-btn-secondary"
-                  onClick={() => setIsCreatingFolder(true)}
-                >
-                  <FolderPlus size={14} />
-                  <span>New Folder</span>
-                </button>
+            {/* Quick Actions */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {activeTab === 'books' && (
                 <button 
                   type="button"
                   className="library-btn-primary"
-                  onClick={() => { onCreateNote(); onClose(); }}
+                  onClick={() => setIsCreatingBook(true)}
                 >
                   <Plus size={14} />
-                  <span>New Note</span>
+                  <span>New Book</span>
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Close Button */}
-            <button 
-              type="button" 
-              className="library-close-btn" 
-              onClick={onClose}
-              title="Return to Editor (Esc)"
-            >
-              <X size={18} />
-            </button>
+              {activeTab === 'folders' && (
+                <>
+                  <button 
+                    type="button"
+                    className="library-btn-secondary"
+                    onClick={() => setIsCreatingFolder(true)}
+                  >
+                    <FolderPlus size={14} />
+                    <span>New Folder</span>
+                  </button>
+                  <button 
+                    type="button"
+                    className="library-btn-primary"
+                    onClick={() => { onCreateNote(); onClose(); }}
+                  >
+                    <Plus size={14} />
+                    <span>New Note</span>
+                  </button>
+                </>
+              )}
+
+              {/* Close Modal */}
+              <button 
+                type="button" 
+                className="library-close-btn" 
+                onClick={onClose}
+                title="Return to Editor (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -222,7 +265,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
             <Search size={14} color="var(--text-muted)" />
             <input
               type="text"
-              placeholder="Search across all books, chapters, notes, and file contents..."
+              placeholder={`Search ${activeTab === 'books' ? 'books and chapters' : activeTab === 'folders' ? 'files and folders' : activeTab === 'media' ? 'media assets and sketches' : 'tags and indexed topics'}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -366,7 +409,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
           )}
 
           {/* TAB 2: FOLDER EXPLORER & FILE MANAGER */}
-          {activeTab === 'files' && (
+          {activeTab === 'folders' && (
             <div className="library-files-split">
               {/* Left Column: Folders Directory */}
               <div className="library-folders-col">
@@ -386,7 +429,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
                     className={`library-folder-row ${selectedFolderId === null ? 'active' : ''}`}
                     onClick={() => setSelectedFolderId(null)}
                   >
-                    <Folder size={14} color="var(--accent-primary)" />
+                    <FolderIcon size={14} color="var(--accent-primary)" />
                     <span>All Notes & Files</span>
                     <span className="badge-count">{activeNotes.length}</span>
                   </li>
@@ -399,7 +442,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
                         className={`library-folder-row ${selectedFolderId === folder.id ? 'active' : ''}`}
                         onClick={() => setSelectedFolderId(folder.id)}
                       >
-                        <Folder size={14} style={{ color: folder.color || 'var(--text-muted)' }} />
+                        <FolderIcon size={14} style={{ color: folder.color || 'var(--text-muted)' }} />
                         <span className="library-folder-name">{folder.name}</span>
                         <div className="folder-row-right">
                           <span className="badge-count">{count}</span>
@@ -468,7 +511,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
                             <div className="col-folder">
                               {noteFolder && (
                                 <span className="table-folder-chip">
-                                  <Folder size={11} style={{ color: noteFolder.color }} />
+                                  <FolderIcon size={11} style={{ color: noteFolder.color }} />
                                   {noteFolder.name}
                                 </span>
                               )}
@@ -543,6 +586,102 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
               </div>
             </div>
           )}
+
+          {/* TAB 3: MEDIA & ATTACHMENTS */}
+          {activeTab === 'media' && (
+            <div className="library-media-hub">
+              {allMediaNotes.length === 0 ? (
+                <div className="library-empty-box">
+                  <Paperclip size={48} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+                  <h3>No Media or Attachments Yet</h3>
+                  <p>Documents with images, drawings, video embeds, or diagrams will appear here automatically.</p>
+                </div>
+              ) : (
+                <div className="media-hub-grid">
+                  {allMediaNotes.map((note) => {
+                    const hasAttachments = note.attachments && note.attachments.length > 0;
+                    const hasDiagram = note.content.includes('```mermaid');
+                    const hasVideo = note.content.includes('<video') || note.content.includes('youtube.com');
+                    const hasImage = note.content.includes('![');
+
+                    return (
+                      <div key={note.id} className="media-hub-card" onClick={() => handleOpenNoteAndExit(note.id)}>
+                        <div className="media-card-top">
+                          <span className="media-badge">
+                            {hasDiagram ? '📊 Diagram' : hasVideo ? '🎬 Video' : hasImage ? '🖼️ Image' : '📎 Attachment'}
+                          </span>
+                          <span className="media-note-date">
+                            {new Date(note.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                        <h4 className="media-card-title">{note.title || 'Untitled Note'}</h4>
+                        <p className="media-card-desc">
+                          {note.content.replace(/[#*`[\]]/g, '').slice(0, 80) || 'Contains attached assets'}
+                        </p>
+                        <div className="media-card-footer">
+                          <span className="media-stats">
+                            {hasAttachments ? `${note.attachments?.length} files` : 'Embedded Media'}
+                          </span>
+                          <button className="media-open-btn" onClick={(e) => { e.stopPropagation(); handleOpenNoteAndExit(note.id); }}>
+                            Open Note <ExternalLink size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: TAGS INDEX */}
+          {activeTab === 'tags' && (
+            <div className="library-tags-hub">
+              {allTagsList.length === 0 ? (
+                <div className="library-empty-box">
+                  <Tag size={48} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+                  <h3>No Tags Created Yet</h3>
+                  <p>Add <code>#tags</code> in your notes or editor to automatically build a topic knowledge graph.</p>
+                </div>
+              ) : (
+                <div className="tags-hub-container">
+                  <div className="tags-cloud-shelf">
+                    {allTagsList.map(([tag, count]) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`tags-shelf-pill ${selectedTag === tag ? 'active' : ''}`}
+                        onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                      >
+                        <Tag size={13} />
+                        <span className="tag-name">#{tag}</span>
+                        <span className="tag-shelf-count">{count}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedTag && (
+                    <div className="tagged-notes-section">
+                      <div className="tagged-section-header">
+                        <h4>Notes tagged with <span>#{selectedTag}</span> ({filteredNotes.length})</h4>
+                        <button className="btn-small-link" onClick={() => setSelectedTag(null)}>Clear filter</button>
+                      </div>
+                      <div className="tagged-notes-grid">
+                        {filteredNotes.map((note) => (
+                          <div key={note.id} className="tagged-note-card" onClick={() => handleOpenNoteAndExit(note.id)}>
+                            <strong className="tagged-note-title">{note.title || 'Untitled'}</strong>
+                            <p className="tagged-note-snippet">{note.content.replace(/[#*`[\]]/g, '').slice(0, 100)}</p>
+                            <span className="tagged-note-date">Updated {new Date(note.updatedAt).toLocaleDateString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* MODAL: CREATE BOOK */}
@@ -673,3 +812,4 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
     </div>
   );
 };
+

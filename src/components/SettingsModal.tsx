@@ -479,6 +479,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </button>
           </div>
+
+          <div style={{ marginTop: '28px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+            <h4 className="panel-section-title">Editor & Auto-Save Behavior</h4>
+            
+            <div className="settings-toggle-row">
+              <div>
+                <span className="settings-toggle-title">Continuous Auto-Save</span>
+                <span className="settings-toggle-sub">
+                  Automatically persist edits to your local vault on every keystroke. When disabled, you can manually save using the dedicated Save button or <kbd>Ctrl+S</kbd> / <kbd>Cmd+S</kbd>.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={localStorage.getItem('milearnapp_autosave_enabled') !== 'false'}
+                onChange={(e) => {
+                  localStorage.setItem('milearnapp_autosave_enabled', e.target.checked ? 'true' : 'false');
+                  // Dispatch storage event so NoteEditor responds immediately
+                  window.dispatchEvent(new Event('storage'));
+                }}
+                className="settings-checkbox"
+              />
+            </div>
+          </div>
         </div>
       )}
 

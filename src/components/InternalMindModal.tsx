@@ -70,7 +70,7 @@ export const InternalMindModal: React.FC<InternalMindModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Internal Mind & Vault Lexicon"
+      title="Internal Mind & Knowledge Dictionary"
       subtitle="Autonomous knowledge graph dictionary of concepts, definitions, and word connections"
       maxWidth="860px"
     >

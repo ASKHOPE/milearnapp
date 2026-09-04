@@ -30,7 +30,7 @@ export const MathRenderer: React.FC<MathRendererProps> = ({
       <div 
         className={`math-block-container ${className}`}
         dangerouslySetInnerHTML={{ __html: html }}
-        title="LaTeX Mathematical Formula"
+        title="Mathematical Formula"
       />
     );
   }
@@ -39,7 +39,7 @@ export const MathRenderer: React.FC<MathRendererProps> = ({
     <span 
       className={`math-inline ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
-      title="LaTeX Formula"
+      title="Mathematical Formula"
     />
   );
 };

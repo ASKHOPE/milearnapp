@@ -11,14 +11,30 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@citation-js/core": "^0.8.2",
+    "@citation-js/plugin-bibtex": "^0.8.2",
+    "@citation-js/plugin-csl": "^0.8.2",
+    "@types/animejs": "^3.1.13",
+    "@types/three": "^0.185.4",
+    "@xyflow/react": "^12.11.6",
+    "advanced-calculator": "^1.4.2",
+    "animejs": "^4.5.0",
+    "blockly": "^13.2.1",
+    "citation-js": "^0.8.2",
+    "desmos": "^1.5.4",
+    "en-dictionary": "^2.0.3",
     "epubjs": "^0.3.93",
+    "fabric": "^7.4.0",
     "katex": "^0.18.5",
     "lucide-react": "^1.39.0",
     "mermaid": "^11.17.2",
     "pdfjs-dist": "^6.3.289",
+    "perfect-freehand": "^1.2.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "three": "^0.185.1",
+    "two.js": "^0.8.24"
   },
   "devDependencies": {
     "@types/katex": "^0.16.8",

@@ -105,7 +105,12 @@ export interface Folder {
   createdAt: string;
 }
 
-export type ViewFilter = 'all' | 'favorites' | 'recent' | 'attachments' | 'archive' | 'trash' | 'books';
+export type ViewFilter = 'all' | 'quick' | 'favorites' | 'recent' | 'attachments' | 'archive' | 'trash' | 'books';
+
+export interface EditorSettings {
+  autoSave: boolean;
+  autoSaveDelayMs: number;
+}
 
 export interface GraphNode {
   id: string;

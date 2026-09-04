@@ -25,6 +25,7 @@ export const BookShelf: React.FC<BookShelfProps> = ({
   onAddPageToBook
 }) => {
   const [expandedBookIds, setExpandedBookIds] = useState<Set<string>>(new Set(books.map((b) => b.id)));
+  const [isSectionExpanded, setIsSectionExpanded] = useState(true);
   const [isCreatingBook, setIsCreatingBook] = useState(false);
   const [newBookTitle, setNewBookTitle] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('📖');
@@ -49,21 +50,39 @@ export const BookShelf: React.FC<BookShelfProps> = ({
 
   return (
     <div className="book-shelf-section">
-      <div className="sidebar-section-title">
+      <div 
+        className="sidebar-section-title clickable-section-header"
+        onClick={() => setIsSectionExpanded(!isSectionExpanded)}
+        title={isSectionExpanded ? "Collapse Books & Notebooks" : "Expand Books & Notebooks"}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <BookOpen size={14} color="var(--accent-primary)" />
+          <button 
+            type="button" 
+            className="section-toggle-chevron"
+            aria-label={isSectionExpanded ? "Collapse Books" : "Expand Books"}
+          >
+            {isSectionExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button>
+          <BookOpen size={13} color="var(--accent-primary)" />
           <span>Books & Notebooks</span>
+          <span className="badge-count-tiny">{books.length}</span>
         </div>
         <button
           className="folder-action-btn"
           title="Create New Book"
-          onClick={() => setIsCreatingBook(!isCreatingBook)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsSectionExpanded(true);
+            setIsCreatingBook(!isCreatingBook);
+          }}
         >
           <Plus size={13} />
         </button>
       </div>
 
-      {/* Book Creation Form */}
+      {isSectionExpanded && (
+        <>
+          {/* Book Creation Form */}
       {isCreatingBook && (
         <form onSubmit={handleCreateBook} className="book-create-form">
           <input
@@ -180,6 +199,8 @@ export const BookShelf: React.FC<BookShelfProps> = ({
           );
         })}
       </div>
-    </div>
-  );
+    </>
+  )}
+</div>
+);
 };

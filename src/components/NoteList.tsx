@@ -19,6 +19,7 @@ import {
   Archive,
   ChevronLeft,
   ChevronRight,
+  PanelLeftClose,
   X,
   SlidersHorizontal,
   Columns2
@@ -75,6 +76,8 @@ export const NoteList: React.FC<NoteListProps> = ({
     columnTitle = `#${selectedTag}`;
   } else if (currentFolderId && activeFolder) {
     columnTitle = activeFolder.name;
+  } else if (currentFilter === 'quick') {
+    columnTitle = '⚡ Quick Notes';
   } else if (currentFilter === 'favorites') {
     columnTitle = 'Favorites';
   } else if (currentFilter === 'recent') {
@@ -113,6 +116,12 @@ export const NoteList: React.FC<NoteListProps> = ({
     // Folder filter
     if (currentFolderId && note.folderId !== currentFolderId) {
       return false;
+    }
+
+    // Quick notes filter
+    if (currentFilter === 'quick') {
+      const isQuick = note.tags?.includes('quick-note') || note.title.toLowerCase().includes('quick scratchpad');
+      if (!isQuick) return false;
     }
 
     // Navigation filters
@@ -202,17 +211,26 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   return (
     <section className="notes-list-pane">
+      {/* Right Edge Center Floating Hover Collapse Handle */}
+      {onToggleCollapse && (
+        <div className="notes-pane-collapse-trigger-edge" title="Collapse Notes List" onClick={onToggleCollapse}>
+          <div className="notes-pane-collapse-edge-handle">
+            <ChevronLeft size={14} />
+          </div>
+        </div>
+      )}
+
       {/* Sleek Modern List Header */}
       <div className="notelist-sleek-header">
-        <div className="notelist-header-top">
-          <div className="notelist-heading-group">
+        <div className="notelist-header-top">          <div className="notelist-heading-group">
             {onToggleCollapse && (
               <button
-                className="btn-collapse-notes-pane"
+                type="button"
+                className="btn-collapse-notelist"
                 onClick={onToggleCollapse}
-                title="Collapse notes panel"
+                title="Collapse Notes List (Hide pane)"
               >
-                <ChevronLeft size={14} />
+                <PanelLeftClose size={15} />
               </button>
             )}
             <h3 className="notelist-heading-title">{columnTitle}</h3>
@@ -312,13 +330,13 @@ export const NoteList: React.FC<NoteListProps> = ({
                 className={`note-card compact-card ${isSelected ? 'selected' : ''}`}
                 onClick={() => onSelectNote(note.id)}
               >
-                {/* Heading: Title & Pin/Favorite */}
+                {/* Heading: Title & Top-Right Actions */}
                 <div className="card-top-row">
                   <div className="card-heading-wrap">
-                    {note.isPinned && <Pin size={11} className="card-pin-icon" />}
+                    {note.isPinned && <Pin size={12} className="card-pin-icon" />}
                     {note.isLocked && (
                       <span title="Encrypted with AES-256-GCM" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Lock size={11} color="var(--color-warning)" />
+                        <Lock size={12} color="var(--color-warning)" />
                       </span>
                     )}
                     <span className="card-heading">{note.title || 'Untitled Note'}</span>
@@ -332,7 +350,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                           title="Restore Note"
                           onClick={(e) => onRestoreNote(note.id, e)}
                         >
-                          <RotateCcw size={12} color="var(--color-success)" />
+                          <RotateCcw size={14} color="var(--color-success)" />
                         </button>
                         {onPermanentDeleteNote && (
                           <button
@@ -340,7 +358,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                             title="Permanently Delete Note"
                             onClick={(e) => onPermanentDeleteNote(note.id, e)}
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={14} />
                           </button>
                         )}
                       </>
@@ -352,7 +370,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                             onClick={(e) => onArchiveNote(note.id, e)}
                             title={note.isArchived ? 'Unarchive Note' : 'Archive Note'}
                           >
-                            <Archive size={12} color={note.isArchived ? '#8b5cf6' : undefined} />
+                            <Archive size={14} color={note.isArchived ? '#8b5cf6' : undefined} />
                           </button>
                         )}
 
@@ -362,7 +380,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                           title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                         >
                           <Star 
-                            size={12} 
+                            size={14} 
                             fill={note.isFavorite ? '#f59e0b' : 'none'} 
                             color={note.isFavorite ? '#f59e0b' : 'var(--text-muted)'} 
                           />
@@ -378,7 +396,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                             }}
                             title="Open Side-by-Side (Split View)"
                           >
-                            <Columns2 size={12} />
+                            <Columns2 size={14} />
                           </button>
                         )}
 
@@ -389,7 +407,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                             onClick={(e) => onDeleteNote(note.id, e)}
                             title="Move to Trash Bin"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={14} />
                           </button>
                         )}
                       </>

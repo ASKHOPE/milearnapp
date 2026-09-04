@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { 
   Note, 
   Folder as FolderType, 
@@ -56,7 +56,31 @@ import {
   Highlighter as HighlighterIcon,
   Strikethrough as StrikethroughIcon,
   Underline as UnderlineIcon,
-  ChevronRight
+  ChevronRight,
+  Save,
+  Sliders,
+  Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Subscript,
+  Superscript,
+  Code2,
+  GitFork,
+  TrendingUp,
+  Puzzle,
+  Box,
+  Printer,
+  Download,
+  Scissors,
+  Presentation,
+  ScanText,
+  GraduationCap,
+  Network,
+  FileCode,
+  FileText,
+  Quote
 } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -66,7 +90,16 @@ import { NoteOutline } from './NoteOutline';
 import { NoteTabs } from './NoteTabs';
 import { FindReplaceBar } from './FindReplaceBar';
 import { DrawingCanvasModal } from './DrawingCanvasModal';
+import { InteractiveFlowModal } from './InteractiveFlowModal';
+import { MathGraphStudioModal } from './MathGraphStudioModal';
+import { BlocklyStudioModal } from './BlocklyStudioModal';
+import { ThreeStudioModal } from './ThreeStudioModal';
+import { CitationStudioModal } from './CitationStudioModal';
 import { ExportModal } from './ExportModal';
+import { NoteCanvasModal } from './NoteCanvasModal';
+import { FlashcardQuizModal } from './FlashcardQuizModal';
+import { OcrScannerModal } from './OcrScannerModal';
+import { SlideDeckModal } from './SlideDeckModal';
 import { BookPageNavigator } from './BookPageNavigator';
 import { MathRenderer } from './MathRenderer';
 import { MermaidRenderer } from './MermaidRenderer';
@@ -108,6 +141,10 @@ interface NoteEditorProps {
   onNavigateToNote: (noteTitle: string) => void;
   onBackMobile: () => void;
   isSplitView?: boolean;
+  paneSide?: 'left' | 'right';
+  onMoveTabToOtherPane?: (noteId: string) => void;
+  onReorderTabs?: (newOrder: string[]) => void;
+  onDropTabFromOtherPane?: (noteId: string, targetIndex?: number) => void;
   onCloseSplit?: () => void;
   onOpenSplit?: (noteId: string) => void;
   onCloseNote?: () => void;
@@ -138,6 +175,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onNavigateToNote,
   onBackMobile,
   isSplitView = false,
+  paneSide = 'left',
+  onMoveTabToOtherPane,
+  onReorderTabs,
+  onDropTabFromOtherPane,
   onCloseSplit,
   onOpenSplit,
   onCloseNote,
@@ -167,11 +208,138 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [mermaidInitialCode, setMermaidInitialCode] = useState('');
   const [activeMermaidBlock, setActiveMermaidBlock] = useState<{ startLine: number; endLine: number } | null>(null);
 
+  // Advanced Visual Studios Modal states
+  const [isInteractiveFlowOpen, setIsInteractiveFlowOpen] = useState(false);
+  const [isMathGraphStudioOpen, setIsMathGraphStudioOpen] = useState(false);
+  const [isBlocklyStudioOpen, setIsBlocklyStudioOpen] = useState(false);
+  const [isThreeStudioOpen, setIsThreeStudioOpen] = useState(false);
+  const [isCitationStudioOpen, setIsCitationStudioOpen] = useState(false);
+  const [isNoteCanvasOpen, setIsNoteCanvasOpen] = useState(false);
+  const [isFlashcardQuizOpen, setIsFlashcardQuizOpen] = useState(false);
+  const [isOcrScannerOpen, setIsOcrScannerOpen] = useState(false);
+  const [isSlideDeckOpen, setIsSlideDeckOpen] = useState(false);
+
+  // Share Dropdown & Page Setup Format States
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const [pageFormat, setPageFormat] = useState<'continuous' | 'a4' | 'letter'>(() => {
+    return (localStorage.getItem('milearnapp_page_format') as any) || 'continuous';
+  });
+  const [pageMargin, setPageMargin] = useState<'normal' | 'compact' | 'wide'>(() => {
+    return (localStorage.getItem('milearnapp_page_margin') as any) || 'normal';
+  });
+
   // Video Embed Modal state
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
-  // Typography settings (RoosterJS / SunEditor)
-  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
+  // Auto-Save & Manual Save Status
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('milearnapp_autosave_enabled') !== 'false';
+  });
+  const pendingNoteRef = useRef<Note | null>(null);
+
+  // Export note file helpers for Share dropdown
+  const handleExportFile = (format: 'md' | 'html' | 'txt') => {
+    if (!note) return;
+    const cleanTitle = (note.title || 'Untitled Note').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${cleanTitle}.${format}`;
+    let content = note.content;
+    let mimeType = 'text/markdown';
+
+    if (format === 'html') {
+      mimeType = 'text/html';
+      content = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${note.title || 'Note'}</title><style>body{font-family:system-ui,-apple-system,sans-serif;max-width:800px;margin:40px auto;padding:0 24px;line-height:1.7;color:#1e293b;}h1{border-bottom:1px solid #e2e8f0;padding-bottom:8px;}</style></head><body><h1>${note.title || 'Untitled'}</h1><div>${note.content.replace(/\n/g, '<br/>')}</div></body></html>`;
+    } else if (format === 'txt') {
+      mimeType = 'text/plain';
+    }
+
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyNoteLink = () => {
+    if (!note) return;
+    const linkText = `[[${note.title || 'Untitled Note'}]]`;
+    navigator.clipboard.writeText(linkText);
+  };
+
+  // 4-Row Toolbar Collapse States
+  const [isRow1Open, setIsRow1Open] = useState<boolean>(() => {
+    const saved = localStorage.getItem('milearnapp_editor_row1_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [isRow2Open, setIsRow2Open] = useState<boolean>(() => {
+    const saved = localStorage.getItem('milearnapp_editor_row2_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [isRow3Open, setIsRow3Open] = useState<boolean>(() => {
+    const saved = localStorage.getItem('milearnapp_editor_row3_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [isRow4Open, setIsRow4Open] = useState<boolean>(() => {
+    const saved = localStorage.getItem('milearnapp_editor_row4_open');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const toggleRow = (rowNum: 1 | 2 | 3 | 4) => {
+    if (rowNum === 1) {
+      setIsRow1Open(prev => {
+        localStorage.setItem('milearnapp_editor_row1_open', String(!prev));
+        return !prev;
+      });
+    } else if (rowNum === 2) {
+      setIsRow2Open(prev => {
+        localStorage.setItem('milearnapp_editor_row2_open', String(!prev));
+        return !prev;
+      });
+    } else if (rowNum === 3) {
+      setIsRow3Open(prev => {
+        localStorage.setItem('milearnapp_editor_row3_open', String(!prev));
+        return !prev;
+      });
+    } else if (rowNum === 4) {
+      setIsRow4Open(prev => {
+        localStorage.setItem('milearnapp_editor_row4_open', String(!prev));
+        return !prev;
+      });
+    }
+  };
+
+  // Sync auto-save setting across window storage events
+  useEffect(() => {
+    const handleStorage = () => {
+      setAutoSaveEnabled(localStorage.getItem('milearnapp_autosave_enabled') !== 'false');
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  // Manual Save Function
+  const handleManualSave = useCallback(() => {
+    if (!note || note.isTrashed) return;
+    setSaveStatus('saving');
+    onUpdateNote(pendingNoteRef.current || note);
+    setTimeout(() => {
+      setSaveStatus('saved');
+    }, 400);
+  }, [note, onUpdateNote]);
+
+  // Typography & Styling Settings (RoosterJS / SunEditor / Froala)
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>(() => {
+    return (localStorage.getItem('milearnapp_editor_font_family') as any) || 'sans';
+  });
+  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>(() => {
+    return (localStorage.getItem('milearnapp_editor_font_size') as any) || 'base';
+  });
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right' | 'justify'>('left');
+  const [lineHeight, setLineHeight] = useState<'normal' | 'relaxed' | 'loose'>('normal');
 
   // Floating Contextual Bubble Toolbar state (Froala / Editor.js)
   const [bubblePosition, setBubblePosition] = useState<FloatingBubblePosition>({
@@ -179,14 +347,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     left: 0,
     visible: false
   });
-  const [activeSelectionRange, setActiveSelectionRange] = useState<{ start: number; end: number; selectedText: string } | null>(null);
-
-  useEffect(() => {
-    if (note) {
-      setMoveFolderChoice(note.folderId || '');
-      setMoveBookChoice(note.bookId || '');
-    }
-  }, [note?.id, note?.folderId, note?.bookId]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Suggestions state (Slash command & Wiki-link)
   const [suggestionState, setSuggestionState] = useState<{
@@ -203,10 +365,17 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     triggerIndex: 0
   });
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [activeSelectionRange, setActiveSelectionRange] = useState<{ start: number; end: number; selectedText: string } | null>(null);
 
-  // Keyboard shortcut Cmd+F for in-note search
+  useEffect(() => {
+    if (note) {
+      setMoveFolderChoice(note.folderId || '');
+      setMoveBookChoice(note.bookId || '');
+      pendingNoteRef.current = note;
+    }
+  }, [note?.id, note?.folderId, note?.bookId]);
+
+  // Keyboard shortcut listener (Cmd+F for search, Cmd+S for manual save)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -216,11 +385,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         e.preventDefault();
         setIsFindReplaceOpen((prev) => !prev);
       }
+
+      if (cmdKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleManualSave();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleManualSave]);
 
   // Selection change listener for Floating Bubble Toolbar (Froala / RoosterJS / Editor.js)
   useEffect(() => {
@@ -292,11 +466,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Handle title change
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (note.isTrashed) return;
-    onUpdateNote({
+    const updated = {
       ...note,
       title: e.target.value,
       updatedAt: new Date().toISOString()
-    });
+    };
+    pendingNoteRef.current = updated;
+
+    if (autoSaveEnabled) {
+      onUpdateNote(updated);
+      setSaveStatus('saved');
+    } else {
+      setSaveStatus('unsaved');
+    }
   };
 
   // Handle content change & Slash / Wiki-link triggers
@@ -305,11 +487,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     const newContent = e.target.value;
     const cursor = e.target.selectionStart;
 
-    onUpdateNote({
+    const updated = {
       ...note,
       content: newContent,
       updatedAt: new Date().toISOString()
-    });
+    };
+    pendingNoteRef.current = updated;
+
+    if (autoSaveEnabled) {
+      onUpdateNote(updated);
+      setSaveStatus('saved');
+    } else {
+      setSaveStatus('unsaved');
+    }
 
     // Check for Slash Command '/' or '[['
     const textBeforeCursor = newContent.slice(0, cursor);
@@ -1628,14 +1818,190 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   return (
     <main className="note-editor-pane active-mobile selectable-text">
-      {/* Mac-Style Note Tabs Bar with Inline Double-Click Rename */}
+      {/* Mac-Style Note Tabs Bar with Inline Double-Click Rename & Drag-and-Drop + Integrated Row Toggles */}
       <NoteTabs
         openNoteIds={openNoteIds}
         activeNoteId={activeNoteId}
         allNotes={allNotes}
+        paneSide={paneSide}
+        isSplitView={isSplitView}
         onSelectTab={onSelectTab}
         onCloseTab={onCloseTab}
         onNewTab={onNewTab}
+        onMoveTabToOtherPane={onMoveTabToOtherPane}
+        onReorderTabs={onReorderTabs}
+        onDropTabFromOtherPane={onDropTabFromOtherPane}
+        rightToolbar={
+          <div className="tabs-embedded-toolbar-strip">
+            {/* Quick Row Toggle Pills */}
+            <div className="tab-row-pill-group">
+              <button
+                type="button"
+                className={`tab-row-pill ${isRow1Open ? 'active' : ''}`}
+                onClick={() => toggleRow(1)}
+                title="Toggle Row 1: Actions & Meta"
+              >
+                <Sliders size={11} />
+                <span>Actions</span>
+              </button>
+              <button
+                type="button"
+                className={`tab-row-pill ${isRow2Open ? 'active' : ''}`}
+                onClick={() => toggleRow(2)}
+                title="Toggle Row 2: Typography & Styling"
+              >
+                <Type size={11} />
+                <span>Typography</span>
+              </button>
+              <button
+                type="button"
+                className={`tab-row-pill ${isRow3Open ? 'active' : ''}`}
+                onClick={() => toggleRow(3)}
+                title="Toggle Row 3: Format & Page Setup (A4, Lists, Tables)"
+              >
+                <LayoutTemplate size={11} />
+                <span>Format</span>
+              </button>
+              <button
+                type="button"
+                className={`tab-row-pill ${isRow4Open ? 'active' : ''}`}
+                onClick={() => toggleRow(4)}
+                title="Toggle Row 4: Media, Links & Studios"
+              >
+                <Sparkles size={11} />
+                <span>Media</span>
+              </button>
+
+              {/* Share & Export Dropdown Button right next to Media */}
+              <div className="tab-share-menu-container" style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className={`tab-row-pill tab-share-pill ${isShareMenuOpen ? 'active' : ''}`}
+                  onClick={() => setIsShareMenuOpen(!isShareMenuOpen)}
+                  title="Share & Export Note (PDF, Markdown, HTML, Link)"
+                >
+                  <Share2 size={11} color="var(--accent-primary)" />
+                  <span>Share</span>
+                  <ChevronDown size={10} />
+                </button>
+
+                {isShareMenuOpen && (
+                  <>
+                    <div className="dropdown-backdrop" onClick={() => setIsShareMenuOpen(false)} />
+                    <div className="tab-share-dropdown-menu">
+                      <div className="share-menu-header">
+                        <span>Export & Share Note</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          window.print();
+                        }}
+                        title="Print Document or Save as PDF"
+                      >
+                        <Printer size={13} color="var(--accent-primary)" />
+                        <div className="share-item-details">
+                          <strong>Export PDF / Print</strong>
+                          <span>Printable document with A4 styling</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          handleExportFile('md');
+                        }}
+                        title="Download Markdown file (.md)"
+                      >
+                        <Download size={13} color="#10b981" />
+                        <div className="share-item-details">
+                          <strong>Export Markdown (.md)</strong>
+                          <span>Standard GFM format with frontmatter</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          handleExportFile('html');
+                        }}
+                        title="Download standalone HTML file"
+                      >
+                        <FileCode size={13} color="#f59e0b" />
+                        <div className="share-item-details">
+                          <strong>Export HTML (.html)</strong>
+                          <span>Self-contained standalone webpage</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          handleExportFile('txt');
+                        }}
+                        title="Download plain text file (.txt)"
+                      >
+                        <FileText size={13} color="var(--text-muted)" />
+                        <div className="share-item-details">
+                          <strong>Export Plain Text (.txt)</strong>
+                          <span>Clean unformatted text</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          handleCopyNoteLink();
+                        }}
+                        title="Copy Markdown Link [[Note Title]]"
+                      >
+                        <Link size={13} color="#8b5cf6" />
+                        <div className="share-item-details">
+                          <strong>Copy Wiki-Link</strong>
+                          <span>[[{note?.title || 'Untitled'}]]</span>
+                        </div>
+                      </button>
+                      <div className="share-menu-divider" />
+                      <button
+                        type="button"
+                        className="share-menu-item studio-trigger"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          setIsExportModalOpen(true);
+                        }}
+                        title="Open Full Export Studio"
+                      >
+                        <Sparkles size={13} color="var(--accent-primary)" />
+                        <div className="share-item-details">
+                          <strong>All Export Options...</strong>
+                          <span>EPUB, JSON backup & styling</span>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Save Pill */}
+            <button
+              type="button"
+              className={`editor-save-btn tab-save-btn ${saveStatus}`}
+              onClick={handleManualSave}
+              disabled={note.isTrashed || saveStatus === 'saving'}
+              title="Save Note (Cmd+S / Ctrl+S)"
+            >
+              <Save size={12} />
+              <span>{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Save' : 'Saved'}</span>
+            </button>
+          </div>
+        }
         onRenameTab={(noteId, newTitle) => {
           const target = allNotes.find((n) => n.id === noteId);
           if (target && !target.isTrashed) {
@@ -1691,413 +2057,689 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         }}
       />
 
-      {/* Top Header Bar */}
-      <div className="editor-header-bar">
-        <div className="editor-breadcrumb">
-          <button 
-            className="editor-icon-btn mobile-only" 
-            onClick={onBackMobile}
-            title="Back to notes list"
-          >
-            <ArrowLeft size={16} />
-          </button>
+      {/* 4-ROW COLLAPSIBLE SYSTEMATIC TOOLBAR */}
+      <div className="editor-systematic-toolbar">
+        
+        {/* ROW 1: ACTIONS & META (Rendered when Actions pill is active) */}
+        {isRow1Open && (
+          <div className="toolbar-row-body row-1-actions">
+            {/* Folder Selector */}
+            <div className="toolbar-inline-select">
+              <FolderIcon size={13} color="var(--text-muted)" />
+              <select 
+                className="editor-folder-select"
+                value={note.folderId || ''}
+                onChange={handleFolderChange}
+                disabled={note.isTrashed}
+                title="Move note to folder"
+              >
+                <option value="">(No Folder / Root)</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* Folder Selector */}
-          <FolderIcon size={14} color="var(--text-muted)" />
-          <select 
-            className="editor-folder-select"
-            value={note.folderId || ''}
-            onChange={handleFolderChange}
-            disabled={note.isTrashed}
-            title="Move note to folder"
-          >
-            <option value="">(No Folder / Root)</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+            {/* Book Selector */}
+            <div className="toolbar-inline-select">
+              <BookOpen size={13} color="var(--accent-primary)" />
+              <select
+                className="editor-folder-select"
+                value={note.bookId || ''}
+                onChange={handleBookChange}
+                disabled={note.isTrashed}
+                title="Organize note into a Book / Notebook"
+              >
+                <option value="">(Not in a Book)</option>
+                {books.map((b) => (
+                  <option key={b.id} value={b.id}>{b.icon} {b.title}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* Book / Chapter Selector */}
-          <BookOpen size={14} color="var(--accent-primary)" style={{ marginLeft: '6px' }} />
-          <select
-            className="editor-folder-select"
-            value={note.bookId || ''}
-            onChange={handleBookChange}
-            disabled={note.isTrashed}
-            title="Organize note into a Book / Notebook"
-          >
-            <option value="">(Not in a Book)</option>
-            {books.map((b) => (
-              <option key={b.id} value={b.id}>{b.icon} {b.title}</option>
-            ))}
-          </select>
+            <span className="toolbar-stat-pill">{wordCount}w · {charCount}c</span>
 
-          <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '6px' }}>
-            {wordCount} words · {charCount} chars
-          </span>
-        </div>
+            <div className="toolbar-divider" />
 
-        {/* Action Controls */}
-        <div className="editor-header-actions">
-          {/* Find in Note Trigger */}
-          <button
-            className={`editor-action-pill ${isFindReplaceOpen ? 'active' : ''}`}
-            onClick={() => setIsFindReplaceOpen(!isFindReplaceOpen)}
-            title="Find & Replace in note (Cmd+F)"
-          >
-            <Search size={14} />
-            <span className="btn-label-text">Find</span>
-          </button>
-
-          {/* Apple Freehand Drawing Canvas Trigger */}
-          <button
-            className="editor-action-pill"
-            onClick={() => setIsDrawingModalOpen(true)}
-            disabled={note.isTrashed}
-            title="Open Freehand Sketchpad"
-          >
-            <PenTool size={14} color="#8b5cf6" />
-            <span className="btn-label-text">Draw</span>
-          </button>
-
-          {/* Table of Contents Outline Trigger */}
-          <button
-            className={`editor-action-pill ${isOutlineOpen ? 'active' : ''}`}
-            onClick={() => setIsOutlineOpen(!isOutlineOpen)}
-            title="Document Outline / Table of Contents"
-          >
-            <ListTree size={14} />
-            <span className="btn-label-text">Outline</span>
-          </button>
-
-          {/* Direct Voice Recording Trigger (ONLY if mic enabled) */}
-          {isMicEnabled && (
+            {/* Find & Search */}
             <button
-              className={`editor-action-pill ${isVoiceRecorderOpen ? 'active' : ''}`}
-              onClick={() => setIsVoiceRecorderOpen(!isVoiceRecorderOpen)}
+              className={`toolbar-btn ${isFindReplaceOpen ? 'active' : ''}`}
+              onClick={() => setIsFindReplaceOpen(!isFindReplaceOpen)}
+              title="Find & Replace in note (Cmd+F)"
+            >
+              <Search size={13} />
+              <span>Find</span>
+            </button>
+
+            {/* Drawing */}
+            <button
+              className="toolbar-btn"
+              onClick={() => setIsDrawingModalOpen(true)}
               disabled={note.isTrashed}
-              title="Record voice memo"
+              title="Open Freehand Sketchpad"
             >
-              <Mic size={14} color="#ef4444" />
-              <span className="btn-label-text">Voice</span>
+              <PenTool size={13} color="#8b5cf6" />
+              <span>Draw</span>
             </button>
-          )}
 
-          {/* Dual Split-View Trigger */}
-          {onOpenSplit && !isSplitView && (
+            {/* Outline */}
             <button
-              type="button"
-              className="editor-action-pill"
-              onClick={() => onOpenSplit(note.id)}
-              title="Open Split View (Side-by-Side)"
+              className={`toolbar-btn ${isOutlineOpen ? 'active' : ''}`}
+              onClick={() => setIsOutlineOpen(!isOutlineOpen)}
+              title="Document Outline"
             >
-              <Columns2 size={14} color="var(--accent-primary)" />
-              <span className="btn-label-text">Split</span>
+              <ListTree size={13} />
+              <span>Outline</span>
             </button>
-          )}
 
-          {isSplitView && onCloseSplit && (
+            {/* Voice memo */}
+            {isMicEnabled && (
+              <button
+                className={`toolbar-btn ${isVoiceRecorderOpen ? 'active' : ''}`}
+                onClick={() => setIsVoiceRecorderOpen(!isVoiceRecorderOpen)}
+                disabled={note.isTrashed}
+                title="Record voice memo"
+              >
+                <Mic size={13} color="#ef4444" />
+                <span>Voice</span>
+              </button>
+            )}
+
+            {/* Split view */}
+            {onOpenSplit && !isSplitView && (
+              <button
+                type="button"
+                className="toolbar-btn"
+                onClick={() => onOpenSplit(note.id)}
+                title="Open Split View (Side-by-Side)"
+              >
+                <Columns2 size={13} color="var(--accent-primary)" />
+                <span>Split</span>
+              </button>
+            )}
+
+            {isSplitView && onCloseSplit && (
+              <button
+                type="button"
+                className="toolbar-btn danger"
+                onClick={onCloseSplit}
+                title="Close Split View"
+              >
+                <XCircle size={13} />
+                <span>Exit Split</span>
+              </button>
+            )}
+
+            {/* Duplicate */}
+            {onDuplicateNote && (
+              <button
+                type="button"
+                className="toolbar-btn"
+                onClick={() => onDuplicateNote(note)}
+                title="Duplicate Note (Copy)"
+              >
+                <Copy size={13} />
+              </button>
+            )}
+
+            {/* Move */}
+            {onMoveNote && (
+              <button
+                type="button"
+                className="toolbar-btn"
+                onClick={() => setIsMoveModalOpen(true)}
+                title="Move Note"
+              >
+                <Move size={13} />
+              </button>
+            )}
+
+            {/* Export */}
             <button
-              type="button"
-              className="editor-action-pill danger"
-              onClick={onCloseSplit}
-              title="Close Split View"
+              className="toolbar-btn"
+              onClick={() => setIsExportModalOpen(true)}
+              title="Export & Share"
             >
-              <XCircle size={14} />
-              <span className="btn-label-text">Exit Split</span>
+              <Share2 size={13} color="var(--accent-primary)" />
+              <span>Export</span>
             </button>
-          )}
 
-          {/* Duplicate Note Trigger */}
-          {onDuplicateNote && (
+            {/* Pin */}
             <button
-              type="button"
-              className="editor-icon-btn"
-              onClick={() => onDuplicateNote(note)}
-              title="Duplicate Note (Copy)"
+              className={`toolbar-btn ${note.isPinned ? 'active' : ''}`}
+              onClick={() => onUpdateNote({ ...note, isPinned: !note.isPinned })}
+              disabled={note.isTrashed}
+              title={note.isPinned ? 'Unpin note' : 'Pin note to top'}
             >
-              <Copy size={15} />
+              <Pin size={13} />
             </button>
-          )}
 
-          {/* Move to Folder / Book Trigger */}
-          {onMoveNote && (
+            {/* Favorite */}
             <button
-              type="button"
-              className="editor-icon-btn"
-              onClick={() => setIsMoveModalOpen(true)}
-              title="Move Note (Folder & Book Organizer)"
+              className={`toolbar-btn ${note.isFavorite ? 'active' : ''}`}
+              onClick={() => onUpdateNote({ ...note, isFavorite: !note.isFavorite })}
+              disabled={note.isTrashed}
+              title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
-              <Move size={15} />
+              <Star size={13} fill={note.isFavorite ? '#f59e0b' : 'none'} color={note.isFavorite ? '#f59e0b' : undefined} />
             </button>
-          )}
 
-          {/* Omni-Format Presentable Export Trigger */}
-          <button
-            className="editor-action-pill"
-            onClick={() => setIsExportModalOpen(true)}
-            title="Export & Share (PDF, Image Card, HTML, Markdown)"
-          >
-            <Share2 size={14} color="var(--accent-primary)" />
-            <span className="btn-label-text">Export</span>
-          </button>
-
-          {/* Archive / Unarchive Button */}
-          <button
-            className={`editor-icon-btn ${note.isArchived ? 'active' : ''}`}
-            onClick={() => onToggleArchiveNote(note.id)}
-            disabled={note.isTrashed}
-            title={note.isArchived ? 'Unarchive note' : 'Archive note'}
-          >
-            <Archive size={15} color={note.isArchived ? '#8b5cf6' : undefined} />
-          </button>
-
-          {/* Zen Focus Mode Toggle */}
-          <button
-            className={`editor-icon-btn ${isZenMode ? 'active' : ''}`}
-            onClick={onToggleZenMode}
-            title={isZenMode ? 'Exit Zen Focus Mode' : 'Distraction-Free Zen Mode'}
-          >
-            {isZenMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-          </button>
-
-          <button
-            className={`editor-icon-btn ${note.isPinned ? 'active' : ''}`}
-            onClick={() => onUpdateNote({ ...note, isPinned: !note.isPinned })}
-            disabled={note.isTrashed}
-            title={note.isPinned ? 'Unpin note' : 'Pin note to top'}
-          >
-            <Pin size={15} />
-          </button>
-
-          <button
-            className={`editor-icon-btn ${note.isFavorite ? 'active' : ''}`}
-            onClick={() => onUpdateNote({ ...note, isFavorite: !note.isFavorite })}
-            disabled={note.isTrashed}
-            title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-          >
-            <Star size={15} fill={note.isFavorite ? '#f59e0b' : 'none'} />
-          </button>
-
-          {/* Zero-Knowledge Note Lock / Unlock */}
-          <button
-            className={`editor-icon-btn ${note.isLocked ? 'active-lock' : ''}`}
-            onClick={() => {
-              setCryptoModalMode(note.isLocked ? 'unlock' : 'lock');
-              setIsCryptoModalOpen(true);
-            }}
-            disabled={note.isTrashed}
-            title={note.isLocked ? 'Unlock Encrypted Note (AES-256-GCM)' : 'Encrypt & Lock Note (AES-256-GCM)'}
-          >
-            {note.isLocked ? <Lock size={15} color="var(--color-warning)" /> : <KeyRound size={15} />}
-          </button>
-
-          {/* Delete to Trash Button */}
-          <button
-            className="editor-icon-btn danger"
-            onClick={() => onDeleteNote(note.id)}
-            title={note.isTrashed ? 'Delete Forever' : 'Move note to Trash'}
-          >
-            <Trash2 size={15} />
-          </button>
-
-          {/* Exit Note Button */}
-          {onCloseNote && (
+            {/* Lock */}
             <button
-              type="button"
-              className="editor-icon-btn exit-btn"
-              onClick={onCloseNote}
-              title="Exit Note (Deselect and return to workspace)"
+              className={`toolbar-btn ${note.isLocked ? 'active-lock' : ''}`}
+              onClick={() => {
+                setCryptoModalMode(note.isLocked ? 'unlock' : 'lock');
+                setIsCryptoModalOpen(true);
+              }}
+              disabled={note.isTrashed}
+              title={note.isLocked ? 'Unlock Encrypted Note' : 'Encrypt & Lock Note'}
             >
-              <LogOut size={15} />
+              {note.isLocked ? <Lock size={13} color="var(--color-warning)" /> : <KeyRound size={13} />}
             </button>
-          )}
-        </div>
-      </div>
 
-      {/* Formatting & View Mode Toolbar */}
-      <div className="editor-toolbar">
-        <button className="toolbar-btn" onClick={() => insertFormatting('# ')} disabled={note.isTrashed} title="Heading 1">
-          <Heading1 size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('## ')} disabled={note.isTrashed} title="Heading 2">
-          <Heading2 size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('### ')} disabled={note.isTrashed} title="Heading 3">
-          <Heading3 size={14} />
-        </button>
-        <div className="toolbar-divider" />
-        <button className="toolbar-btn" onClick={() => insertFormatting('**', '**')} disabled={note.isTrashed} title="Bold (**text**)">
-          <Bold size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('*', '*')} disabled={note.isTrashed} title="Italic (*text*)">
-          <Italic size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('<u>', '</u>')} disabled={note.isTrashed} title="Underline (<u>text</u>)">
-          <UnderlineIcon size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('~~', '~~')} disabled={note.isTrashed} title="Strikethrough (~~text~~)">
-          <StrikethroughIcon size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('<mark>', '</mark>')} disabled={note.isTrashed} title="Highlight (<mark>text</mark>)">
-          <HighlighterIcon size={14} color="#f59e0b" />
-        </button>
-        <div className="toolbar-divider" />
-        {/* Font Family Selector (RoosterJS / SunEditor) */}
-        <select 
-          className="editor-font-select"
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value as any)}
-          title="Font Family"
-        >
-          <option value="sans">Sans (Inter)</option>
-          <option value="serif">Serif (Editorial)</option>
-          <option value="mono">Mono (Code)</option>
-        </select>
-        <div className="toolbar-divider" />
-        <button className="toolbar-btn" onClick={() => insertFormatting('- [ ] ')} disabled={note.isTrashed} title="Checklist item">
-          <CheckSquare size={14} />
-          <span>Task</span>
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('- ')} disabled={note.isTrashed} title="Bullet List">
-          <List size={14} />
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('\n| Header 1 | Header 2 |\n| :--- | :--- |\n| Item 1 | Item 2 |\n\n')} disabled={note.isTrashed} title="Insert Table">
-          <TableIcon size={14} />
-          <span>Table</span>
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('> [!NOTE]\n> ')} disabled={note.isTrashed} title="Callout Card">
-          <Info size={14} />
-          <span>Callout</span>
-        </button>
-        <button className="toolbar-btn" onClick={() => insertFormatting('```typescript\n', '\n```')} disabled={note.isTrashed} title="Code Block">
-          <Code size={14} />
-        </button>
-        <button 
-          className="toolbar-btn" 
-          onClick={() => insertFormatting('[[', ']]')} 
-          disabled={note.isTrashed} 
-          title="Internal Note Link ([[Wiki-Link]] to another note in your workspace)"
-        >
-          <Link size={14} />
-          <span>[[Wiki]]</span>
-        </button>
-        <button 
-          className="toolbar-btn" 
-          onClick={handleToolbarLinkClick} 
-          disabled={note.isTrashed} 
-          title="Insert Web Link (Dialog to enter URL & Title with smart website title derivation)"
-        >
-          <ExternalLink size={14} />
-          <span>[Link]</span>
-        </button>
-        <button 
-          className="toolbar-btn" 
-          onClick={() => insertFormatting('$$ ', ' $$')} 
-          disabled={note.isTrashed} 
-          title="LaTeX Math Formula ($$ Formula $$)"
-        >
-          <Sigma size={14} />
-          <span>Math</span>
-        </button>
-        <button 
-          className="toolbar-btn" 
-          onClick={handleToolbarDiagramClick} 
-          disabled={note.isTrashed} 
-          title="Interactive Mermaid Diagram Studio (Click to design or highlight text to auto-convert text to diagram)"
-        >
-          <GitBranch size={14} color="#8b5cf6" />
-          <span>Diagram</span>
-        </button>
-        <button 
-          className="toolbar-btn" 
-          onClick={() => setIsInsertImageOpen(true)} 
-          disabled={note.isTrashed} 
-          title="Insert Image with Text Wrapping & Pixel Width Control"
-        >
-          <ImageIcon size={14} color="var(--accent-primary)" />
-          <span>Image</span>
-        </button>
-        <button 
-          className="toolbar-btn" 
-          onClick={() => setIsVideoModalOpen(true)} 
-          disabled={note.isTrashed} 
-          title="Embed Video (YouTube, Vimeo, HTML5 Video)"
-        >
-          <VideoIcon size={14} color="#ef4444" />
-          <span>Video</span>
-        </button>
-
-        {/* Templates Dropdown Button */}
-        <div style={{ position: 'relative' }}>
-          <button 
-            className="toolbar-btn" 
-            onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
-            disabled={note.isTrashed}
-            title="Insert Note Template"
-          >
-            <LayoutTemplate size={14} color="var(--accent-primary)" />
-            <span>Template</span>
-            <ChevronDown size={11} />
-          </button>
-
-          {isTemplateMenuOpen && (
-            <div 
-              className="editor-suggestions-menu"
-              style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', width: '260px', zIndex: 60 }}
+            {/* Zen Mode */}
+            <button
+              className={`toolbar-btn ${isZenMode ? 'active' : ''}`}
+              onClick={onToggleZenMode}
+              title={isZenMode ? 'Exit Zen Mode' : 'Zen Focus Mode'}
             >
-              <div className="suggestion-menu-header">
-                <span>Choose Template</span>
+              {isZenMode ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+
+            {/* Mobile Back button */}
+            {onBackMobile && (
+              <button
+                type="button"
+                className="toolbar-btn mobile-only"
+                onClick={onBackMobile}
+                title="Back to notes list"
+              >
+                <ArrowLeft size={13} />
+                <span>Back</span>
+              </button>
+            )}
+
+            {/* Archive */}
+            {onToggleArchiveNote && (
+              <button
+                type="button"
+                className={`toolbar-btn ${note.isArchived ? 'active' : ''}`}
+                onClick={() => onToggleArchiveNote(note.id)}
+                disabled={note.isTrashed}
+                title={note.isArchived ? 'Unarchive note' : 'Archive note'}
+              >
+                <Archive size={13} color={note.isArchived ? '#8b5cf6' : undefined} />
+              </button>
+            )}
+
+            {/* Trash */}
+            <button
+              className="toolbar-btn danger"
+              onClick={() => onDeleteNote(note.id)}
+              title={note.isTrashed ? 'Delete Forever' : 'Move note to Trash'}
+            >
+              <Trash2 size={13} />
+            </button>
+
+            {/* Exit Note */}
+            {onCloseNote && (
+              <button
+                type="button"
+                className="toolbar-btn exit-btn"
+                onClick={onCloseNote}
+                title="Exit Note"
+              >
+                <LogOut size={13} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ROW 2: TYPOGRAPHY (Rendered when Typography pill is active) */}
+        {isRow2Open && (
+          <div className="toolbar-row-body row-2-typography">
+            <button className="toolbar-btn" onClick={() => insertFormatting('# ')} disabled={note.isTrashed} title="Heading 1">
+              <Heading1 size={14} />
+              <span>H1</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('## ')} disabled={note.isTrashed} title="Heading 2">
+              <Heading2 size={14} />
+              <span>H2</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('### ')} disabled={note.isTrashed} title="Heading 3">
+              <Heading3 size={14} />
+              <span>H3</span>
+            </button>
+
+            <div className="toolbar-divider" />
+
+            {/* Font Family Selector */}
+            <select 
+              className="editor-font-select"
+              value={fontFamily}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                setFontFamily(val);
+                localStorage.setItem('milearnapp_editor_font_family', val);
+              }}
+              title="Font Family"
+            >
+              <option value="sans">Sans (Inter)</option>
+              <option value="serif">Serif (Editorial)</option>
+              <option value="mono">Mono (Code)</option>
+            </select>
+
+            {/* Font Size Selector */}
+            <select 
+              className="editor-font-select"
+              value={fontSize}
+              onChange={(e) => {
+                const val = e.target.value as any;
+                setFontSize(val);
+                localStorage.setItem('milearnapp_editor_font_size', val);
+              }}
+              title="Font Size"
+            >
+              <option value="sm">Small (13px)</option>
+              <option value="base">Default (15px)</option>
+              <option value="lg">Large (17px)</option>
+              <option value="xl">Extra Large (19px)</option>
+            </select>
+
+            {/* Line Height Selector */}
+            <select 
+              className="editor-font-select"
+              value={lineHeight}
+              onChange={(e) => setLineHeight(e.target.value as any)}
+              title="Line Spacing / Height"
+            >
+              <option value="normal">Normal Line Spacing</option>
+              <option value="relaxed">Relaxed (1.8x)</option>
+              <option value="loose">Loose (2.1x)</option>
+            </select>
+
+            <div className="toolbar-divider" />
+
+            {/* Alignment Buttons */}
+            <div className="editor-align-btn-group" style={{ display: 'inline-flex', gap: '2px' }}>
+              <button
+                type="button"
+                className={`toolbar-btn ${textAlign === 'left' ? 'active' : ''}`}
+                onClick={() => {
+                  setTextAlign('left');
+                  insertFormatting('<div align="left">\n\n', '\n\n</div>');
+                }}
+                disabled={note.isTrashed}
+                title="Align Left"
+              >
+                <AlignLeft size={14} />
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${textAlign === 'center' ? 'active' : ''}`}
+                onClick={() => {
+                  setTextAlign('center');
+                  insertFormatting('<div align="center">\n\n', '\n\n</div>');
+                }}
+                disabled={note.isTrashed}
+                title="Align Center"
+              >
+                <AlignCenter size={14} />
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${textAlign === 'right' ? 'active' : ''}`}
+                onClick={() => {
+                  setTextAlign('right');
+                  insertFormatting('<div align="right">\n\n', '\n\n</div>');
+                }}
+                disabled={note.isTrashed}
+                title="Align Right"
+              >
+                <AlignRight size={14} />
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${textAlign === 'justify' ? 'active' : ''}`}
+                onClick={() => {
+                  setTextAlign('justify');
+                  insertFormatting('<div style="text-align: justify;">\n\n', '\n\n</div>');
+                }}
+                disabled={note.isTrashed}
+                title="Justify Text"
+              >
+                <AlignJustify size={14} />
+              </button>
+            </div>
+
+            <div className="toolbar-divider" />
+
+            {/* Text Styling */}
+            <button className="toolbar-btn" onClick={() => insertFormatting('**', '**')} disabled={note.isTrashed} title="Bold (**text**)">
+              <Bold size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('*', '*')} disabled={note.isTrashed} title="Italic (*text*)">
+              <Italic size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('<u>', '</u>')} disabled={note.isTrashed} title="Underline (<u>text</u>)">
+              <UnderlineIcon size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('~~', '~~')} disabled={note.isTrashed} title="Strikethrough (~~text~~)">
+              <StrikethroughIcon size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('`', '`')} disabled={note.isTrashed} title="Inline Code (`code`)">
+              <Code2 size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('<sub>', '</sub>')} disabled={note.isTrashed} title="Subscript (<sub>text</sub>)">
+              <Subscript size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('<sup>', '</sup>')} disabled={note.isTrashed} title="Superscript (<sup>text</sup>)">
+              <Superscript size={14} />
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('<mark>', '</mark>')} disabled={note.isTrashed} title="Highlight (<mark>text</mark>)">
+              <HighlighterIcon size={14} color="#f59e0b" />
+              <span>Highlight</span>
+            </button>
+          </div>
+        )}
+
+        {/* ROW 3: FORMAT & PAGE SETUP (Rendered when Format pill is active) */}
+        {isRow3Open && (
+          <div className="toolbar-row-body row-3-blocks row-3-format">
+            {/* Page Setup Format Selector */}
+            <div className="toolbar-inline-select page-setup-select">
+              <LayoutTemplate size={13} color="var(--accent-primary)" />
+              <select
+                className="editor-format-select"
+                value={pageFormat}
+                onChange={(e) => {
+                  const val = e.target.value as any;
+                  setPageFormat(val);
+                  localStorage.setItem('milearnapp_page_format', val);
+                }}
+                title="Document Page Setup (A4 Document, US Letter, Continuous Flow)"
+              >
+                <option value="continuous">📄 Continuous Flow</option>
+                <option value="a4">📑 A4 Document (Print & PDF)</option>
+                <option value="letter">📃 US Letter (8.5 × 11 in)</option>
+              </select>
+            </div>
+
+            {/* Page Margin Selector (when A4 or US Letter is active) */}
+            {pageFormat !== 'continuous' && (
+              <div className="toolbar-inline-select page-setup-margins">
+                <select
+                  className="editor-format-select"
+                  value={pageMargin}
+                  onChange={(e) => {
+                    const val = e.target.value as any;
+                    setPageMargin(val);
+                    localStorage.setItem('milearnapp_page_margin', val);
+                  }}
+                  title="Document Margins"
+                >
+                  <option value="normal">Normal (24mm)</option>
+                  <option value="compact">Compact (12mm)</option>
+                  <option value="wide">Wide (36mm)</option>
+                </select>
               </div>
-              <div className="suggestion-items-list">
-                {NOTE_TEMPLATES.map((tmpl) => (
+            )}
+
+            {/* Page Break / Divider */}
+            <button 
+              className="toolbar-btn" 
+              onClick={() => insertFormatting('\n\n---\n\n')} 
+              disabled={note.isTrashed} 
+              title="Insert Page Break / Slide Separator (---)"
+            >
+              <Scissors size={14} />
+              <span>Page Break</span>
+            </button>
+
+            <div className="toolbar-divider" />
+
+            <button className="toolbar-btn" onClick={() => insertFormatting('- [ ] ')} disabled={note.isTrashed} title="Task checklist">
+              <CheckSquare size={14} />
+              <span>Checklist Task</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('- ')} disabled={note.isTrashed} title="Bullet List">
+              <List size={14} />
+              <span>Bullet List</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('1. ')} disabled={note.isTrashed} title="Numbered List">
+              <span style={{ fontSize: '12px', fontWeight: 600 }}>1.</span>
+              <span>Numbered</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('\n| Header 1 | Header 2 |\n| :--- | :--- |\n| Item 1 | Item 2 |\n\n')} disabled={note.isTrashed} title="Insert Table">
+              <TableIcon size={14} />
+              <span>Table Grid</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('> [!NOTE]\n> ')} disabled={note.isTrashed} title="Callout Card">
+              <Info size={14} />
+              <span>Callout Box</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('```typescript\n', '\n```')} disabled={note.isTrashed} title="Code Block">
+              <Code size={14} />
+              <span>Code Block</span>
+            </button>
+            <button className="toolbar-btn" onClick={() => insertFormatting('> ')} disabled={note.isTrashed} title="Quote Block">
+              <span style={{ fontSize: '14px', fontWeight: 700, fontStyle: 'italic' }}>“</span>
+              <span>Blockquote</span>
+            </button>
+          </div>
+        )}
+
+        {/* ROW 4: MEDIA, ADVANCED & STUDIOS (Rendered when Media pill is active) */}
+        {isRow4Open && (
+          <div className="toolbar-row-body row-4-advanced">
+            <button 
+              className="toolbar-btn" 
+              onClick={() => insertFormatting('[[', ']]')} 
+              disabled={note.isTrashed} 
+              title="Internal Note Link ([[Wiki-Link]])"
+            >
+              <Link size={14} />
+              <span>[[Wiki]]</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={handleToolbarLinkClick} 
+              disabled={note.isTrashed} 
+              title="Insert Web Link"
+            >
+              <ExternalLink size={14} />
+              <span>[Web Link]</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => insertFormatting('$$ ', ' $$')} 
+              disabled={note.isTrashed} 
+              title="Insert Mathematical Formula"
+            >
+              <Sigma size={14} />
+              <span>Math Formula</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={handleToolbarDiagramClick} 
+              disabled={note.isTrashed} 
+              title="Mermaid Diagram Studio"
+            >
+              <GitBranch size={14} color="#8b5cf6" />
+              <span>Diagram</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsInteractiveFlowOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Interactive Flow & Concept Canvas (@xyflow/react)"
+            >
+              <GitFork size={14} color="#818cf8" />
+              <span>Flow Canvas</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsMathGraphStudioOpen(true)} 
+              disabled={note.isTrashed} 
+              title="2D Function Grapher & Scientific Calculator (Desmos & Advanced-Calculator)"
+            >
+              <TrendingUp size={14} color="#10b981" />
+              <span>Graph/Calc</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsBlocklyStudioOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Visual Logic & Block Programming (Google Blockly)"
+            >
+              <Puzzle size={14} color="#f59e0b" />
+              <span>Blockly Code</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsThreeStudioOpen(true)} 
+              disabled={note.isTrashed} 
+              title="3D Interactive Geometry & Models (Three.js WebGL)"
+            >
+              <Box size={14} color="#06b6d4" />
+              <span>3D Model</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsCitationStudioOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Academic Citations & Bibliography Studio (Citation.js)"
+            >
+              <Quote size={14} color="#ec4899" />
+              <span>Citations</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsSlideDeckOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Present as Fullscreen Slide Deck (splits on ---)"
+            >
+              <Presentation size={14} color="#ec4899" />
+              <span>Slide Deck</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsOcrScannerOpen(true)} 
+              disabled={note.isTrashed} 
+              title="OCR Scanner: Extract text from photos or textbook pages"
+            >
+              <ScanText size={14} color="#10b981" />
+              <span>Scan Text</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsFlashcardQuizOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Active Recall Flashcards & Spaced Repetition Quiz"
+            >
+              <GraduationCap size={14} color="var(--accent-primary)" />
+              <span>Study Cards</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsNoteCanvasOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Infinite Note Canvas: Map knowledge & connections (@xyflow/react)"
+            >
+              <Network size={14} color="#0ea5e9" />
+              <span>Note Canvas</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsInsertImageOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Insert Image"
+            >
+              <ImageIcon size={14} color="var(--accent-primary)" />
+              <span>Image</span>
+            </button>
+            <button 
+              className="toolbar-btn" 
+              onClick={() => setIsVideoModalOpen(true)} 
+              disabled={note.isTrashed} 
+              title="Embed Video"
+            >
+              <VideoIcon size={14} color="#ef4444" />
+              <span>Video</span>
+            </button>
+
+            {/* Templates Dropdown Button */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="toolbar-btn" 
+                onClick={() => setIsTemplateMenuOpen(!isTemplateMenuOpen)}
+                disabled={note.isTrashed} 
+                title="Insert Note Template"
+              >
+                <LayoutTemplate size={14} color="var(--accent-primary)" />
+                <span>Template</span>
+                <ChevronDown size={11} />
+              </button>
+
+                {isTemplateMenuOpen && (
                   <div 
-                    key={tmpl.id} 
-                    className="suggestion-item"
-                    onClick={() => handleInsertTemplate(tmpl.content)}
+                    className="editor-suggestions-menu"
+                    style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', width: '260px', zIndex: 60 }}
                   >
-                    <div className="suggestion-item-icon">
-                      <LayoutTemplate size={14} color="var(--accent-primary)" />
+                    <div className="suggestion-menu-header">
+                      <span>Choose Template</span>
                     </div>
-                    <div className="suggestion-item-text">
-                      <span className="suggestion-item-title">{tmpl.name}</span>
-                      <span className="suggestion-item-sub">{tmpl.description}</span>
+                    <div className="suggestion-items-list">
+                      {NOTE_TEMPLATES.map((tmpl) => (
+                        <div 
+                          key={tmpl.id} 
+                          className="suggestion-item"
+                          onClick={() => handleInsertTemplate(tmpl.content)}
+                        >
+                          <div className="suggestion-item-icon">
+                            <LayoutTemplate size={14} color="var(--accent-primary)" />
+                          </div>
+                          <div className="suggestion-item-text">
+                            <span className="suggestion-item-title">{tmpl.name}</span>
+                            <span className="suggestion-item-sub">{tmpl.description}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+              </div>
+
+              {/* View Mode Selector: Live, Split, Markdown */}
+              <div className="mode-toggle-group" style={{ marginLeft: 'auto' }}>
+                <button 
+                  className={`mode-btn ${mode === 'live' ? 'active' : ''}`}
+                  onClick={() => setMode('live')}
+                  title="Interactive Live Document (WYSIWYG)"
+                >
+                  <Sparkles size={11} style={{ marginRight: '3px' }} />
+                  <span>Live</span>
+                </button>
+                <button 
+                  className={`mode-btn ${mode === 'split' ? 'active' : ''}`}
+                  onClick={() => setMode('split')}
+                  title="Side-by-Side Split View"
+                >
+                  <Columns size={11} style={{ marginRight: '3px' }} />
+                  <span>Split</span>
+                </button>
+                <button 
+                  className={`mode-btn ${mode === 'source' ? 'active' : ''}`}
+                  onClick={() => setMode('source')}
+                  title="Raw Markdown Source Editor"
+                >
+                  <Edit3 size={11} style={{ marginRight: '3px' }} />
+                  <span>Markdown</span>
+                </button>
               </div>
             </div>
           )}
         </div>
-
-        {/* View Mode Selector: Live, Split, Markdown */}
-        <div className="mode-toggle-group">
-          <button 
-            className={`mode-btn ${mode === 'live' ? 'active' : ''}`}
-            onClick={() => setMode('live')}
-            title="Interactive Live Document (WYSIWYG)"
-          >
-            <Sparkles size={11} style={{ marginRight: '3px' }} />
-            <span>Live</span>
-          </button>
-          <button 
-            className={`mode-btn ${mode === 'split' ? 'active' : ''}`}
-            onClick={() => setMode('split')}
-            title="Side-by-Side Split View"
-          >
-            <Columns size={11} style={{ marginRight: '3px' }} />
-            <span>Split</span>
-          </button>
-          <button 
-            className={`mode-btn ${mode === 'source' ? 'active' : ''}`}
-            onClick={() => setMode('source')}
-            title="Raw Markdown Source Editor"
-          >
-            <Edit3 size={11} style={{ marginRight: '3px' }} />
-            <span>Markdown</span>
-          </button>
-        </div>
-      </div>
 
       {/* Voice Recorder Bar (if active and mic enabled) */}
       {isMicEnabled && (
@@ -2115,12 +2757,88 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onSaveDrawing={handleAddAttachment}
       />
 
+      {/* Interactive Flow Studio Modal (@xyflow/react) */}
+      <InteractiveFlowModal
+        isOpen={isInteractiveFlowOpen}
+        onClose={() => setIsInteractiveFlowOpen(false)}
+        onInsertIntoNote={(diagramCode) => {
+          insertFormatting(diagramCode);
+        }}
+      />
+
+      {/* Math & Graphing Studio Modal (Desmos + Advanced Calculator) */}
+      <MathGraphStudioModal
+        isOpen={isMathGraphStudioOpen}
+        onClose={() => setIsMathGraphStudioOpen(false)}
+        onInsertIntoNote={(mathContent) => {
+          insertFormatting(mathContent);
+        }}
+        onSaveAttachment={handleAddAttachment}
+      />
+
+      {/* Visual Logic Studio Modal (Blockly) */}
+      <BlocklyStudioModal
+        isOpen={isBlocklyStudioOpen}
+        onClose={() => setIsBlocklyStudioOpen(false)}
+        onInsertIntoNote={(codeBlock) => {
+          insertFormatting(codeBlock);
+        }}
+      />
+
+      {/* 3D Interactive Model Studio Modal (Three.js) */}
+      <ThreeStudioModal
+        isOpen={isThreeStudioOpen}
+        onClose={() => setIsThreeStudioOpen(false)}
+        onSaveAttachment={handleAddAttachment}
+      />
+
+      {/* Academic Citation & Bibliography Studio Modal (Citation.js) */}
+      <CitationStudioModal
+        isOpen={isCitationStudioOpen}
+        onClose={() => setIsCitationStudioOpen(false)}
+        onInsertIntoNote={(content) => {
+          insertFormatting(content);
+        }}
+      />
+
       {/* Omni-Format Presentable Export Modal */}
       <ExportModal
         isOpen={isExportModalOpen}
         note={note}
         activeWorkspace={activeWorkspace}
         onClose={() => setIsExportModalOpen(false)}
+      />
+
+      {/* Infinite Note Canvas Modal (@xyflow/react) */}
+      <NoteCanvasModal
+        isOpen={isNoteCanvasOpen}
+        onClose={() => setIsNoteCanvasOpen(false)}
+        allNotes={allNotes}
+        onSelectNote={(noteId) => onSelectTab(noteId)}
+      />
+
+      {/* Active Recall Flashcard Spaced Repetition Quiz Modal */}
+      <FlashcardQuizModal
+        isOpen={isFlashcardQuizOpen}
+        onClose={() => setIsFlashcardQuizOpen(false)}
+        currentNote={note}
+        allNotes={allNotes}
+      />
+
+      {/* OCR Scanner Image-to-Text Extraction Modal (tesseract.js) */}
+      <OcrScannerModal
+        isOpen={isOcrScannerOpen}
+        onClose={() => setIsOcrScannerOpen(false)}
+        onInsertIntoNote={(extractedText) => {
+          insertFormatting(extractedText);
+        }}
+      />
+
+      {/* Slide Deck / Fullscreen Presentation Modal */}
+      <SlideDeckModal
+        isOpen={isSlideDeckOpen}
+        onClose={() => setIsSlideDeckOpen(false)}
+        note={note}
       />
 
       {/* Outline Drawer (Table of Contents) */}
@@ -2154,6 +2872,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           onTriggerVideoEmbed={() => {
             setSuggestionState((prev) => ({ ...prev, isOpen: false }));
             setIsVideoModalOpen(true);
+          }}
+          onTriggerCitationStudio={() => {
+            setSuggestionState((prev) => ({ ...prev, isOpen: false }));
+            setIsCitationStudioOpen(true);
           }}
           onClose={() => setSuggestionState((prev) => ({ ...prev, isOpen: false }))}
         />
@@ -2202,7 +2924,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       ) : mode === 'split' ? (
-        <div className="split-view-container">
+        <div className={`split-view-container page-format-${pageFormat} page-margin-${pageMargin}`}>
           {/* Left Pane: Raw Markdown Editor */}
           <div className="split-pane-editor">
             <input
@@ -2253,7 +2975,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       ) : (
         <div 
-          className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''}`} 
+          className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''} page-format-${pageFormat} page-margin-${pageMargin}`} 
           ref={scrollAreaRef}
           onClick={(e) => {
             const target = e.target as HTMLElement;
@@ -2379,8 +3101,20 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                   <span>Click here or anywhere in this space to type, or type <code>/</code> for templates & commands</span>
                 </div>
               )}
-              <div className={`markdown-body live-rich-document font-${fontFamily} selectable-text`}>
-                {renderMarkdownPreview(note.content)}
+              <div className={`markdown-body live-rich-document font-${fontFamily} size-${fontSize} leading-${lineHeight} align-${textAlign} selectable-text`}>
+                {renderMarkdownPreview(
+                  (() => {
+                    const trimmedContent = note.content.trim();
+                    const cleanTitle = (note.title || '').trim().toLowerCase();
+                    if (trimmedContent.startsWith('# ')) {
+                      const firstLine = trimmedContent.split('\n')[0].replace(/^#\s+/, '').trim().toLowerCase();
+                      if (firstLine === cleanTitle) {
+                        return note.content.replace(/^#\s+[^\n]*\n?/, '');
+                      }
+                    }
+                    return note.content;
+                  })()
+                )}
               </div>
               {/* Trailing click-to-type area for adding text below existing content */}
               {!note.isTrashed && (
@@ -2570,6 +3304,27 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onApplyFormat={handleApplyBubbleFormat}
         onClose={() => setBubblePosition((prev) => ({ ...prev, visible: false }))}
       />
+
+      {/* Floating Autosave & Word / Character Metrics Badge (Bottom-Right Corner) */}
+      <div 
+        className="editor-floating-status-badge"
+        title={`Live document metrics · Autosave: ${saveStatus}`}
+      >
+        <span className={`floating-autosave-dot ${saveStatus}`} />
+        <span className="floating-autosave-label">
+          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : 'Autosave active'}
+        </span>
+        <span className="floating-badge-sep">·</span>
+        <span className="floating-badge-val">
+          <strong>{wordCount.toLocaleString()}</strong> words
+        </span>
+        <span className="floating-badge-sep">·</span>
+        <span className="floating-badge-val">
+          <strong>{charCount.toLocaleString()}</strong> chars
+        </span>
+        <span className="floating-badge-sep">·</span>
+        <span className="floating-badge-sub">~{Math.max(1, Math.ceil(wordCount / 200))}m read</span>
+      </div>
     </main>
   );
 };

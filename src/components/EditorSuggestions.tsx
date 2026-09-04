@@ -46,6 +46,7 @@ interface EditorSuggestionsProps {
   onTriggerVoiceRecorder: () => void;
   onTriggerDrawing: () => void;
   onTriggerVideoEmbed?: () => void;
+  onTriggerCitationStudio?: () => void;
   onClose: () => void;
 }
 
@@ -60,6 +61,7 @@ export const EditorSuggestions: React.FC<EditorSuggestionsProps> = ({
   onTriggerVoiceRecorder,
   onTriggerDrawing,
   onTriggerVideoEmbed,
+  onTriggerCitationStudio,
   onClose
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -149,6 +151,19 @@ export const EditorSuggestions: React.FC<EditorSuggestionsProps> = ({
       sublabel: 'Blockquote styling',
       icon: <Quote size={15} color="#64748b" />,
       action: () => onSelectSlashCommand('> ')
+    },
+    {
+      id: 'citation',
+      label: 'Citation & Bibliography Studio',
+      sublabel: 'Cite papers & generate bibliographies (Citation.js)',
+      icon: <Quote size={15} color="#ec4899" />,
+      action: () => {
+        if (onTriggerCitationStudio) {
+          onTriggerCitationStudio();
+        } else {
+          onSelectSlashCommand('\n\n> **Reference**: (Author, Year). *Title*. Venue.\n\n');
+        }
+      }
     },
     {
       id: 'voice',

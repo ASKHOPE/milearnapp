@@ -1,39 +1,33 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  Network, 
-  GitFork, 
-  Sun, 
-  Moon, 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Search,
+  Network,
+  GitFork,
+  Sun,
+  Moon,
   Menu,
   GraduationCap,
   Timer,
   Settings,
   Brain,
   Monitor,
-  PanelLeftClose,
-  PanelLeftOpen,
   Zap,
   Sparkles,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Pin,
-  PinOff
+  PinOff,
+  Keyboard,
+  BookA
 } from 'lucide-react';
 import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { typingMetrics, type TypingSessionStats } from '../services/typingMetrics';
 
 interface HeaderProps {
   theme: ThemeMode;
   activeWorkspace?: Workspace;
   userProfile?: UserProfile;
-  workspaces?: Workspace[];
-  activeWorkspaceId?: string;
-  notesCountByWorkspace?: Map<string, number>;
-  onSelectWorkspace?: (id: string) => void;
-  onCreateWorkspace?: (name: string, icon: string, color: string, description: string) => void;
-  onDeleteWorkspace?: (id: string) => void;
-  isSidebarCollapsed?: boolean;
-  onToggleSidebar?: () => void;
   pomodoroSecondsLeft?: number;
   isPomodoroRunning?: boolean;
   pomodoroMode?: PomodoroMode;
@@ -46,22 +40,18 @@ interface HeaderProps {
   onOpenSettings?: () => void;
   onOpenStudyMode: () => void;
   onOpenPomodoro: () => void;
+  onOpenTypingMetrics?: () => void;
+  onOpenDictionary?: () => void;
   onToggleMobileSidebar: () => void;
   onQuickNote?: () => void;
 }
+
+const WIDGET_TOOL_IDS = ['pomodoro', 'typing'];
 
 export const Header: React.FC<HeaderProps> = ({
   theme,
   activeWorkspace,
   userProfile,
-  workspaces,
-  activeWorkspaceId,
-  notesCountByWorkspace,
-  onSelectWorkspace,
-  onCreateWorkspace,
-  onDeleteWorkspace,
-  isSidebarCollapsed = false,
-  onToggleSidebar,
   pomodoroSecondsLeft,
   isPomodoroRunning,
   pomodoroMode = 'work',
@@ -74,6 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenStudyMode,
   onOpenPomodoro,
+  onOpenTypingMetrics,
+  onOpenDictionary,
   onToggleMobileSidebar,
   onQuickNote
 }) => {
@@ -87,13 +79,90 @@ export const Header: React.FC<HeaderProps> = ({
     }
   });
 
+  // Live on-device Typing Metrics state for pinned visual meter
+  const [typingStats, setTypingStats] = useState<TypingSessionStats>(() => 
+    typingMetrics.calculateStats()
+  );
+
+  useEffect(() => {
+    const unsubscribe = typingMetrics.subscribe((stats) => {
+      setTypingStats(stats);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Horizontal scroll for pinned tools
+  const pinnedScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkPinnedScroll = useCallback(() => {
+    const el = pinnedScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkPinnedScroll();
+    const el = pinnedScrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkPinnedScroll);
+    window.addEventListener('resize', checkPinnedScroll);
+    return () => {
+      el.removeEventListener('scroll', checkPinnedScroll);
+      window.removeEventListener('resize', checkPinnedScroll);
+    };
+  }, [pinnedTools, typingStats, checkPinnedScroll]);
+
+  const scrollPinned = (direction: 'left' | 'right') => {
+    const el = pinnedScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction === 'left' ? -90 : 90, behavior: 'smooth' });
+  };
+
+  /**
+   * Enforce Pinning Rules:
+   * - Max 3 widget-style pins (Pomodoro timer, live Typing metrics)
+   * - Max 2 icon pins if widgets are pinned, or max 5 icons total if no widgets
+   */
   const togglePin = (toolId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setPinnedTools((prev) => {
-      const next = prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId];
-      try {
-        localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next));
-      } catch {}
+      if (prev.includes(toolId)) {
+        const next = prev.filter((id) => id !== toolId);
+        try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next)); } catch { }
+        return next;
+      }
+
+      const isWidget = WIDGET_TOOL_IDS.includes(toolId);
+      const curWidgets = prev.filter((id) => WIDGET_TOOL_IDS.includes(id));
+      const curIcons = prev.filter((id) => !WIDGET_TOOL_IDS.includes(id));
+
+      let nextWidgets = [...curWidgets];
+      let nextIcons = [...curIcons];
+
+      if (isWidget) {
+        if (nextWidgets.length >= 3) {
+          nextWidgets.shift(); // Remove oldest widget to honor max 3
+        }
+        nextWidgets.push(toolId);
+        // If widgets present, icons limited to max 2
+        if (nextIcons.length > 2) {
+          nextIcons = nextIcons.slice(-2);
+        }
+      } else {
+        const maxIcons = nextWidgets.length > 0 ? 2 : 5;
+        if (nextIcons.length >= maxIcons) {
+          nextIcons.shift(); // Remove oldest icon to honor max limit
+        }
+        nextIcons.push(toolId);
+      }
+
+      const next = [...nextWidgets, ...nextIcons];
+      try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next)); } catch { }
       return next;
     });
   };
@@ -104,10 +173,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="app-header">
-      {/* Left: Sidebar Toggle, MiLEARNAPP Brand & Persona Switcher */}
+      {/* Left: Mobile Toggle & MiLEARNAPP Brand Logo */}
       <div className="header-left">
-        <button 
-          className="mobile-only-btn editor-icon-btn" 
+        <button
+          className="mobile-only-btn editor-icon-btn"
           onClick={onToggleMobileSidebar}
           title="Toggle Sidebar Navigation"
           aria-label="Toggle Sidebar"
@@ -116,40 +185,15 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu size={18} />
         </button>
 
-        {onToggleSidebar && (
-          <button 
-            type="button"
-            className="header-sidebar-toggle-btn"
-            onClick={onToggleSidebar}
-            title={isSidebarCollapsed ? 'Expand Sidebar (Cmd+\\)' : 'Collapse Sidebar (Cmd+\\)'}
-            aria-label={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-          </button>
-        )}
-
         <div className="app-brand-text">
           <span className="brand-title-logo" title="MiLEARNAPP - Knowledge & Learning Hub">MiLEARNAPP</span>
         </div>
-
-        {workspaces && activeWorkspaceId && onSelectWorkspace && onCreateWorkspace && onDeleteWorkspace && (
-          <div className="header-workspace-wrapper">
-            <WorkspaceSwitcher
-              workspaces={workspaces}
-              activeWorkspaceId={activeWorkspaceId}
-              notesCountByWorkspace={notesCountByWorkspace || new Map()}
-              onSelectWorkspace={onSelectWorkspace}
-              onCreateWorkspace={onCreateWorkspace}
-              onDeleteWorkspace={onDeleteWorkspace}
-            />
-          </div>
-        )}
       </div>
 
       {/* Center: Global Search Trigger */}
       <div className="header-center">
-        <button 
-          className="search-trigger-btn" 
+        <button
+          className="search-trigger-btn"
           onClick={onOpenSearch}
           title="Global Spotlight Search across all notes, tags, books & media (Cmd+K)"
         >
@@ -161,10 +205,10 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Right: Quick Note (Moved here next to Tools), Pinned Tools, Tools Tray, Theme, Profile Tablet */}
+      {/* Right: Quick Note, Pinned Tools (Widget & Icon system), Tools Tray, Theme, Profile */}
       <div className="header-right">
 
-        {/* ⚡ Quick Note Button (Moved to right next to tools) */}
+        {/* ⚡ Quick Note Button */}
         {onQuickNote && (
           <button
             type="button"
@@ -177,63 +221,127 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
-        {/* Pinned Nav Quick Access Tools */}
-        <div className="header-pinned-tools">
-          {pinnedTools.includes('pomodoro') && (
+        {/* Pinned Nav Tools with intelligent horizontal scroll & limit management */}
+        <div className="pinned-tools-nav-wrapper">
+          {canScrollLeft && (
             <button
               type="button"
-              className={`header-pinned-tool-btn ${isPomodoroRunning ? 'running' : ''}`}
-              onClick={onOpenPomodoro}
-              title={`Focus Pomodoro (${isPomodoroRunning ? formattedPomoTime : '25m Timer'})`}
+              className="pinned-nav-scroll-btn prev"
+              onClick={() => scrollPinned('left')}
+              title="Previous pinned tools"
             >
-              <Timer size={14} color="#ef4444" />
-              {isPomodoroRunning && (
-                <span className="pinned-pomo-text">{formattedPomoTime}</span>
-              )}
+              <ChevronLeft size={12} />
             </button>
           )}
 
-          {pinnedTools.includes('study') && (
-            <button
-              type="button"
-              className="header-pinned-tool-btn"
-              onClick={onOpenStudyMode}
-              title="Study Cards (Spaced Repetition Flashcards)"
-            >
-              <GraduationCap size={14} color="var(--accent-primary)" />
-            </button>
-          )}
+          <div 
+            ref={pinnedScrollRef} 
+            className="header-pinned-tools"
+            onWheel={(e) => {
+              if (pinnedScrollRef.current && e.deltaY !== 0) {
+                pinnedScrollRef.current.scrollLeft += e.deltaY;
+              }
+            }}
+          >
+            {/* WIDGET 1: Pomodoro Focus Timer Widget */}
+            {pinnedTools.includes('pomodoro') && (
+              <button
+                type="button"
+                className={`header-pinned-tool-btn header-pinned-widget ${isPomodoroRunning ? 'running' : ''}`}
+                onClick={onOpenPomodoro}
+                title={`Focus Pomodoro (${isPomodoroRunning ? formattedPomoTime : '25m Timer'})`}
+              >
+                <Timer size={14} color="#ef4444" className={isPomodoroRunning ? 'pulse-icon' : ''} />
+                <span className="pinned-pomo-text">
+                  {isPomodoroRunning ? formattedPomoTime : '25:00'}
+                </span>
+              </button>
+            )}
 
-          {pinnedTools.includes('knowledge') && (
-            <button
-              type="button"
-              className="header-pinned-tool-btn"
-              onClick={onOpenKnowledgeBase}
-              title="Knowledge Base Graph (Galaxy View)"
-            >
-              <Network size={14} color="#0ea5e9" />
-            </button>
-          )}
+            {/* WIDGET 2: Live On-Device Typing Metrics Visual Meter (NOT A POPUP) */}
+            {pinnedTools.includes('typing') && (
+              <div
+                className="header-pinned-tool-btn header-pinned-widget typing-meter-widget"
+                title={`Live Typing Rhythm: ${typingStats.wpm} WPM · ${typingStats.accuracy}% Accuracy · ${typingStats.cpm} CPM (Updates live on keystroke)`}
+              >
+                <Keyboard size={13} color="#6366f1" />
+                <span className="pinned-widget-text">
+                  <strong>{typingStats.wpm}</strong> <span className="pinned-widget-unit">WPM</span>
+                  <span className="pinned-widget-dot">·</span>
+                  <span className="pinned-widget-acc">{typingStats.accuracy}%</span>
+                </span>
+              </div>
+            )}
 
-          {pinnedTools.includes('mind') && onOpenInternalMind && (
-            <button
-              type="button"
-              className="header-pinned-tool-btn"
-              onClick={onOpenInternalMind}
-              title="Internal Mind Lexicon (Autonomous Dictionary)"
-            >
-              <Brain size={14} color="#8b5cf6" />
-            </button>
-          )}
+            {/* ICON 1: Study Cards (SRS Flashcards) */}
+            {pinnedTools.includes('study') && (
+              <button
+                type="button"
+                className="header-pinned-tool-btn"
+                onClick={onOpenStudyMode}
+                title="Study Cards (Spaced Repetition Flashcards)"
+              >
+                <GraduationCap size={14} color="var(--accent-primary)" />
+              </button>
+            )}
 
-          {pinnedTools.includes('linktree') && (
+            {/* ICON 2: Knowledge Base Graph */}
+            {pinnedTools.includes('knowledge') && (
+              <button
+                type="button"
+                className="header-pinned-tool-btn"
+                onClick={onOpenKnowledgeBase}
+                title="Knowledge Base Graph (Galaxy View)"
+              >
+                <Network size={14} color="#0ea5e9" />
+              </button>
+            )}
+
+            {/* ICON 3: Internal Mind Knowledge Hub */}
+            {pinnedTools.includes('mind') && onOpenInternalMind && (
+              <button
+                type="button"
+                className="header-pinned-tool-btn"
+                onClick={onOpenInternalMind}
+                title="Internal Mind & Knowledge Dictionary"
+              >
+                <Brain size={14} color="#8b5cf6" />
+              </button>
+            )}
+
+            {/* ICON 4: Folder Link Tree */}
+            {pinnedTools.includes('linktree') && (
+              <button
+                type="button"
+                className="header-pinned-tool-btn"
+                onClick={onOpenLinkTree}
+                title="Folder Link Tree Visualizer"
+              >
+                <GitFork size={14} color="#10b981" />
+              </button>
+            )}
+
+            {/* ICON 5: English Dictionary */}
+            {pinnedTools.includes('dictionary') && onOpenDictionary && (
+              <button
+                type="button"
+                className="header-pinned-tool-btn"
+                onClick={onOpenDictionary}
+                title="English Dictionary & Word Lookup"
+              >
+                <BookA size={14} color="#0ea5e9" />
+              </button>
+            )}
+          </div>
+
+          {canScrollRight && (
             <button
               type="button"
-              className="header-pinned-tool-btn"
-              onClick={onOpenLinkTree}
-              title="Folder Link Tree Visualizer"
+              className="pinned-nav-scroll-btn next"
+              onClick={() => scrollPinned('right')}
+              title="Next pinned tools"
             >
-              <GitFork size={14} color="#10b981" />
+              <ChevronRight size={12} />
             </button>
           )}
         </div>
@@ -263,10 +371,11 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="dropdown-backdrop" onClick={() => setIsToolsTrayOpen(false)} />
               <div className="tools-tray-dropdown-menu">
                 <div className="tray-menu-header">
-                  <span>Workspace Utilities</span>
-                  <span className="tray-pin-hint">Pin to Nav</span>
+                  <span>Tools & Widgets</span>
+                  <span className="tray-pin-hint">Max 3 widgets · 2 icons</span>
                 </div>
 
+                {/* 1. Pomodoro Focus Timer */}
                 <div className="tray-item-row-wrap">
                   <button
                     type="button"
@@ -284,18 +393,46 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     className={`btn-tool-pin ${pinnedTools.includes('pomodoro') ? 'pinned' : ''}`}
                     onClick={(e) => togglePin('pomodoro', e)}
-                    title={pinnedTools.includes('pomodoro') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                    title={pinnedTools.includes('pomodoro') ? 'Unpin timer from nav' : 'Pin live countdown widget to nav'}
                   >
                     {pinnedTools.includes('pomodoro') ? <PinOff size={13} /> : <Pin size={13} />}
                   </button>
                 </div>
 
+                {/* 2. On-Device Typing Metrics */}
+                <div className="tray-item-row-wrap">
+                  <button
+                    type="button"
+                    className="tray-item-btn"
+                    onClick={() => {
+                      if (onOpenTypingMetrics) onOpenTypingMetrics();
+                      setIsToolsTrayOpen(false);
+                    }}
+                    title="View Typing Metrics Analytics"
+                  >
+                    <Keyboard size={15} color="#6366f1" />
+                    <div className="tray-item-text">
+                      <strong>Typing Metrics</strong>
+                      <span>Live {typingStats.wpm} WPM · {typingStats.accuracy}% Accuracy</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-tool-pin ${pinnedTools.includes('typing') ? 'pinned' : ''}`}
+                    onClick={(e) => togglePin('typing', e)}
+                    title={pinnedTools.includes('typing') ? 'Unpin live WPM visual from nav' : 'Pin live WPM visual widget to nav'}
+                  >
+                    {pinnedTools.includes('typing') ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                </div>
+
+                {/* 3. Study Flashcards */}
                 <div className="tray-item-row-wrap">
                   <button
                     type="button"
                     className="tray-item-btn"
                     onClick={() => { onOpenStudyMode(); setIsToolsTrayOpen(false); }}
-                    title="Open Study Flashcards & SuperMemo-2 Spaced Repetition"
+                    title="Open Study Flashcards & Spaced Repetition"
                   >
                     <GraduationCap size={15} color="var(--accent-primary)" />
                     <div className="tray-item-text">
@@ -307,12 +444,13 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     className={`btn-tool-pin ${pinnedTools.includes('study') ? 'pinned' : ''}`}
                     onClick={(e) => togglePin('study', e)}
-                    title={pinnedTools.includes('study') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                    title={pinnedTools.includes('study') ? 'Unpin from top nav' : 'Pin icon to top nav'}
                   >
                     {pinnedTools.includes('study') ? <PinOff size={13} /> : <Pin size={13} />}
                   </button>
                 </div>
 
+                {/* 4. Knowledge Base Graph */}
                 <div className="tray-item-row-wrap">
                   <button
                     type="button"
@@ -330,37 +468,39 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     className={`btn-tool-pin ${pinnedTools.includes('knowledge') ? 'pinned' : ''}`}
                     onClick={(e) => togglePin('knowledge', e)}
-                    title={pinnedTools.includes('knowledge') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                    title={pinnedTools.includes('knowledge') ? 'Unpin from top nav' : 'Pin icon to top nav'}
                   >
                     {pinnedTools.includes('knowledge') ? <PinOff size={13} /> : <Pin size={13} />}
                   </button>
                 </div>
 
+                {/* 5. Internal Mind Knowledge Hub */}
                 {onOpenInternalMind && (
                   <div className="tray-item-row-wrap">
                     <button
                       type="button"
                       className="tray-item-btn"
                       onClick={() => { onOpenInternalMind(); setIsToolsTrayOpen(false); }}
-                      title="Open Autonomous Internal Mind Lexicon & Concept Index"
+                      title="Open Internal Mind & Knowledge Dictionary"
                     >
                       <Brain size={15} color="#8b5cf6" />
                       <div className="tray-item-text">
-                        <strong>Internal Mind Lexicon</strong>
-                        <span>Autonomous dictionary & concept index</span>
+                        <strong>Internal Mind</strong>
+                        <span>Autonomous knowledge dictionary & concepts</span>
                       </div>
                     </button>
                     <button
                       type="button"
                       className={`btn-tool-pin ${pinnedTools.includes('mind') ? 'pinned' : ''}`}
                       onClick={(e) => togglePin('mind', e)}
-                      title={pinnedTools.includes('mind') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                      title={pinnedTools.includes('mind') ? 'Unpin from top nav' : 'Pin icon to top nav'}
                     >
                       {pinnedTools.includes('mind') ? <PinOff size={13} /> : <Pin size={13} />}
                     </button>
                   </div>
                 )}
 
+                {/* 6. Folder Link Tree */}
                 <div className="tray-item-row-wrap">
                   <button
                     type="button"
@@ -378,26 +518,52 @@ export const Header: React.FC<HeaderProps> = ({
                     type="button"
                     className={`btn-tool-pin ${pinnedTools.includes('linktree') ? 'pinned' : ''}`}
                     onClick={(e) => togglePin('linktree', e)}
-                    title={pinnedTools.includes('linktree') ? 'Unpin from top navigation' : 'Pin to top navigation'}
+                    title={pinnedTools.includes('linktree') ? 'Unpin from top nav' : 'Pin icon to top nav'}
                   >
                     {pinnedTools.includes('linktree') ? <PinOff size={13} /> : <Pin size={13} />}
                   </button>
                 </div>
+
+                {/* 7. English Dictionary & Word Lookup */}
+                {onOpenDictionary && (
+                  <div className="tray-item-row-wrap">
+                    <button
+                      type="button"
+                      className="tray-item-btn"
+                      onClick={() => { onOpenDictionary(); setIsToolsTrayOpen(false); }}
+                      title="Open English Dictionary & Word Lookup"
+                    >
+                      <BookA size={15} color="#0ea5e9" />
+                      <div className="tray-item-text">
+                        <strong>Dictionary & Word Lookup</strong>
+                        <span>en-dictionary + custom vocabulary</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-tool-pin ${pinnedTools.includes('dictionary') ? 'pinned' : ''}`}
+                      onClick={(e) => togglePin('dictionary', e)}
+                      title={pinnedTools.includes('dictionary') ? 'Unpin from top nav' : 'Pin icon to top nav'}
+                    >
+                      {pinnedTools.includes('dictionary') ? <PinOff size={13} /> : <Pin size={13} />}
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
 
         {/* 3-Way Theme Toggle: System -> Day -> Night */}
-        <button 
+        <button
           className="theme-toggle-btn"
           onClick={onToggleTheme}
           title={
             theme === 'system'
               ? 'Theme: System Default (Click for Day Theme)'
               : theme === 'light'
-              ? 'Theme: Day Theme (Click for Night Theme)'
-              : 'Theme: Night Theme (Click for System Default)'
+                ? 'Theme: Day Theme (Click for Night Theme)'
+                : 'Theme: Night Theme (Click for System Default)'
           }
           aria-label="Toggle Theme"
         >
@@ -411,7 +577,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         {/* Combined Profile & Settings Tablet (Profile Avatar + Name + Settings Gear Icon) */}
-        <div 
+        <div
           className="header-profile-tablet"
           onClick={onOpenSettings || onOpenProfile}
           title="Account, Identity & Settings (Cmd+,)"

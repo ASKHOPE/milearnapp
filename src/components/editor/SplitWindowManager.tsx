@@ -17,6 +17,9 @@ interface SplitWindowManagerProps {
   rightTitle?: string;
   onCloseSplit: () => void;
   onSwapPanes?: () => void;
+  activePane?: 'left' | 'right';
+  onFocusLeft?: () => void;
+  onFocusRight?: () => void;
 }
 
 export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
@@ -25,7 +28,10 @@ export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
   leftTitle = 'Left Note',
   rightTitle = 'Right Note',
   onCloseSplit,
-  onSwapPanes
+  onSwapPanes,
+  activePane = 'left',
+  onFocusLeft,
+  onFocusRight
 }) => {
   const [splitRatio, setSplitRatio] = useState<number>(50); // percentage 20 to 80
   const [orientation, setOrientation] = useState<'vertical' | 'horizontal'>('vertical');
@@ -70,13 +76,35 @@ export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
         <div className="wm-toolbar-left">
           <span className="wm-badge">🪟 Split Window Manager</span>
           <span className="wm-titles-preview">
-            <strong>{leftTitle}</strong> ↔ <strong>{rightTitle}</strong>
+            <strong 
+              style={{ 
+                color: activePane === 'left' ? 'var(--accent-primary)' : undefined, 
+                textDecoration: activePane === 'left' ? 'underline' : 'none',
+                cursor: 'pointer' 
+              }}
+              onClick={onFocusLeft}
+              title="Click to focus Left Editor"
+            >
+              {leftTitle} {activePane === 'left' ? '●' : ''}
+            </strong>
+            {' '}↔{' '}
+            <strong 
+              style={{ 
+                color: activePane === 'right' ? 'var(--accent-primary)' : undefined, 
+                textDecoration: activePane === 'right' ? 'underline' : 'none',
+                cursor: 'pointer' 
+              }}
+              onClick={onFocusRight}
+              title="Click to focus Right Editor"
+            >
+              {rightTitle} {activePane === 'right' ? '●' : ''}
+            </strong>
           </span>
         </div>
 
         <div className="wm-toolbar-right">
           {/* Ratio Presets */}
-          <div className="wm-ratio-buttons">
+          <div className="wm-ratio-buttons" title="Split Screen Ratio Presets">
             <button
               type="button"
               className={`wm-ratio-btn ${splitRatio === 30 ? 'active' : ''}`}
@@ -108,39 +136,42 @@ export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
           {/* Orientation Toggle: Vertical (Side-by-side) vs Horizontal (Stacked) */}
           <button
             type="button"
-            className="wm-icon-btn"
+            className="wm-labeled-btn"
             onClick={() => setOrientation(orientation === 'vertical' ? 'horizontal' : 'vertical')}
             title={orientation === 'vertical' ? 'Switch to Horizontal Stacked Split' : 'Switch to Side-by-Side Vertical Split'}
           >
-            {orientation === 'vertical' ? <Rows size={14} /> : <Columns2 size={14} />}
+            {orientation === 'vertical' ? <Rows size={13} /> : <Columns2 size={13} />}
+            <span>{orientation === 'vertical' ? 'Stack' : 'Side-by-Side'}</span>
           </button>
 
           {/* Swap Left & Right Panes */}
           {onSwapPanes && (
             <button
               type="button"
-              className="wm-icon-btn"
+              className="wm-labeled-btn"
               onClick={onSwapPanes}
               title="Swap Left and Right Notes"
             >
-              <ArrowLeftRight size={14} />
+              <ArrowLeftRight size={13} />
+              <span>Swap</span>
             </button>
           )}
 
           {/* Maximize Toggle */}
           <button
             type="button"
-            className="wm-icon-btn"
+            className="wm-labeled-btn"
             onClick={() => {
               if (maximizedPane) {
                 setMaximizedPane(null);
               } else {
-                setMaximizedPane('left');
+                setMaximizedPane(activePane === 'right' ? 'right' : 'left');
               }
             }}
-            title={maximizedPane ? 'Restore Split View' : 'Maximize Left Note'}
+            title={maximizedPane ? 'Restore Split View' : `Maximize ${activePane === 'right' ? 'Right' : 'Left'} Note`}
           >
-            {maximizedPane ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {maximizedPane ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            <span>{maximizedPane ? 'Restore' : 'Maximize'}</span>
           </button>
 
           <div className="wm-divider" />
@@ -148,11 +179,12 @@ export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
           {/* Close Split View */}
           <button
             type="button"
-            className="wm-icon-btn danger"
+            className="wm-labeled-btn danger"
             onClick={onCloseSplit}
             title="Close Split View (Esc)"
           >
-            <X size={14} />
+            <X size={13} />
+            <span>Close Split</span>
           </button>
         </div>
       </div>
@@ -176,7 +208,10 @@ export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
       >
         {/* Left / Top Pane */}
         {maximizedPane !== 'right' && (
-          <div className="split-wm-pane left-pane">
+          <div 
+            className={`split-wm-pane left-pane ${activePane === 'left' ? 'is-focused' : 'is-unfocused'}`}
+            onClickCapture={onFocusLeft}
+          >
             {leftPane}
           </div>
         )}
@@ -197,7 +232,10 @@ export const SplitWindowManager: React.FC<SplitWindowManagerProps> = ({
 
         {/* Right / Bottom Pane */}
         {maximizedPane !== 'left' && (
-          <div className="split-wm-pane right-pane">
+          <div 
+            className={`split-wm-pane right-pane ${activePane === 'right' ? 'is-focused' : 'is-unfocused'}`}
+            onClickCapture={onFocusRight}
+          >
             {rightPane}
           </div>
         )}

@@ -30,6 +30,8 @@ export const App: React.FC = () => {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [secondaryNoteId, setSecondaryNoteId] = useState<string | null>(null);
   const [openNoteIds, setOpenNoteIds] = useState<string[]>([]);
+  const [rightOpenNoteIds, setRightOpenNoteIds] = useState<string[]>([]);
+  const [activeSplitSide, setActiveSplitSide] = useState<'left' | 'right'>('left');
 
   // Filters & Navigation
   const [currentFilter, setCurrentFilter] = useState<ViewFilter>('all');
@@ -192,20 +194,91 @@ export const App: React.FC = () => {
     storage.setMicEnabled(enabled);
   };
 
-  // Open note in tab
+  // Open note in tab (left pane / primary)
   const handleOpenNote = (noteId: string) => {
     setSelectedNoteId(noteId);
     setOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
+    setActiveSplitSide('left');
   };
 
-  // Close tab
-  const handleCloseTab = (noteId: string, e?: React.MouseEvent) => {
+  // Open note targeting currently active pane in split mode
+  const handleOpenNoteInActivePane = (noteId: string) => {
+    if (secondaryNoteId && activeSplitSide === 'right') {
+      setSecondaryNoteId(noteId);
+      setRightOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
+    } else {
+      setSelectedNoteId(noteId);
+      setOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
+      setActiveSplitSide('left');
+    }
+  };
+
+  // Close tab on Left Pane
+  const handleCloseLeftTab = (noteId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const nextTabs = openNoteIds.filter((id) => id !== noteId);
     setOpenNoteIds(nextTabs);
     if (selectedNoteId === noteId) {
       setSelectedNoteId(nextTabs.length > 0 ? nextTabs[nextTabs.length - 1] : null);
     }
+  };
+
+  // Close tab from both/active panes (used by shortcuts, trash, delete)
+  const handleCloseTab = (noteId: string, e?: React.MouseEvent) => {
+    handleCloseLeftTab(noteId, e);
+    handleCloseRightTab(noteId, e);
+  };
+
+  // Select tab on Right Pane
+  const handleSelectRightTab = (noteId: string) => {
+    setSecondaryNoteId(noteId);
+    setRightOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
+    setActiveSplitSide('right');
+  };
+
+  // Close tab on Right Pane
+  const handleCloseRightTab = (noteId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextTabs = rightOpenNoteIds.filter((id) => id !== noteId);
+    setRightOpenNoteIds(nextTabs);
+    if (secondaryNoteId === noteId) {
+      if (nextTabs.length > 0) {
+        setSecondaryNoteId(nextTabs[nextTabs.length - 1]);
+      } else {
+        setSecondaryNoteId(null);
+        setActiveSplitSide('left');
+      }
+    }
+  };
+
+  // Create new note on Right Pane
+  const handleNewRightTab = async () => {
+    let targetFolder = currentFolderId;
+    if (!targetFolder) {
+      targetFolder = await ensureUncategorizedFolder(activeWorkspaceId);
+    }
+
+    const newNote: Note = {
+      id: 'n-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+      title: 'Untitled Note',
+      content: '',
+      folderId: targetFolder,
+      workspaceId: activeWorkspaceId,
+      tags: selectedTag ? [selectedTag] : [],
+      isFavorite: false,
+      isPinned: false,
+      isArchived: false,
+      isTrashed: false,
+      attachments: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setNotes((prev) => [newNote, ...prev]);
+    setSecondaryNoteId(newNote.id);
+    setRightOpenNoteIds((prev) => (prev.includes(newNote.id) ? prev : [...prev, newNote.id]));
+    setActiveSplitSide('right');
+    await storage.saveNote(newNote);
   };
 
   // Switch Active Workspace
@@ -225,6 +298,9 @@ export const App: React.FC = () => {
       setSelectedNoteId(null);
       setOpenNoteIds([]);
     }
+    setSecondaryNoteId(null);
+    setRightOpenNoteIds([]);
+    setActiveSplitSide('left');
   };
 
   // Create New Workspace
@@ -430,10 +506,13 @@ export const App: React.FC = () => {
   // Split View Handlers
   const handleOpenNoteSplit = (noteId: string) => {
     setSecondaryNoteId(noteId);
+    setRightOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
+    setActiveSplitSide('right');
   };
 
   const handleCloseSplit = () => {
     setSecondaryNoteId(null);
+    setActiveSplitSide('left');
   };
 
   // Exit Note Handler
@@ -755,7 +834,7 @@ export const App: React.FC = () => {
           onCreateBook={handleCreateBook}
           onDeleteBook={handleDeleteBook}
           onAddPageToBook={handleAddPageToBook}
-          onSelectNote={handleOpenNote}
+          onSelectNote={handleOpenNoteInActivePane}
           onOpenLibrary={() => setIsLibraryOpen(true)}
           isLibraryOpen={isLibraryOpen}
           onSelectFilter={(filter) => {
@@ -781,13 +860,13 @@ export const App: React.FC = () => {
         <NoteList
           notes={workspaceNotes}
           folders={workspaceFolders}
-          selectedNoteId={selectedNoteId}
+          selectedNoteId={secondaryNoteId && activeSplitSide === 'right' ? secondaryNoteId : selectedNoteId}
           currentFilter={currentFilter}
           currentFolderId={currentFolderId}
           selectedTag={selectedTag}
           isCollapsed={isNotesCollapsed}
           onToggleCollapse={() => setIsNotesCollapsed(!isNotesCollapsed)}
-          onSelectNote={handleOpenNote}
+          onSelectNote={handleOpenNoteInActivePane}
           onSelectNoteSplit={handleOpenNoteSplit}
           onCreateNote={handleCreateNote}
           onToggleFavorite={handleToggleFavorite}
@@ -803,11 +882,18 @@ export const App: React.FC = () => {
           <SplitWindowManager
             leftTitle={currentNote?.title || 'Left Note'}
             rightTitle={notes.find((n) => n.id === secondaryNoteId)?.title || 'Right Note'}
+            activePane={activeSplitSide}
+            onFocusLeft={() => setActiveSplitSide('left')}
+            onFocusRight={() => setActiveSplitSide('right')}
             onCloseSplit={handleCloseSplit}
             onSwapPanes={() => {
-              const temp = selectedNoteId;
+              const tempActive = selectedNoteId;
+              const tempTabs = openNoteIds;
               setSelectedNoteId(secondaryNoteId);
-              setSecondaryNoteId(temp);
+              setOpenNoteIds(rightOpenNoteIds.length > 0 ? rightOpenNoteIds : (secondaryNoteId ? [secondaryNoteId] : []));
+              setSecondaryNoteId(tempActive);
+              setRightOpenNoteIds(tempTabs.length > 0 ? tempTabs : (tempActive ? [tempActive] : []));
+              setActiveSplitSide((prev) => (prev === 'left' ? 'right' : 'left'));
             }}
             leftPane={
               <NoteEditor
@@ -819,8 +905,12 @@ export const App: React.FC = () => {
                 openNoteIds={openNoteIds}
                 activeNoteId={selectedNoteId}
                 isMicEnabled={isMicEnabled}
-                onSelectTab={handleOpenNote}
-                onCloseTab={handleCloseTab}
+                onSelectTab={(id) => {
+                  setSelectedNoteId(id);
+                  setOpenNoteIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                  setActiveSplitSide('left');
+                }}
+                onCloseTab={handleCloseLeftTab}
                 onNewTab={handleCreateNote}
                 isZenMode={isZenMode}
                 onToggleZenMode={() => setIsZenMode((z) => !z)}
@@ -846,12 +936,12 @@ export const App: React.FC = () => {
                 allNotes={workspaceNotes}
                 books={workspaceBooks}
                 activeWorkspace={activeWorkspace}
-                openNoteIds={openNoteIds}
+                openNoteIds={rightOpenNoteIds.length > 0 ? rightOpenNoteIds : [secondaryNoteId]}
                 activeNoteId={secondaryNoteId}
                 isMicEnabled={isMicEnabled}
-                onSelectTab={handleOpenNote}
-                onCloseTab={handleCloseTab}
-                onNewTab={handleCreateNote}
+                onSelectTab={handleSelectRightTab}
+                onCloseTab={handleCloseRightTab}
+                onNewTab={handleNewRightTab}
                 isZenMode={isZenMode}
                 onToggleZenMode={() => setIsZenMode((z) => !z)}
                 onUpdateNote={handleUpdateNote}
@@ -861,10 +951,16 @@ export const App: React.FC = () => {
                 onToggleArchiveNote={handleToggleArchiveNote}
                 onAddPageToBook={handleAddPageToBook}
                 onNavigateToNote={handleNavigateToNote}
-                onBackMobile={() => setSecondaryNoteId(null)}
+                onBackMobile={() => {
+                  setSecondaryNoteId(null);
+                  setActiveSplitSide('left');
+                }}
                 isSplitView={true}
                 onCloseSplit={handleCloseSplit}
-                onCloseNote={() => setSecondaryNoteId(null)}
+                onCloseNote={() => {
+                  setSecondaryNoteId(null);
+                  setActiveSplitSide('left');
+                }}
                 onDuplicateNote={handleDuplicateNote}
                 onMoveNote={handleMoveNote}
               />

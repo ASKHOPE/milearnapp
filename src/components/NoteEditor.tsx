@@ -237,10 +237,17 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         return;
       }
 
-      // Ensure selection is inside our note editor pane
+      // Ensure selection is inside our note editor pane and not in tabs, headers, or toolbars
       const editorPane = document.querySelector('.note-editor-pane');
       const anchorNode = selection.anchorNode;
       if (!editorPane || !anchorNode || !editorPane.contains(anchorNode)) {
+        setBubblePosition((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        return;
+      }
+
+      // Ignore selections in tab bar, header bar, breadcrumbs, or toolbar buttons
+      const anchorEl = anchorNode instanceof HTMLElement ? anchorNode : anchorNode.parentElement;
+      if (anchorEl?.closest('.note-tabs-bar, .editor-header-bar, .editor-toolbar, .editor-tags-bar, .split-wm-toolbar')) {
         setBubblePosition((prev) => (prev.visible ? { ...prev, visible: false } : prev));
         return;
       }
@@ -1621,7 +1628,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   return (
     <main className="note-editor-pane active-mobile selectable-text">
-      {/* Mac-Style Note Tabs Bar */}
+      {/* Mac-Style Note Tabs Bar with Inline Double-Click Rename */}
       <NoteTabs
         openNoteIds={openNoteIds}
         activeNoteId={activeNoteId}
@@ -1629,6 +1636,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onSelectTab={onSelectTab}
         onCloseTab={onCloseTab}
         onNewTab={onNewTab}
+        onRenameTab={(noteId, newTitle) => {
+          const target = allNotes.find((n) => n.id === noteId);
+          if (target && !target.isTrashed) {
+            onUpdateNote({
+              ...target,
+              title: newTitle,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }}
       />
 
       {/* Trash Recovery Warning Banner */}
@@ -1724,41 +1741,45 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         <div className="editor-header-actions">
           {/* Find in Note Trigger */}
           <button
-            className={`editor-icon-btn ${isFindReplaceOpen ? 'active' : ''}`}
+            className={`editor-action-pill ${isFindReplaceOpen ? 'active' : ''}`}
             onClick={() => setIsFindReplaceOpen(!isFindReplaceOpen)}
             title="Find & Replace in note (Cmd+F)"
           >
-            <Search size={16} />
+            <Search size={14} />
+            <span className="btn-label-text">Find</span>
           </button>
 
           {/* Apple Freehand Drawing Canvas Trigger */}
           <button
-            className="editor-icon-btn"
+            className="editor-action-pill"
             onClick={() => setIsDrawingModalOpen(true)}
             disabled={note.isTrashed}
             title="Open Freehand Sketchpad"
           >
-            <PenTool size={16} color="#8b5cf6" />
+            <PenTool size={14} color="#8b5cf6" />
+            <span className="btn-label-text">Draw</span>
           </button>
 
           {/* Table of Contents Outline Trigger */}
           <button
-            className={`editor-icon-btn ${isOutlineOpen ? 'active' : ''}`}
+            className={`editor-action-pill ${isOutlineOpen ? 'active' : ''}`}
             onClick={() => setIsOutlineOpen(!isOutlineOpen)}
             title="Document Outline / Table of Contents"
           >
-            <ListTree size={16} />
+            <ListTree size={14} />
+            <span className="btn-label-text">Outline</span>
           </button>
 
           {/* Direct Voice Recording Trigger (ONLY if mic enabled) */}
           {isMicEnabled && (
             <button
-              className={`editor-icon-btn ${isVoiceRecorderOpen ? 'active' : ''}`}
+              className={`editor-action-pill ${isVoiceRecorderOpen ? 'active' : ''}`}
               onClick={() => setIsVoiceRecorderOpen(!isVoiceRecorderOpen)}
               disabled={note.isTrashed}
               title="Record voice memo"
             >
-              <Mic size={16} color="#ef4444" />
+              <Mic size={14} color="#ef4444" />
+              <span className="btn-label-text">Voice</span>
             </button>
           )}
 
@@ -1766,22 +1787,24 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           {onOpenSplit && !isSplitView && (
             <button
               type="button"
-              className="editor-icon-btn"
+              className="editor-action-pill"
               onClick={() => onOpenSplit(note.id)}
               title="Open Split View (Side-by-Side)"
             >
-              <Columns2 size={16} color="var(--accent-primary)" />
+              <Columns2 size={14} color="var(--accent-primary)" />
+              <span className="btn-label-text">Split</span>
             </button>
           )}
 
           {isSplitView && onCloseSplit && (
             <button
               type="button"
-              className="editor-icon-btn danger"
+              className="editor-action-pill danger"
               onClick={onCloseSplit}
               title="Close Split View"
             >
-              <XCircle size={16} />
+              <XCircle size={14} />
+              <span className="btn-label-text">Exit Split</span>
             </button>
           )}
 
@@ -1793,7 +1816,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               onClick={() => onDuplicateNote(note)}
               title="Duplicate Note (Copy)"
             >
-              <Copy size={16} />
+              <Copy size={15} />
             </button>
           )}
 
@@ -1805,17 +1828,18 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               onClick={() => setIsMoveModalOpen(true)}
               title="Move Note (Folder & Book Organizer)"
             >
-              <Move size={16} />
+              <Move size={15} />
             </button>
           )}
 
           {/* Omni-Format Presentable Export Trigger */}
           <button
-            className="editor-icon-btn"
+            className="editor-action-pill"
             onClick={() => setIsExportModalOpen(true)}
             title="Export & Share (PDF, Image Card, HTML, Markdown)"
           >
-            <Share2 size={16} color="var(--accent-primary)" />
+            <Share2 size={14} color="var(--accent-primary)" />
+            <span className="btn-label-text">Export</span>
           </button>
 
           {/* Archive / Unarchive Button */}
@@ -1825,7 +1849,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             disabled={note.isTrashed}
             title={note.isArchived ? 'Unarchive note' : 'Archive note'}
           >
-            <Archive size={16} color={note.isArchived ? '#8b5cf6' : undefined} />
+            <Archive size={15} color={note.isArchived ? '#8b5cf6' : undefined} />
           </button>
 
           {/* Zen Focus Mode Toggle */}
@@ -1834,7 +1858,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             onClick={onToggleZenMode}
             title={isZenMode ? 'Exit Zen Focus Mode' : 'Distraction-Free Zen Mode'}
           >
-            {isZenMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            {isZenMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
 
           <button
@@ -1843,7 +1867,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             disabled={note.isTrashed}
             title={note.isPinned ? 'Unpin note' : 'Pin note to top'}
           >
-            <Pin size={16} />
+            <Pin size={15} />
           </button>
 
           <button
@@ -1852,7 +1876,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             disabled={note.isTrashed}
             title={note.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
-            <Star size={16} fill={note.isFavorite ? '#f59e0b' : 'none'} />
+            <Star size={15} fill={note.isFavorite ? '#f59e0b' : 'none'} />
           </button>
 
           {/* Zero-Knowledge Note Lock / Unlock */}
@@ -1865,7 +1889,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             disabled={note.isTrashed}
             title={note.isLocked ? 'Unlock Encrypted Note (AES-256-GCM)' : 'Encrypt & Lock Note (AES-256-GCM)'}
           >
-            {note.isLocked ? <Lock size={16} color="var(--color-warning)" /> : <KeyRound size={16} />}
+            {note.isLocked ? <Lock size={15} color="var(--color-warning)" /> : <KeyRound size={15} />}
           </button>
 
           {/* Delete to Trash Button */}
@@ -1874,7 +1898,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             onClick={() => onDeleteNote(note.id)}
             title={note.isTrashed ? 'Delete Forever' : 'Move note to Trash'}
           >
-            <Trash2 size={16} />
+            <Trash2 size={15} />
           </button>
 
           {/* Exit Note Button */}
@@ -1885,7 +1909,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               onClick={onCloseNote}
               title="Exit Note (Deselect and return to workspace)"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
             </button>
           )}
         </div>
@@ -2232,10 +2256,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''}`} 
           ref={scrollAreaRef}
           onClick={(e) => {
-            if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('editor-scroll-area') || (e.target as HTMLElement).classList.contains('live-document-wrapper')) {
-              if (mode === 'live') {
-                setMode('split');
-              } else if (textareaRef.current) {
+            const target = e.target as HTMLElement;
+            if (
+              target === e.currentTarget || 
+              target.classList.contains('editor-scroll-area') || 
+              target.classList.contains('live-document-wrapper') ||
+              target.classList.contains('live-empty-canvas-prompt') ||
+              target.closest('.live-empty-canvas-prompt') ||
+              target.closest('.live-empty-trailing-space')
+            ) {
+              if (textareaRef.current) {
                 textareaRef.current.focus();
                 textareaRef.current.setSelectionRange(note.content.length, note.content.length);
               }
@@ -2253,7 +2283,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             {currentBook ? (
               <>
                 <span className="crumb-sep">/</span>
-                <span className="crumb-item book" title={`Book: ${currentBook.title}`}>
+                <span className="crumb-item crumb-book-item" title={`Book: ${currentBook.title}`}>
                   <span>{currentBook.icon}</span>
                   <span>{currentBook.title}</span>
                 </span>
@@ -2332,9 +2362,44 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             />
           ) : (
             <div className="live-document-wrapper">
+              {(!note.content || !note.content.trim()) && !note.isTrashed && (
+                <div 
+                  className="live-empty-canvas-prompt"
+                  onClick={() => {
+                    setMode('source');
+                    setTimeout(() => {
+                      if (textareaRef.current) {
+                        textareaRef.current.focus();
+                      }
+                    }, 50);
+                  }}
+                  title="Click to write or edit"
+                >
+                  <Edit3 size={15} color="var(--accent-primary)" />
+                  <span>Click here or anywhere in this space to type, or type <code>/</code> for templates & commands</span>
+                </div>
+              )}
               <div className={`markdown-body live-rich-document font-${fontFamily} selectable-text`}>
                 {renderMarkdownPreview(note.content)}
               </div>
+              {/* Trailing click-to-type area for adding text below existing content */}
+              {!note.isTrashed && (
+                <div 
+                  className="live-empty-trailing-space"
+                  onClick={() => {
+                    setMode('source');
+                    setTimeout(() => {
+                      if (textareaRef.current) {
+                        textareaRef.current.focus();
+                        textareaRef.current.setSelectionRange(note.content.length, note.content.length);
+                      }
+                    }, 50);
+                  }}
+                  title="Click here to continue typing at the end of the note"
+                >
+                  <span className="trailing-prompt-hint">Click here to continue writing...</span>
+                </div>
+              )}
             </div>
           )}
 

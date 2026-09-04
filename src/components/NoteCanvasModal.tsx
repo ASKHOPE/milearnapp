@@ -55,7 +55,7 @@ export const NoteCanvasModal: React.FC<NoteCanvasModalProps> = ({
       const x = centerX + radius * Math.cos(angle) + (Math.random() * 40 - 20);
       const y = centerY + radius * Math.sin(angle) + (Math.random() * 40 - 20);
 
-      const snippet = n.content.slice(0, 75).replace(/[#*`_\[\]]/g, '').trim();
+      const snippet = n.content.slice(0, 75).replace(/[#*`_[\]]/g, '').trim();
 
       return {
         id: n.id,

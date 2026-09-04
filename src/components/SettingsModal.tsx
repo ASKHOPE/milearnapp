@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Workspace, Note, Folder, Book, ThemeMode, UserProfile } from '../types';
+import { type Workspace, type Note, type Folder, type Book, type ThemeMode, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
+export { DEFAULT_USER_PROFILE };
 import { optimizer, type StorageHealth } from '../services/optimizer';
 import { lockoutManager } from '../services/cryptoLockout';
 import { shortcutManager } from '../services/shortcutManager';
@@ -26,15 +27,6 @@ import {
   Monitor,
   QrCode
 } from 'lucide-react';
-
-export const DEFAULT_USER_PROFILE: UserProfile = {
-  name: 'Alex Mercer',
-  bio: 'Staff Engineer • Local-First Systems & Mathematics Enthusiast',
-  role: 'Systems Architect',
-  avatarType: 'emoji',
-  avatarValue: '⚡',
-  mood: 'Deep Focus'
-};
 
 interface SettingsModalProps {
   isOpen: boolean;

@@ -89,17 +89,9 @@ import type { SuggestionType } from './EditorSuggestions';
 import { NoteOutline } from './NoteOutline';
 import { NoteTabs } from './NoteTabs';
 import { FindReplaceBar } from './FindReplaceBar';
-import { DrawingCanvasModal } from './DrawingCanvasModal';
-import { InteractiveFlowModal } from './InteractiveFlowModal';
-import { MathGraphStudioModal } from './MathGraphStudioModal';
-import { BlocklyStudioModal } from './BlocklyStudioModal';
-import { ThreeStudioModal } from './ThreeStudioModal';
-import { CitationStudioModal } from './CitationStudioModal';
-import { ExportModal } from './ExportModal';
-import { NoteCanvasModal } from './NoteCanvasModal';
-import { FlashcardQuizModal } from './FlashcardQuizModal';
-import { OcrScannerModal } from './OcrScannerModal';
-import { SlideDeckModal } from './SlideDeckModal';
+import { EditorStudioModals } from './editor/EditorStudioModals';
+import { EditorFooterStatus } from './editor/EditorFooterStatus';
+import { ErrorBoundary } from './common/ErrorBoundary';
 import { BookPageNavigator } from './BookPageNavigator';
 import { MathRenderer } from './MathRenderer';
 import { MermaidRenderer } from './MermaidRenderer';
@@ -116,7 +108,6 @@ import { MermaidEditorModal } from './editor/MermaidEditorModal';
 import { scanTextToDiagram } from '../services/textToDiagram';
 import { FloatingBubbleToolbar, type FloatingBubblePosition } from './editor/FloatingBubbleToolbar';
 import { BlockActionsMenu } from './editor/BlockActionsMenu';
-import { VideoEmbedModal } from './editor/VideoEmbedModal';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -373,7 +364,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       setMoveBookChoice(note.bookId || '');
       pendingNoteRef.current = note;
     }
-  }, [note?.id, note?.folderId, note?.bookId]);
+  }, [note]);
 
   // Keyboard shortcut listener (Cmd+F for search, Cmd+S for manual save)
   useEffect(() => {
@@ -1428,20 +1419,23 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             const startLine = codeBlockStartIndex;
             const endLine = index;
             elements.push(
-              <MermaidRenderer 
-                key={blockId} 
-                chart={codeText} 
-                id={blockId}
-                onEditChart={(newChart) => {
-                  setActiveMermaidBlock({ startLine, endLine });
-                  setMermaidInitialCode(newChart);
-                  setIsMermaidModalOpen(true);
-                }}
-              />
+              <ErrorBoundary key={blockId} name="Mermaid Diagram">
+                <MermaidRenderer 
+                  chart={codeText} 
+                  id={blockId}
+                  onEditChart={(newChart) => {
+                    setActiveMermaidBlock({ startLine, endLine });
+                    setMermaidInitialCode(newChart);
+                    setIsMermaidModalOpen(true);
+                  }}
+                />
+              </ErrorBoundary>
             );
           } else if (codeLanguage === 'math' || codeLanguage === 'latex') {
             elements.push(
-              <MathRenderer key={blockId} math={codeText} block />
+              <ErrorBoundary key={blockId} name="Math Formula">
+                <MathRenderer math={codeText} block />
+              </ErrorBoundary>
             );
           } else {
             elements.push(
@@ -2750,95 +2744,38 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         />
       )}
 
-      {/* Freehand Drawing Canvas Modal */}
-      <DrawingCanvasModal
-        isOpen={isDrawingModalOpen}
-        onClose={() => setIsDrawingModalOpen(false)}
-        onSaveDrawing={handleAddAttachment}
-      />
-
-      {/* Interactive Flow Studio Modal (@xyflow/react) */}
-      <InteractiveFlowModal
-        isOpen={isInteractiveFlowOpen}
-        onClose={() => setIsInteractiveFlowOpen(false)}
-        onInsertIntoNote={(diagramCode) => {
-          insertFormatting(diagramCode);
-        }}
-      />
-
-      {/* Math & Graphing Studio Modal (Desmos + Advanced Calculator) */}
-      <MathGraphStudioModal
-        isOpen={isMathGraphStudioOpen}
-        onClose={() => setIsMathGraphStudioOpen(false)}
-        onInsertIntoNote={(mathContent) => {
-          insertFormatting(mathContent);
-        }}
-        onSaveAttachment={handleAddAttachment}
-      />
-
-      {/* Visual Logic Studio Modal (Blockly) */}
-      <BlocklyStudioModal
-        isOpen={isBlocklyStudioOpen}
-        onClose={() => setIsBlocklyStudioOpen(false)}
-        onInsertIntoNote={(codeBlock) => {
-          insertFormatting(codeBlock);
-        }}
-      />
-
-      {/* 3D Interactive Model Studio Modal (Three.js) */}
-      <ThreeStudioModal
-        isOpen={isThreeStudioOpen}
-        onClose={() => setIsThreeStudioOpen(false)}
-        onSaveAttachment={handleAddAttachment}
-      />
-
-      {/* Academic Citation & Bibliography Studio Modal (Citation.js) */}
-      <CitationStudioModal
-        isOpen={isCitationStudioOpen}
-        onClose={() => setIsCitationStudioOpen(false)}
-        onInsertIntoNote={(content) => {
-          insertFormatting(content);
-        }}
-      />
-
-      {/* Omni-Format Presentable Export Modal */}
-      <ExportModal
-        isOpen={isExportModalOpen}
+      {/* Visual Studios Orchestrator Container */}
+      <EditorStudioModals
         note={note}
+        allNotes={allNotes}
         activeWorkspace={activeWorkspace}
-        onClose={() => setIsExportModalOpen(false)}
-      />
-
-      {/* Infinite Note Canvas Modal (@xyflow/react) */}
-      <NoteCanvasModal
-        isOpen={isNoteCanvasOpen}
-        onClose={() => setIsNoteCanvasOpen(false)}
-        allNotes={allNotes}
-        onSelectNote={(noteId) => onSelectTab(noteId)}
-      />
-
-      {/* Active Recall Flashcard Spaced Repetition Quiz Modal */}
-      <FlashcardQuizModal
-        isOpen={isFlashcardQuizOpen}
-        onClose={() => setIsFlashcardQuizOpen(false)}
-        currentNote={note}
-        allNotes={allNotes}
-      />
-
-      {/* OCR Scanner Image-to-Text Extraction Modal (tesseract.js) */}
-      <OcrScannerModal
-        isOpen={isOcrScannerOpen}
-        onClose={() => setIsOcrScannerOpen(false)}
-        onInsertIntoNote={(extractedText) => {
-          insertFormatting(extractedText);
-        }}
-      />
-
-      {/* Slide Deck / Fullscreen Presentation Modal */}
-      <SlideDeckModal
-        isOpen={isSlideDeckOpen}
-        onClose={() => setIsSlideDeckOpen(false)}
-        note={note}
+        onSelectTab={onSelectTab}
+        onInsertIntoNote={insertFormatting}
+        onSaveAttachment={handleAddAttachment}
+        isDrawingModalOpen={isDrawingModalOpen}
+        onCloseDrawingModal={() => setIsDrawingModalOpen(false)}
+        isInteractiveFlowOpen={isInteractiveFlowOpen}
+        onCloseInteractiveFlow={() => setIsInteractiveFlowOpen(false)}
+        isMathGraphStudioOpen={isMathGraphStudioOpen}
+        onCloseMathGraphStudio={() => setIsMathGraphStudioOpen(false)}
+        isBlocklyStudioOpen={isBlocklyStudioOpen}
+        onCloseBlocklyStudio={() => setIsBlocklyStudioOpen(false)}
+        isThreeStudioOpen={isThreeStudioOpen}
+        onCloseThreeStudio={() => setIsThreeStudioOpen(false)}
+        isCitationStudioOpen={isCitationStudioOpen}
+        onCloseCitationStudio={() => setIsCitationStudioOpen(false)}
+        isExportModalOpen={isExportModalOpen}
+        onCloseExportModal={() => setIsExportModalOpen(false)}
+        isNoteCanvasOpen={isNoteCanvasOpen}
+        onCloseNoteCanvas={() => setIsNoteCanvasOpen(false)}
+        isFlashcardQuizOpen={isFlashcardQuizOpen}
+        onCloseFlashcardQuiz={() => setIsFlashcardQuizOpen(false)}
+        isOcrScannerOpen={isOcrScannerOpen}
+        onCloseOcrScanner={() => setIsOcrScannerOpen(false)}
+        isSlideDeckOpen={isSlideDeckOpen}
+        onCloseSlideDeck={() => setIsSlideDeckOpen(false)}
+        isVideoModalOpen={isVideoModalOpen}
+        onCloseVideoModal={() => setIsVideoModalOpen(false)}
       />
 
       {/* Outline Drawer (Table of Contents) */}
@@ -3289,15 +3226,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         onSave={handleSaveMermaidDiagram}
       />
 
-      {/* Video Embed Modal (YouTube / Vimeo / MP4 - Froala / Editor.js) */}
-      <VideoEmbedModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        onInsert={(embedMarkdown) => {
-          insertFormatting(embedMarkdown);
-        }}
-      />
-
       {/* Floating Bubble Contextual Formatting Toolbar (Froala / Quill / SunEditor / RoosterJS) */}
       <FloatingBubbleToolbar
         position={bubblePosition}
@@ -3306,25 +3234,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       />
 
       {/* Floating Autosave & Word / Character Metrics Badge (Bottom-Right Corner) */}
-      <div 
-        className="editor-floating-status-badge"
-        title={`Live document metrics · Autosave: ${saveStatus}`}
-      >
-        <span className={`floating-autosave-dot ${saveStatus}`} />
-        <span className="floating-autosave-label">
-          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Unsaved' : 'Autosave active'}
-        </span>
-        <span className="floating-badge-sep">·</span>
-        <span className="floating-badge-val">
-          <strong>{wordCount.toLocaleString()}</strong> words
-        </span>
-        <span className="floating-badge-sep">·</span>
-        <span className="floating-badge-val">
-          <strong>{charCount.toLocaleString()}</strong> chars
-        </span>
-        <span className="floating-badge-sep">·</span>
-        <span className="floating-badge-sub">~{Math.max(1, Math.ceil(wordCount / 200))}m read</span>
-      </div>
+      <EditorFooterStatus
+        saveStatus={saveStatus}
+        content={note.content || ''}
+      />
     </main>
   );
 };

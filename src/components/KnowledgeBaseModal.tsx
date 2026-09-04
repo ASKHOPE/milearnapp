@@ -81,6 +81,8 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
     notes.forEach((note) => {
       const folder = folders.find((f) => f.id === note.folderId);
       const center = folderCenters.get(note.folderId || 'root') || { x: 0, y: 0 };
+      const hashX = (note.id.split('').reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) % 1000, 0) / 1000);
+      const hashY = (note.id.split('').reduce((acc, c) => (acc * 37 + c.charCodeAt(0)) % 1000, 0) / 1000);
 
       nodes.push({
         id: note.id,
@@ -91,9 +93,9 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
         tags: note.tags || [],
         connectionCount: 0,
         attachmentCount: note.attachments?.length || 0,
-        // Start near cluster center with jitter
-        x: center.x + (Math.random() - 0.5) * 120,
-        y: center.y + (Math.random() - 0.5) * 120,
+        // Start near cluster center with deterministic jitter
+        x: center.x + (hashX - 0.5) * 120,
+        y: center.y + (hashY - 0.5) * 120,
         vx: 0,
         vy: 0
       });

@@ -1,25 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Note, Folder, ViewFilter, ThemeMode, Workspace, Book, PomodoroMode, UserProfile } from './types';
+import { type Note, type Folder, type ViewFilter, type ThemeMode, type Workspace, type Book, type PomodoroMode, type UserProfile, DEFAULT_USER_PROFILE } from './types';
 import { storage } from './services/storage';
-import { shortcutManager } from './services/shortcutManager';
 import { inactivityLockManager } from './services/inactivityLock';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { NoteEditor } from './components/NoteEditor';
-import { KnowledgeBaseModal } from './components/KnowledgeBaseModal';
-import { FolderLinkTreeModal } from './components/FolderLinkTreeModal';
-import { SearchModal } from './components/SearchModal';
-import { SettingsModal, DEFAULT_USER_PROFILE } from './components/SettingsModal';
-import { StudyModeModal } from './components/StudyModeModal';
-import { FocusPomodoroModal } from './components/FocusPomodoroModal';
-import { InternalMindModal } from './components/InternalMindModal';
-import { TypingMetricsModal } from './components/TypingMetricsModal';
-import { DictionaryAbbreviationsModal } from './components/DictionaryAbbreviationsModal';
 import { InactivityOverlay } from './components/InactivityOverlay';
-import { LibraryFileManager } from './components/LibraryFileManager';
 import { SplitWindowManager } from './components/editor/SplitWindowManager';
 import { NOTE_TEMPLATES } from './services/templates';
+import { AppModals } from './components/AppModals';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './styles/main.css';
 
 export const App: React.FC = () => {
@@ -132,53 +123,30 @@ export const App: React.FC = () => {
     return () => inactivityLockManager.stop();
   }, []);
 
-  // Dynamic Keyboard Shortcuts via shortcutManager
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const hotkeys = shortcutManager.getHotkeys();
-
-      if (shortcutManager.matchesEvent(e, hotkeys.search)) {
-        e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
-      } else if (shortcutManager.matchesEvent(e, hotkeys.newNote)) {
-        e.preventDefault();
-        handleCreateNote();
-      } else if (shortcutManager.matchesEvent(e, hotkeys.closeTab) && selectedNoteId) {
-        e.preventDefault();
-        handleCloseTab(selectedNoteId);
-      } else if (shortcutManager.matchesEvent(e, hotkeys.studyMode)) {
-        e.preventDefault();
-        setIsStudyModeOpen((prev) => !prev);
-      } else if (shortcutManager.matchesEvent(e, hotkeys.pomodoro)) {
-        e.preventDefault();
-        setIsPomodoroOpen((prev) => !prev);
-      } else if (shortcutManager.matchesEvent(e, hotkeys.zenMode)) {
-        e.preventDefault();
-        setIsZenMode((prev) => !prev);
-      } else if (shortcutManager.matchesEvent(e, hotkeys.settings)) {
-        e.preventDefault();
-        setIsSettingsOpen((prev) => !prev);
-      } else if ((e.altKey || e.metaKey) && e.key.toLowerCase() === 'q') {
-        e.preventDefault();
-        handleCreateQuickNote();
-      }
-
-      if (e.key === 'Escape') {
-        setIsSearchOpen(false);
-        setIsKnowledgeBaseOpen(false);
-        setIsInternalMindOpen(false);
-        setIsLinkTreeOpen(false);
-        setIsSettingsOpen(false);
-        setIsStudyModeOpen(false);
-        setIsPomodoroOpen(false);
-        setIsLibraryOpen(false);
-        if (isZenMode) setIsZenMode(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNoteId, openNoteIds, isZenMode]);
+  // Dynamic Keyboard Shortcuts via useGlobalShortcuts
+  useGlobalShortcuts({
+    onToggleSearch: () => setIsSearchOpen((prev) => !prev),
+    onCreateNote: () => { handleCreateNote(); },
+    onCloseTab: () => {
+      if (selectedNoteId) handleCloseTab(selectedNoteId);
+    },
+    onToggleStudyMode: () => setIsStudyModeOpen((prev) => !prev),
+    onTogglePomodoro: () => setIsPomodoroOpen((prev) => !prev),
+    onToggleZenMode: () => setIsZenMode((prev) => !prev),
+    onToggleSettings: () => setIsSettingsOpen((prev) => !prev),
+    onCreateQuickNote: () => { handleCreateQuickNote(); },
+    onEscape: () => {
+      setIsSearchOpen(false);
+      setIsKnowledgeBaseOpen(false);
+      setIsInternalMindOpen(false);
+      setIsLinkTreeOpen(false);
+      setIsSettingsOpen(false);
+      setIsStudyModeOpen(false);
+      setIsPomodoroOpen(false);
+      setIsLibraryOpen(false);
+      setIsZenMode(false);
+    },
+  });
 
   // 3-Way Theme Toggle: System -> Day -> Night
   const handleToggleTheme = () => {
@@ -1067,9 +1035,10 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* Settings, Backup, Security, Hotkeys & Identity Hub */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
+      {/* Application Modals Hub */}
+      <AppModals
+        isSettingsOpen={isSettingsOpen}
+        onCloseSettings={() => setIsSettingsOpen(false)}
         theme={theme}
         onChangeTheme={handleChangeTheme}
         activeWorkspace={activeWorkspace}
@@ -1081,106 +1050,41 @@ export const App: React.FC = () => {
         onExportVault={handleExportData}
         onImportVault={handleImportData}
         onReseedTutorialVault={handleReseedTutorialVault}
-        onSelectNote={handleOpenNote}
-        onClose={() => setIsSettingsOpen(false)}
         userProfile={userProfile}
         onUpdateProfile={setUserProfile}
-      />
-
-      {/* Knowledge Base Modal: Infinite Galaxy Force-Directed Graph */}
-      <KnowledgeBaseModal
-        isOpen={isKnowledgeBaseOpen}
-        notes={workspaceNotes.filter((n) => !n.isTrashed)}
-        folders={workspaceFolders}
-        onClose={() => setIsKnowledgeBaseOpen(false)}
-        onSelectNote={handleOpenNote}
-      />
-
-      {/* Folder Link Tree Modal: Hierarchical Tree & Link Cards */}
-      <FolderLinkTreeModal
-        isOpen={isLinkTreeOpen}
-        folders={workspaceFolders}
-        notes={workspaceNotes.filter((n) => !n.isTrashed)}
-        onClose={() => setIsLinkTreeOpen(false)}
+        isKnowledgeBaseOpen={isKnowledgeBaseOpen}
+        onCloseKnowledgeBase={() => setIsKnowledgeBaseOpen(false)}
+        isLinkTreeOpen={isLinkTreeOpen}
+        onCloseLinkTree={() => setIsLinkTreeOpen(false)}
         onSelectFolder={(folderId) => {
           setCurrentFolderId(folderId);
           setCurrentFilter('all');
         }}
-        onSelectNote={handleOpenNote}
-      />
-
-      {/* Global Quick Search Modal (Cmd+K) */}
-      <SearchModal
-        isOpen={isSearchOpen}
-        notes={workspaceNotes.filter((n) => !n.isTrashed)}
-        folders={workspaceFolders}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectNote={handleOpenNote}
-      />
-
-      {/* Interactive Flashcards & Spaced Repetition (Study Mode) */}
-      <StudyModeModal
-        isOpen={isStudyModeOpen}
-        notes={workspaceNotes.filter((n) => !n.isTrashed)}
+        isSearchOpen={isSearchOpen}
+        onCloseSearch={() => setIsSearchOpen(false)}
+        isStudyModeOpen={isStudyModeOpen}
+        onCloseStudyMode={() => setIsStudyModeOpen(false)}
         currentNote={currentNote}
-        onClose={() => setIsStudyModeOpen(false)}
-      />
-
-      {/* Focus Pomodoro & Ambient Soundscapes Modal */}
-      <FocusPomodoroModal
-        isOpen={isPomodoroOpen}
-        onClose={() => setIsPomodoroOpen(false)}
+        isPomodoroOpen={isPomodoroOpen}
+        onClosePomodoro={() => setIsPomodoroOpen(false)}
         onTimerTick={(seconds, running, m) => {
           setPomodoroSecondsLeft(seconds);
           setIsPomodoroRunning(running);
           setPomodoroMode(m);
         }}
-      />
-
-      {/* Internal Mind / Knowledge Lexicon Modal */}
-      <InternalMindModal
-        isOpen={isInternalMindOpen}
-        notes={workspaceNotes.filter((n) => !n.isTrashed)}
-        onNavigateToNote={handleOpenNote}
-        onClose={() => setIsInternalMindOpen(false)}
-      />
-
-      {/* Typing Metrics & Keystroke Dynamics Modal */}
-      <TypingMetricsModal
-        isOpen={isTypingMetricsOpen}
-        onClose={() => setIsTypingMetricsOpen(false)}
-      />
-
-      {/* English Dictionary & Abbreviations Modal */}
-      <DictionaryAbbreviationsModal
-        isOpen={isDictionaryOpen}
-        onClose={() => setIsDictionaryOpen(false)}
-      />
-
-      {/* Inactivity Security Screen Lock */}
-      <InactivityOverlay
-        isLocked={isVaultLockedDueToInactivity}
-        profileName={userProfile.name}
-        profileAvatar={userProfile.avatarValue}
-        avatarType={userProfile.avatarType}
-        onUnlock={() => setIsVaultLockedDueToInactivity(false)}
-      />
-
-      {/* Full Library & File Manager Modal Overlay */}
-      <LibraryFileManager
-        isOpen={isLibraryOpen}
-        onClose={() => setIsLibraryOpen(false)}
-        books={workspaceBooks}
-        folders={workspaceFolders}
-        notes={workspaceNotes}
-        onSelectNote={(noteId) => {
-          handleOpenNote(noteId);
-          setIsLibraryOpen(false);
-        }}
-        onSelectNoteSplit={(noteId) => {
-          handleOpenNoteSplit(noteId);
-          setIsLibraryOpen(false);
-        }}
+        isInternalMindOpen={isInternalMindOpen}
+        onCloseInternalMind={() => setIsInternalMindOpen(false)}
+        isTypingMetricsOpen={isTypingMetricsOpen}
+        onCloseTypingMetrics={() => setIsTypingMetricsOpen(false)}
+        isDictionaryOpen={isDictionaryOpen}
+        onCloseDictionary={() => setIsDictionaryOpen(false)}
+        isLibraryOpen={isLibraryOpen}
+        onCloseLibrary={() => setIsLibraryOpen(false)}
+        workspaceNotes={workspaceNotes}
+        workspaceFolders={workspaceFolders}
+        workspaceBooks={workspaceBooks}
+        onSelectNote={handleOpenNote}
+        onSelectNoteSplit={handleOpenNoteSplit}
         onCreateBook={handleCreateBook}
         onDeleteBook={handleDeleteBook}
         onDuplicateBook={handleDuplicateBook}
@@ -1190,6 +1094,15 @@ export const App: React.FC = () => {
         onDuplicateNote={handleDuplicateNote}
         onAddPageToBook={handleAddPageToBook}
         onCreateNote={handleCreateNote}
+      />
+
+      {/* Inactivity Security Screen Lock */}
+      <InactivityOverlay
+        isLocked={isVaultLockedDueToInactivity}
+        profileName={userProfile.name}
+        profileAvatar={userProfile.avatarValue}
+        avatarType={userProfile.avatarType}
+        onUnlock={() => setIsVaultLockedDueToInactivity(false)}
       />
     </div>
   );

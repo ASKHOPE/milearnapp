@@ -1,5 +1,4 @@
-import type { Note, Folder, ThemeMode, Workspace, Book, UserProfile } from '../types';
-import { DEFAULT_USER_PROFILE } from '../components/SettingsModal';
+import { type Note, type Folder, type ThemeMode, type Workspace, type Book, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
 
 const DB_NAME = 'noteflow_db';
 const DB_VERSION = 2;

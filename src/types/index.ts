@@ -166,3 +166,13 @@ export interface AmbientSoundTrack {
   isPlaying: boolean;
   volume: number; // 0 to 1
 }
+
+export const DEFAULT_USER_PROFILE: UserProfile = {
+  name: 'Alex Mercer',
+  bio: 'Staff Engineer • Local-First Systems & Mathematics Enthusiast',
+  role: 'Systems Architect',
+  avatarType: 'emoji',
+  avatarValue: '⚡',
+  mood: 'Deep Focus'
+};
+

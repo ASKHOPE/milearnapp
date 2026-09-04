@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Folder as FolderType, Note, ViewFilter, Workspace, Book } from '../types';
+import type { Folder as FolderType, Note, ViewFilter, Workspace, Book, ThemeMode } from '../types';
 import { 
   FileText, 
   Star, 
@@ -7,6 +7,7 @@ import {
   Folder, 
   Tag, 
   ChevronRight, 
+  ChevronLeft,
   ChevronDown, 
   ChevronUp,
   Trash2, 
@@ -19,7 +20,12 @@ import {
   Zap,
   Pin,
   SlidersHorizontal,
-  Plus
+  Plus,
+  Sun,
+  Moon,
+  Monitor,
+  Sparkles,
+  Cloud
 } from 'lucide-react';
 
 import { CalendarWidget } from './CalendarWidget';
@@ -60,6 +66,8 @@ interface SidebarProps {
   onCloseMobile: () => void;
   onOpenLibrary?: () => void;
   isLibraryOpen?: boolean;
+  theme?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -76,6 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   isCollapsed = false,
   onToggleCollapse,
+  theme = 'system',
+  onToggleTheme,
   onSelectWorkspace,
   onCreateWorkspace,
   onDeleteWorkspace,
@@ -287,6 +297,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (isCollapsed) {
     return (
       <aside className="app-sidebar collapsed">
+        {onToggleCollapse && (
+          <button
+            type="button"
+            className="edge-middle-toggle-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse();
+            }}
+            title="Expand Sidebar (Cmd+\)"
+            aria-label="Expand Sidebar"
+          >
+            <ChevronRight size={13} />
+          </button>
+        )}
         <div className="sidebar-collapsed-rail">
           {/* Top Rail Expand Button */}
           {onToggleCollapse && (
@@ -413,6 +437,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Trash2 size={16} color="#ef4444" />
               {trashedNotesCount > 0 && <span className="rail-pill-badge danger">{trashedNotesCount}</span>}
             </button>
+
+            {onToggleTheme && (
+              <button 
+                type="button"
+                className="rail-nav-btn rail-theme-btn"
+                onClick={onToggleTheme}
+                title={`Theme: ${
+                  theme === 'system' ? 'System Default' :
+                  theme === 'light' ? 'Day Theme' :
+                  theme === 'dark' ? 'Night Theme' :
+                  theme === 'oled' ? 'Obsidian Onyx' :
+                  theme === 'tokyo' ? 'Tokyo Midnight' :
+                  theme === 'nordic' ? 'Nordic Frost' : 'Editorial'
+                } (Click to Cycle Themes)`}
+              >
+                {theme === 'system' ? <Monitor size={16} /> :
+                 theme === 'light' ? <Sun size={16} color="#f59e0b" /> :
+                 theme === 'dark' ? <Moon size={16} color="#8b5cf6" /> :
+                 theme === 'oled' ? <Sparkles size={16} color="#a855f7" /> :
+                 theme === 'tokyo' ? <Zap size={16} color="#38bdf8" /> :
+                 theme === 'nordic' ? <Cloud size={16} color="#34d399" /> :
+                 <BookOpen size={16} color="#c2410c" />}
+              </button>
+            )}
           </div>
         </div>
       </aside>
@@ -472,6 +520,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       <aside className={`app-sidebar ${isOpenMobile ? 'open' : ''}`}>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            className="edge-middle-toggle-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse();
+            }}
+            title="Collapse Sidebar (Cmd+\)"
+            aria-label="Collapse Sidebar"
+          >
+            <ChevronLeft size={13} />
+          </button>
+        )}
         {/* Top Header: Persona Switcher with right-aligned collapse button */}
         <div className="sidebar-top-header">
           <div className="sidebar-ws-container">
@@ -866,6 +928,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </button>
         </div>
+
+        {/* Theme Switcher beneath Archive and Bin */}
+        {onToggleTheme && (
+          <div className="sidebar-footer-theme">
+            <button
+              type="button"
+              className="sidebar-theme-toggle-pill"
+              onClick={onToggleTheme}
+              title={`Theme: ${
+                theme === 'system' ? 'System Default' :
+                theme === 'light' ? 'Day Theme' :
+                theme === 'dark' ? 'Night Theme' :
+                theme === 'oled' ? 'Obsidian Onyx' :
+                theme === 'tokyo' ? 'Tokyo Midnight' :
+                theme === 'nordic' ? 'Nordic Frost' : 'Warm Editorial'
+              } (Click to Cycle Themes)`}
+            >
+              <div className="sidebar-theme-icon-wrap">
+                {theme === 'system' ? <Monitor size={14} /> :
+                 theme === 'light' ? <Sun size={14} color="#f59e0b" /> :
+                 theme === 'dark' ? <Moon size={14} color="#8b5cf6" /> :
+                 theme === 'oled' ? <Sparkles size={14} color="#a855f7" /> :
+                 theme === 'tokyo' ? <Zap size={14} color="#38bdf8" /> :
+                 theme === 'nordic' ? <Cloud size={14} color="#34d399" /> :
+                 <BookOpen size={14} color="#c2410c" />}
+              </div>
+              <span className="sidebar-theme-name">
+                {theme === 'system' ? 'System Theme' :
+                 theme === 'light' ? 'Day Light' :
+                 theme === 'dark' ? 'Night Dark' :
+                 theme === 'oled' ? 'Obsidian Onyx' :
+                 theme === 'tokyo' ? 'Tokyo Midnight' :
+                 theme === 'nordic' ? 'Nordic Frost' : 'Warm Editorial'}
+              </span>
+              <span className="sidebar-theme-chip">Theme</span>
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );

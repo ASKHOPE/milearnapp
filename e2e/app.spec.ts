@@ -16,10 +16,9 @@ test.describe('MiLEARNAPP Enterprise Desktop App Tests', () => {
     const header = page.locator('.app-header');
     await expect(header).toBeVisible();
 
-    // Verify PostgreSQL status pill is rendered in header
-    const pgPill = page.locator('.header-pg-status-pill');
-    await expect(pgPill).toBeVisible();
-    await expect(pgPill).toContainText(/Postgres/i);
+    // Verify PostgreSQL status indicator dot is rendered on settings in header
+    const pgDot = page.locator('.settings-nav-pg-dot');
+    await expect(pgDot).toBeVisible();
   });
 
   test('allows opening and testing the Pomodoro Focus Timer modal', async ({ page }) => {
@@ -52,10 +51,13 @@ test.describe('MiLEARNAPP Enterprise Desktop App Tests', () => {
   });
 
   test('opens Database Settings tab from PostgreSQL status indicator', async ({ page }) => {
-    const pgPill = page.locator('.header-pg-status-pill').first();
-    await pgPill.click();
+    const profileTablet = page.locator('.header-profile-tablet');
+    await profileTablet.click();
 
-    // Verify settings modal is open and shows Database Sync tab with live Docker container
+    // Switch to database tab in settings modal
+    await page.locator('button:has-text("PostgreSQL Sync")').click();
+
+    // Verify settings modal shows Database Sync tab with live Docker container
     await expect(page.locator('text=PostgreSQL 16 Container Online')).toBeVisible();
     await expect(page.locator('text=Relational Table Telemetry')).toBeVisible();
 

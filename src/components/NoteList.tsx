@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { 
   Note, 
   Folder as FolderType, 
@@ -19,7 +19,6 @@ import {
   Archive,
   ChevronLeft,
   ChevronRight,
-  PanelLeftClose,
   X,
   SlidersHorizontal,
   Columns2
@@ -36,7 +35,7 @@ interface NoteListProps {
   onToggleCollapse?: () => void;
   onSelectNote: (noteId: string) => void;
   onSelectNoteSplit?: (noteId: string) => void;
-  onCreateNote: () => void;
+  onCreateNote?: () => void;
   onToggleFavorite: (noteId: string, e: React.MouseEvent) => void;
   onEmptyTrash: () => void;
   onRestoreNote: (noteId: string, e: React.MouseEvent) => void;
@@ -44,6 +43,33 @@ interface NoteListProps {
   onDeleteNote?: (noteId: string, e: React.MouseEvent) => void;
   onPermanentDeleteNote?: (noteId: string, e: React.MouseEvent) => void;
 }
+
+// Helper: Relative time format
+const formatTime = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    const diffHours = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60));
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+};
+
+// Helper: Clean content preview
+const getCleanSnippet = (content: string) => {
+  return content
+    .replace(/^#+\s+/gm, '') // Remove markdown headers
+    .replace(/\[\[(.*?)\]\]/g, '$1') // Remove wiki link brackets
+    .replace(/!\[.*?\]\(.*?\)/g, '') // Remove images
+    .replace(/`{1,3}.*?`{1,3}/gs, '') // Remove code blocks
+    .replace(/-\s\[[ x]\]\s/g, '') // Remove checklist marks
+    .replace(/\n+/g, ' ')
+    .trim();
+};
 
 export const NoteList: React.FC<NoteListProps> = ({
   notes,
@@ -64,155 +90,108 @@ export const NoteList: React.FC<NoteListProps> = ({
   onDeleteNote,
   onPermanentDeleteNote
 }) => {
-  const [listSearch, setListSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'updated' | 'created' | 'title'>('updated');
+  const [query, setQuery] = useState('');
+  const [sortOption, setSortOption] = useState<'updated' | 'created' | 'title'>('updated');
 
-  // Find active folder name
-  const activeFolder = folders.find((f) => f.id === currentFolderId);
-
-  // Determine Title for the list column
-  let columnTitle = 'All Notes';
-  if (selectedTag) {
+  // Derive title from active view
+  let columnTitle = 'Notes';
+  if (currentFolderId) {
+    const currentFolder = folders.find((f) => f.id === currentFolderId);
+    columnTitle = currentFolder ? currentFolder.name : 'Folder';
+  } else if (selectedTag) {
     columnTitle = `#${selectedTag}`;
-  } else if (currentFolderId && activeFolder) {
-    columnTitle = activeFolder.name;
-  } else if (currentFilter === 'quick') {
-    columnTitle = '⚡ Quick Notes';
   } else if (currentFilter === 'favorites') {
     columnTitle = 'Favorites';
   } else if (currentFilter === 'recent') {
     columnTitle = 'Recent Notes';
+  } else if (currentFilter === 'quick') {
+    columnTitle = 'Quick Notes';
   } else if (currentFilter === 'attachments') {
-    columnTitle = 'With Files & Media';
+    columnTitle = 'Files & Media';
   } else if (currentFilter === 'archive') {
-    columnTitle = 'Archived Notes';
+    columnTitle = 'Archive';
   } else if (currentFilter === 'trash') {
     columnTitle = 'Trash Bin';
   }
 
-  // Filter notes based on lifecycle and current filter
-  let filteredNotes = notes.filter((note) => {
+  // Filter notes based on active filter, folder, tag, and search query
+  const filteredNotes = useMemo(() => {
+    let list: Note[] = [];
+
     // 1. Trash Bin Mode: ONLY show trashed notes
     if (currentFilter === 'trash') {
-      if (!note.isTrashed) return false;
+      list = notes.filter((n) => n.isTrashed);
     } else {
       // All other modes: EXCLUDE trashed notes
-      if (note.isTrashed) return false;
+      list = notes.filter((n) => !n.isTrashed);
 
-      // 2. Archive Mode: ONLY show archived notes
       if (currentFilter === 'archive') {
-        if (!note.isArchived) return false;
+        list = list.filter((n) => n.isArchived);
       } else {
-        // Normal views: EXCLUDE archived notes
-        if (note.isArchived) return false;
+        // Exclude archived from normal views
+        list = list.filter((n) => !n.isArchived);
+
+        if (currentFilter === 'favorites') {
+          list = list.filter((n) => n.isFavorite);
+        } else if (currentFilter === 'quick') {
+          list = list.filter((n) => !n.folderId);
+        } else if (currentFilter === 'attachments') {
+          list = list.filter((n) => n.attachments && n.attachments.length > 0);
+        } else if (currentFolderId) {
+          list = list.filter((n) => n.folderId === currentFolderId);
+        } else if (selectedTag) {
+          list = list.filter((n) => n.tags && n.tags.includes(selectedTag));
+        }
       }
     }
 
-    // Tag filter
-    if (selectedTag && (!note.tags || !note.tags.includes(selectedTag))) {
-      return false;
+    // Apply text search query
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter((n) =>
+        (n.title || '').toLowerCase().includes(q) ||
+        (n.content || '').toLowerCase().includes(q) ||
+        (n.tags && n.tags.some((t) => t.toLowerCase().includes(q)))
+      );
     }
 
-    // Folder filter
-    if (currentFolderId && note.folderId !== currentFolderId) {
-      return false;
-    }
-
-    // Quick notes filter
-    if (currentFilter === 'quick') {
-      const isQuick = note.tags?.includes('quick-note') || note.title.toLowerCase().includes('quick scratchpad');
-      if (!isQuick) return false;
-    }
-
-    // Navigation filters
-    if (currentFilter === 'favorites' && !note.isFavorite) {
-      return false;
-    }
-    if (currentFilter === 'attachments') {
-      if (!note.attachments || note.attachments.length === 0) return false;
-    }
-
-    // List search query
-    if (listSearch.trim()) {
-      const q = listSearch.toLowerCase();
-      const matchTitle = note.title.toLowerCase().includes(q);
-      const matchContent = note.content.toLowerCase().includes(q);
-      const matchTag = note.tags?.some((t) => t.toLowerCase().includes(q));
-      if (!matchTitle && !matchContent && !matchTag) return false;
-    }
-
-    return true;
-  });
-
-  // Sort notes: pinned first, then by selected sort
-  filteredNotes.sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-
-    if (sortBy === 'updated') {
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    }
-    if (sortBy === 'created') {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    }
-    if (sortBy === 'title') {
-      return a.title.localeCompare(b.title);
-    }
-    return 0;
-  });
-
-  // Helper: Format relative date
-  const formatTime = (isoString: string) => {
-    try {
-      const date = new Date(isoString);
-      const now = new Date();
-      const diffMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-
-      if (diffMinutes < 1) return 'Just now';
-      if (diffMinutes < 60) return `${diffMinutes}m ago`;
-      const diffHours = Math.floor(diffMinutes / 60);
-      if (diffHours < 24) return `${diffHours}h ago`;
-      const diffDays = Math.floor(diffHours / 24);
-      if (diffDays < 7) return `${diffDays}d ago`;
-
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
-  };
-
-  // Helper: Clean content preview
-  const getCleanSnippet = (content: string) => {
-    return content
-      .replace(/^#+\s+/gm, '') // Remove markdown headers
-      .replace(/\[\[(.*?)\]\]/g, '$1') // Remove wiki link brackets
-      .replace(/!\[.*?\]\(.*?\)/g, '') // Remove images
-      .replace(/`{1,3}.*?`{1,3}/gs, '') // Remove code blocks
-      .replace(/-\s\[[ x]\]\s/g, '') // Remove checklist marks
-      .replace(/\n+/g, ' ')
-      .trim();
-  };
+    // Sorting
+    return [...list].sort((a, b) => {
+      if (sortOption === 'updated') {
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      } else if (sortOption === 'created') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else if (sortOption === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      return 0;
+    });
+  }, [notes, currentFilter, currentFolderId, selectedTag, query, sortOption]);
 
   return (
     <section className={`notes-list-pane ${isCollapsed ? 'collapsed' : ''}`}>
+      {/* Middle Edge Floating Toggle Button */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          className="edge-middle-toggle-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse();
+          }}
+          title={isCollapsed ? "Expand Notes List" : "Collapse Notes List"}
+          aria-label={isCollapsed ? "Expand Notes List" : "Collapse Notes List"}
+        >
+          {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
+      )}
+
       {isCollapsed ? (
         <div 
           className="notes-list-collapsed-strip" 
           onClick={onToggleCollapse} 
           title="Click anywhere to expand Notes List"
         >
-          <button
-            type="button"
-            className="btn-expand-notes-pane"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCollapse?.();
-            }}
-            title="Expand Notes List"
-          >
-            <ChevronRight size={15} />
-          </button>
-
           {onCreateNote && currentFilter !== 'trash' && currentFilter !== 'archive' && (
             <button
               type="button"
@@ -234,95 +213,75 @@ export const NoteList: React.FC<NoteListProps> = ({
         </div>
       ) : (
         <>
-          {/* Right Edge Center Floating Hover Collapse Handle */}
-          {onToggleCollapse && (
-            <div className="notes-pane-collapse-trigger-edge" title="Collapse Notes List" onClick={onToggleCollapse}>
-          <div className="notes-pane-collapse-edge-handle">
-            <ChevronLeft size={14} />
-          </div>
-        </div>
-      )}
+          {/* Sleek Modern List Header */}
+          <div className="notelist-sleek-header">
+            <div className="notelist-header-title-wrap">
+              <h3 className="notelist-heading-title">{columnTitle}</h3>
+              <span className="notelist-count-chip">{filteredNotes.length}</span>
+            </div>
 
-      {/* Sleek Modern List Header */}
-      <div className="notelist-sleek-header">
-        <div className="notelist-header-top">          <div className="notelist-heading-group">
-            {onToggleCollapse && (
-              <button
-                type="button"
-                className="btn-collapse-notelist"
-                onClick={onToggleCollapse}
-                title="Collapse Notes List (Hide pane)"
+            <div className="notelist-actions-group">
+              {currentFilter === 'trash' && filteredNotes.length > 0 && (
+                <button
+                  className="btn-trash-empty"
+                  onClick={onEmptyTrash}
+                  title="Permanently empty trash"
+                >
+                  <Trash2 size={12} />
+                  <span>Empty</span>
+                </button>
+              )}
+
+              {currentFilter !== 'trash' && currentFilter !== 'archive' && (
+                <button
+                  className="btn-create-note-compact"
+                  onClick={onCreateNote}
+                  title="Create New Note (Cmd+N)"
+                >
+                  <Plus size={14} />
+                  <span>New Note</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Compact Integrated Search & Sort Toolbar */}
+          <div className="notelist-toolbar-row">
+            <div className="notelist-search-wrapper">
+              <Search size={13} className="search-icon" />
+              <input
+                type="text"
+                placeholder="Search notes in list..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="notelist-search-input"
+              />
+              {query && (
+                <button
+                  type="button"
+                  className="search-clear-btn"
+                  onClick={() => setQuery('')}
+                  title="Clear filter"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <div className="notelist-sort-wrapper">
+              <SlidersHorizontal size={12} className="sort-icon" />
+              <select
+                className="notelist-sort-dropdown"
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as any)}
+                title="Sort notes"
               >
-                <PanelLeftClose size={15} />
-              </button>
-            )}
-            <h3 className="notelist-heading-title">{columnTitle}</h3>
-            <span className="notelist-count-chip">{filteredNotes.length}</span>
+                <option value="updated">Recent</option>
+                <option value="created">Created</option>
+                <option value="title">A–Z</option>
+              </select>
+            </div>
           </div>
-
-          <div className="notelist-actions-group">
-            {currentFilter === 'trash' && filteredNotes.length > 0 && (
-              <button
-                className="btn-trash-empty"
-                onClick={onEmptyTrash}
-                title="Permanently empty trash"
-              >
-                <Trash2 size={12} />
-                <span>Empty</span>
-              </button>
-            )}
-
-            {currentFilter !== 'trash' && currentFilter !== 'archive' && (
-              <button
-                className="btn-create-note-compact"
-                onClick={onCreateNote}
-                title="Create New Note (Cmd+N)"
-              >
-                <Plus size={14} />
-                <span>New Note</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Compact Integrated Search & Sort Toolbar */}
-        <div className="notelist-toolbar-row">
-          <div className="notelist-search-wrapper">
-            <Search size={13} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search notes in list..."
-              value={listSearch}
-              onChange={(e) => setListSearch(e.target.value)}
-              className="notelist-search-input"
-            />
-            {listSearch && (
-              <button
-                type="button"
-                className="search-clear-btn"
-                onClick={() => setListSearch('')}
-                title="Clear filter"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          <div className="notelist-sort-wrapper">
-            <SlidersHorizontal size={12} className="sort-icon" />
-            <select
-              className="notelist-sort-dropdown"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              title="Sort notes"
-            >
-              <option value="updated">Recent</option>
-              <option value="created">Created</option>
-              <option value="title">A–Z</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
       {/* Notes List Cards */}
       <div className="notes-cards-scroll">
@@ -333,7 +292,7 @@ export const NoteList: React.FC<NoteListProps> = ({
                 ? 'Trash bin is empty' 
                 : currentFilter === 'archive' 
                 ? 'No archived notes' 
-                : listSearch 
+                : query 
                 ? 'No notes match your filter' 
                 : 'No notes yet'}
             </p>

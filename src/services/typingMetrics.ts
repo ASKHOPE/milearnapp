@@ -59,6 +59,12 @@ class TypingMetricsService {
 
   private listeners: Set<(stats: TypingSessionStats) => void> = new Set();
 
+  // Ambient Live Note Typing Tracker (for Header Pinned Widget)
+  private ambientKeystrokes: Array<{ time: number; isError: boolean }> = [];
+  private ambientBurstStartTime: number = 0;
+  private ambientResetTimeout: ReturnType<typeof setTimeout> | null = null;
+  private ambientLastKeyTime: number = 0;
+
   public isSessionActive(): boolean {
     return this.isListening;
   }
@@ -73,9 +79,45 @@ class TypingMetricsService {
     this.notifySubscribers();
   }
 
+  /**
+   * Ambient keystroke recorder for live typing in notes and text editors.
+   * Calculates real-time rolling WPM without requiring the practice sprint game to be open.
+   */
+  public recordAmbientKeystroke(e: KeyboardEvent) {
+    if (this.isListening) return; // Practice game handles its own keystroke pipeline
+
+    // Ignore standalone modifier presses
+    if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Escape'].includes(e.key)) return;
+
+    const now = performance.now();
+    const isError = e.key === 'Backspace' || e.key === 'Delete';
+
+    // If more than 3.5s elapsed since last key, restart burst
+    if (this.ambientLastKeyTime === 0 || (now - this.ambientLastKeyTime) > 3500) {
+      this.ambientBurstStartTime = now;
+      this.ambientKeystrokes = [];
+    }
+    this.ambientLastKeyTime = now;
+
+    this.ambientKeystrokes.push({ time: now, isError });
+
+    // Prune keystrokes older than 30 seconds
+    const cutoff = now - 30000;
+    this.ambientKeystrokes = this.ambientKeystrokes.filter(k => k.time >= cutoff);
+
+    this.notifySubscribers();
+
+    // Idle decay: after 4s without typing, gently settle
+    if (this.ambientResetTimeout) clearTimeout(this.ambientResetTimeout);
+    this.ambientResetTimeout = setTimeout(() => {
+      this.notifySubscribers();
+    }, 4000);
+  }
+
   public recordKeyDown(e: KeyboardEvent) {
     if (!this.isListening) {
-      return; // Do NOT listen or track keystrokes outside of active practice games
+      this.recordAmbientKeystroke(e);
+      return;
     }
 
     const now = performance.now();
@@ -127,6 +169,57 @@ class TypingMetricsService {
 
   public calculateStats(): TypingSessionStats {
     const now = performance.now();
+
+    // If ambient tracking is active outside the game modal
+    if (!this.isListening && this.ambientKeystrokes.length > 0) {
+      const isIdle = (now - this.ambientLastKeyTime) > 3500;
+      if (isIdle) {
+        return {
+          wpm: 0,
+          rawWpm: 0,
+          cpm: 0,
+          accuracy: 100,
+          totalKeystrokes: this.ambientKeystrokes.length,
+          correctKeystrokes: this.ambientKeystrokes.filter(k => !k.isError).length,
+          errorKeystrokes: this.ambientKeystrokes.filter(k => k.isError).length,
+          backspaceCount: this.ambientKeystrokes.filter(k => k.isError).length,
+          averageHoldTime: 0,
+          averageFlightTime: 0,
+          consistencyScore: 100,
+          durationSeconds: 0,
+          timestamp: new Date().toISOString(),
+          passageTitle: 'Live Note Taking'
+        };
+      }
+
+      const burstDurationMs = Math.max(800, now - this.ambientBurstStartTime);
+      const burstDurationMin = burstDurationMs / 60000;
+      const totalKeys = this.ambientKeystrokes.length;
+      const errKeys = this.ambientKeystrokes.filter(k => k.isError).length;
+      const netKeys = Math.max(0, totalKeys - errKeys);
+
+      const netWpm = Math.round((netKeys / 5) / burstDurationMin);
+      const rawWpm = Math.round((totalKeys / 5) / burstDurationMin);
+      const accuracy = totalKeys > 0 ? Math.round((netKeys / totalKeys) * 1000) / 10 : 100;
+
+      return {
+        wpm: Math.min(250, Math.max(0, netWpm)),
+        rawWpm: Math.min(250, Math.max(0, rawWpm)),
+        cpm: Math.round(totalKeys / burstDurationMin),
+        accuracy,
+        totalKeystrokes: totalKeys,
+        correctKeystrokes: netKeys,
+        errorKeystrokes: errKeys,
+        backspaceCount: errKeys,
+        averageHoldTime: 0,
+        averageFlightTime: 0,
+        consistencyScore: 95,
+        durationSeconds: Math.round(burstDurationMs / 1000),
+        timestamp: new Date().toISOString(),
+        passageTitle: 'Live Note Taking'
+      };
+    }
+
     const durationMs = Math.max(500, now - (this.sessionStartTime || now));
     const durationSeconds = Math.round(durationMs / 1000);
     const durationMinutes = durationMs / 60000;
@@ -308,3 +401,23 @@ class TypingMetricsService {
 }
 
 export const typingMetrics = new TypingMetricsService();
+
+// Auto-register ambient keyboard telemetry on text editors and notes
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const isEditable = 
+      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'INPUT' || 
+      target.isContentEditable || 
+      target.closest('.note-editor-pane') !== null ||
+      target.closest('.rich-note-editor') !== null ||
+      target.closest('.markdown-body') !== null;
+
+    if (isEditable) {
+      typingMetrics.recordAmbientKeystroke(e);
+    }
+  }, { passive: true });
+}
+

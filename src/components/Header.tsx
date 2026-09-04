@@ -3,18 +3,12 @@ import {
   Search,
   Network,
   GitFork,
-  Sun,
-  Moon,
   Menu,
   GraduationCap,
   Timer,
   Settings,
   Brain,
-  Monitor,
-  Zap,
   Sparkles,
-  Cloud,
-  BookOpen,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -22,19 +16,20 @@ import {
   PinOff,
   Keyboard,
   BookA,
-  Globe
+  Globe,
+  Zap
 } from 'lucide-react';
 import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
 import { typingMetrics, type TypingSessionStats } from '../services/typingMetrics';
 
 interface HeaderProps {
-  theme: ThemeMode;
+  theme?: ThemeMode;
   activeWorkspace?: Workspace;
   userProfile?: UserProfile;
   pomodoroSecondsLeft?: number;
   isPomodoroRunning?: boolean;
   pomodoroMode?: PomodoroMode;
-  onToggleTheme: () => void;
+  onToggleTheme?: () => void;
   onOpenSearch: () => void;
   onOpenKnowledgeBase: () => void;
   onOpenInternalMind?: () => void;
@@ -53,13 +48,11 @@ interface HeaderProps {
 const WIDGET_TOOL_IDS = ['pomodoro', 'typing'];
 
 export const Header: React.FC<HeaderProps> = ({
-  theme,
   activeWorkspace,
   userProfile,
   pomodoroSecondsLeft,
   isPomodoroRunning,
   pomodoroMode = 'work',
-  onToggleTheme,
   onOpenSearch,
   onOpenKnowledgeBase,
   onOpenInternalMind,
@@ -599,69 +592,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* PostgreSQL Live Sync Status Pill */}
-        <button
-          type="button"
-          className="header-pg-status-pill"
-          onClick={() => onOpenSettings?.('database')}
-          title="PostgreSQL Database Sync: Click to open Database Settings"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 10px',
-            borderRadius: '20px',
-            background: 'var(--bg-card, rgba(255, 255, 255, 0.05))',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-            fontSize: '11px',
-            fontWeight: 600,
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <span style={{
-            width: '7px',
-            height: '7px',
-            borderRadius: '50%',
-            background: '#10b981',
-            boxShadow: '0 0 6px #10b981'
-          }} />
-          <span>Postgres Synced</span>
-        </button>
-
-        {/* Multi-Theme Toggle: System -> Day -> Night -> OLED -> Tokyo -> Nordic -> Editorial */}
-        <button
-          className="theme-toggle-btn"
-          onClick={onToggleTheme}
-          title={`Theme: ${
-            theme === 'system' ? 'System Default' :
-            theme === 'light' ? 'Day Theme' :
-            theme === 'dark' ? 'Night Theme' :
-            theme === 'oled' ? 'Obsidian Onyx (OLED)' :
-            theme === 'tokyo' ? 'Tokyo Midnight' :
-            theme === 'nordic' ? 'Nordic Frost' : 'Editorial Paper'
-          } (Click to Cycle Luxury Themes)`}
-          aria-label="Toggle Theme"
-        >
-          {theme === 'system' ? (
-            <Monitor size={15} />
-          ) : theme === 'light' ? (
-            <Sun size={15} color="#f59e0b" />
-          ) : theme === 'dark' ? (
-            <Moon size={15} color="#8b5cf6" />
-          ) : theme === 'oled' ? (
-            <Sparkles size={15} color="#a855f7" />
-          ) : theme === 'tokyo' ? (
-            <Zap size={15} color="#38bdf8" />
-          ) : theme === 'nordic' ? (
-            <Cloud size={15} color="#34d399" />
-          ) : (
-            <BookOpen size={15} color="#c2410c" />
-          )}
-        </button>
-
-        {/* Combined Profile & Settings Tablet (Profile Avatar + Name + Settings Gear Icon) */}
+        {/* Combined Profile & Settings Tablet (Profile Avatar + Name + Settings Gear Icon with Live Postgres Indicator) */}
         <div
           className="header-profile-tablet"
           onClick={() => (onOpenSettings ? onOpenSettings('profile') : onOpenProfile())}
@@ -683,6 +614,7 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
           <div className="profile-tablet-gear-box" title="Open Settings (Cmd+,)">
             <Settings size={13} className="profile-tablet-gear" />
+            <span className="settings-nav-pg-dot connected" title="PostgreSQL: Connected & Synced" />
           </div>
         </div>
 

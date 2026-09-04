@@ -896,6 +896,8 @@ export const App: React.FC = () => {
           onRenameFolder={handleRenameFolder}
           onDeleteFolder={handleDeleteFolder}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
         />
 
         {/* Pane 2: Notes List with Search, Sorting & Compact Hover Preview Cards */}

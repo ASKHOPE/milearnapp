@@ -22,7 +22,7 @@ describe('Advanced Rich Editor Features (Editor.js, RoosterJS, SunEditor, Froala
   it('accurately detects and transforms YouTube and Vimeo URLs into responsive embeds', () => {
     const parseVideoEmbed = (url: string) => {
       const trimmed = url.trim();
-      const ytMatch = trimmed.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+      const ytMatch = trimmed.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i);
       if (ytMatch && ytMatch[1]) {
         return {
           embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,

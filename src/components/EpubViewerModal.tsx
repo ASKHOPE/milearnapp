@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, BookOpen, List, Settings, Minus, Plus, Sun, Moon, AlignLeft, Maximize2, Minimize2 } from 'lucide-react';
 import ePub from 'epubjs';
 import type { Book, Rendition, Location } from 'epubjs';
@@ -46,6 +46,13 @@ export const EpubViewerModal: React.FC<EpubViewerModalProps> = ({
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [toc, setToc] = useState<Array<{ label: string; href: string; subitems?: any[] }>>([]);
+
+  const applyTheme = useCallback((rendition: Rendition, t: Theme, fs: number) => {
+    Object.entries(THEMES[t]).forEach(([selector, rules]) => {
+      rendition.themes.override(selector, rules);
+    });
+    rendition.themes.fontSize(`${fs}px`);
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !containerRef.current) return;
@@ -114,38 +121,31 @@ export const EpubViewerModal: React.FC<EpubViewerModalProps> = ({
       bookRef.current = null;
       renditionRef.current = null;
     };
-  }, [isOpen, src]);
-
-  const applyTheme = (rendition: Rendition, t: Theme, fs: number) => {
-    Object.entries(THEMES[t]).forEach(([selector, rules]) => {
-      rendition.themes.override(selector, rules);
-    });
-    rendition.themes.fontSize(`${fs}px`);
-  };
+  }, [isOpen, src, applyTheme, theme, fontSize]);
 
   useEffect(() => {
     if (!renditionRef.current) return;
     applyTheme(renditionRef.current, theme, fontSize);
-  }, [theme, fontSize]);
+  }, [theme, fontSize, applyTheme]);
 
-  const prev = () => renditionRef.current?.prev();
-  const next = () => renditionRef.current?.next();
+  const prev = useCallback(() => renditionRef.current?.prev(), []);
+  const next = useCallback(() => renditionRef.current?.next(), []);
   const goTo = (href: string) => {
     renditionRef.current?.display(href);
     setIsTocOpen(false);
   };
 
-  const handleKey = (e: KeyboardEvent) => {
+  const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
     if (e.key === 'Escape') onClose();
-  };
+  }, [next, prev, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [isOpen]);
+  }, [isOpen, handleKey]);
 
   if (!isOpen) return null;
 

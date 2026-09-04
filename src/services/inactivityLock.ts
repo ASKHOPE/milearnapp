@@ -34,7 +34,7 @@ export class InactivityLockManager {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(SECURITY_STORAGE_KEY, JSON.stringify(settings));
       }
-    } catch (err) {}
+    } catch {}
     this.restartTimer();
   }
 

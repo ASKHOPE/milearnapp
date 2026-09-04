@@ -26,7 +26,7 @@ export function scanTextToDiagram(rawText: string): DiagramConversionResult {
   if (arrowMatch && arrowMatch.length >= 1) {
     const rawSegments = text.split(/(?:->|-->|=>|==>|\n)+/);
     const steps = rawSegments
-      .map((s) => s.replace(/^\d+[\.\)]\s*/, '').trim())
+      .map((s) => s.replace(/^\d+[.)]\s*/, '').trim())
       .filter((s) => s.length > 0);
 
     if (steps.length >= 2) {
@@ -56,10 +56,10 @@ export function scanTextToDiagram(rawText: string): DiagramConversionResult {
   }
 
   // Pattern 2: Numbered Step List (e.g. "1. First step", "2. Second step")
-  const numberedSteps = lines.filter((l) => /^\d+[\.\)]\s+/.test(l));
+  const numberedSteps = lines.filter((l) => /^\d+[.)]\s+/.test(l));
   if (numberedSteps.length >= 2 && numberedSteps.length >= lines.length * 0.5) {
     let flowchart = 'graph TD\n';
-    const steps = numberedSteps.map((l) => l.replace(/^\d+[\.\)]\s+/, '').trim());
+    const steps = numberedSteps.map((l) => l.replace(/^\d+[.)]\s+/, '').trim());
 
     for (let i = 0; i < steps.length; i++) {
       const id = `Step${i + 1}`;
@@ -81,13 +81,13 @@ export function scanTextToDiagram(rawText: string): DiagramConversionResult {
   const hasIndents = rawIndentedLines.some((l) => /^\s{2,}/.test(l) || /^\t/.test(l));
   if (hasIndents && rawIndentedLines.length >= 3) {
     let mindmap = 'mindmap\n';
-    const rootLine = rawIndentedLines[0].trim().replace(/^[-*#\d\.]+\s*/, '');
+    const rootLine = rawIndentedLines[0].trim().replace(/^[-*#\d.]+\s*/, '');
     mindmap += `  root((${sanitizeLabel(rootLine || 'Central Concept')}))\n`;
 
     for (let i = 1; i < rawIndentedLines.length; i++) {
       const line = rawIndentedLines[i];
       const indentCount = (line.match(/^(\s+|\t+)/) || [''])[0].replace(/\t/g, '  ').length;
-      const cleanLine = line.trim().replace(/^[-*#\d\.]+\s*/, '');
+      const cleanLine = line.trim().replace(/^[-*#\d.]+\s*/, '');
       if (!cleanLine) continue;
 
       const depth = Math.max(1, Math.min(4, Math.floor(indentCount / 2) + 1));
@@ -174,7 +174,7 @@ export function scanTextToDiagram(rawText: string): DiagramConversionResult {
 
 function sanitizeLabel(str: string): string {
   return str
-    .replace(/["'\[\]\(\)\{\}\<\>]/g, '')
+    .replace(/["'[\](){}<>]/g, '')
     .trim()
     .slice(0, 70);
 }

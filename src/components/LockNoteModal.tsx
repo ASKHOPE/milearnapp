@@ -126,7 +126,7 @@ export const LockNoteModal: React.FC<LockNoteModalProps> = ({
 
       onUnlockSuccess(decrypted);
       onClose();
-    } catch (err: any) {
+    } catch {
       // Record failure for exponential backoff lockout
       const status = lockoutManager.recordFailedAttempt(note.id);
       setFailedAttempts(status.failedAttempts);

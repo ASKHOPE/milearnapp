@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Attachment } from '../types';
 import { Mic, Square, X, AlertCircle } from 'lucide-react';
 
@@ -21,16 +21,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      startRecording();
-    } else {
-      cleanup();
-    }
-    return () => cleanup();
-  }, [isOpen]);
-
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         mediaRecorderRef.current.stop();
@@ -43,9 +34,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     setIsRecording(false);
     setDuration(0);
     setErrorMsg(null);
-  };
+  }, []);
 
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     setErrorMsg(null);
     audioChunksRef.current = [];
 
@@ -71,7 +62,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
           const base64Data = reader.result as string;
           const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
           const voiceAttachment: Attachment = {
-            id: 'voice-' + Math.random().toString(36).substr(2, 9),
+            id: 'voice-' + Math.random().toString(36).substring(2, 11),
             name: `Voice-Memo-${timestamp}.webm`,
             type: 'audio',
             size: audioBlob.size,
@@ -97,7 +88,16 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       setErrorMsg(err.message || 'Could not access microphone');
       setIsRecording(false);
     }
-  };
+  }, [onClose, onSaveVoiceNote]);
+
+  useEffect(() => {
+    if (isOpen) {
+      startRecording();
+    } else {
+      cleanup();
+    }
+    return () => cleanup();
+  }, [isOpen, startRecording, cleanup]);
 
   const handleStopAndSave = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {

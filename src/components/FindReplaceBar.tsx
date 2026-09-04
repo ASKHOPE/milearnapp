@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Replace, ChevronUp, ChevronDown, X } from 'lucide-react';
 
 interface FindReplaceBarProps {
@@ -17,27 +17,11 @@ export const FindReplaceBar: React.FC<FindReplaceBarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [replaceQuery, setReplaceQuery] = useState('');
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const [matches, setMatches] = useState<number[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => searchInputRef.current?.focus(), 50);
-    } else {
-      setSearchQuery('');
-      setReplaceQuery('');
-      setMatches([]);
-    }
-  }, [isOpen]);
-
-  // Find all match indices
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setMatches([]);
-      setCurrentMatchIndex(0);
-      return;
-    }
-
+  // Compute match indices directly during render
+  const matches = useMemo(() => {
+    if (!searchQuery.trim()) return [];
     const indices: number[] = [];
     const textLower = content.toLowerCase();
     const queryLower = searchQuery.toLowerCase();
@@ -49,12 +33,16 @@ export const FindReplaceBar: React.FC<FindReplaceBarProps> = ({
       indices.push(idx);
       startIndex = idx + queryLower.length;
     }
-
-    setMatches(indices);
-    if (indices.length > 0 && currentMatchIndex >= indices.length) {
-      setCurrentMatchIndex(0);
-    }
+    return indices;
   }, [searchQuery, content]);
+
+  const activeMatchIndex = matches.length === 0 ? 0 : Math.min(currentMatchIndex, matches.length - 1);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
 
   const handleNext = () => {
     if (matches.length === 0) return;
@@ -68,7 +56,7 @@ export const FindReplaceBar: React.FC<FindReplaceBarProps> = ({
 
   const handleReplaceOne = () => {
     if (matches.length === 0 || !searchQuery) return;
-    const targetIdx = matches[currentMatchIndex];
+    const targetIdx = matches[activeMatchIndex];
     const before = content.slice(0, targetIdx);
     const after = content.slice(targetIdx + searchQuery.length);
     const newText = before + replaceQuery + after;
@@ -112,7 +100,7 @@ export const FindReplaceBar: React.FC<FindReplaceBarProps> = ({
           />
           {searchQuery && (
             <span className="find-match-counter">
-              {matches.length > 0 ? `${currentMatchIndex + 1} of ${matches.length}` : '0 results'}
+              {matches.length > 0 ? `${activeMatchIndex + 1} of ${matches.length}` : '0 results'}
             </span>
           )}
           <button className="find-arrow-btn" onClick={handlePrev} title="Previous Match (Shift+Enter)">

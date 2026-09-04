@@ -103,8 +103,14 @@ export const DrawingCanvasModal: React.FC<DrawingCanvasModalProps> = ({
   const [textInputPos, setTextInputPos] = useState<{ x: number; y: number } | null>(null);
   const [textInputValue, setTextInputValue] = useState('');
 
-  // Rerender trigger
-  const [, setTick] = useState(0);
+  // Undo / redo state
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const updateHistoryState = () => {
+    setCanUndo(historyIndexRef.current >= 0);
+    setCanRedo(historyIndexRef.current < strokesRef.current.length - 1);
+  };
 
   // Draw paper pattern background
   const drawBackground = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number, pattern: PaperPattern) => {
@@ -303,28 +309,28 @@ export const DrawingCanvasModal: React.FC<DrawingCanvasModalProps> = ({
     strokesRef.current = newStrokes;
     historyIndexRef.current = newStrokes.length - 1;
     redrawCanvas();
-    setTick(t => t + 1);
+    updateHistoryState();
   };
 
   const handleUndo = () => {
     if (historyIndexRef.current < 0) return;
     historyIndexRef.current -= 1;
     redrawCanvas();
-    setTick(t => t + 1);
+    updateHistoryState();
   };
 
   const handleRedo = () => {
     if (historyIndexRef.current >= strokesRef.current.length - 1) return;
     historyIndexRef.current += 1;
     redrawCanvas();
-    setTick(t => t + 1);
+    updateHistoryState();
   };
 
   const handleClear = () => {
     strokesRef.current = [];
     historyIndexRef.current = -1;
     redrawCanvas();
-    setTick(t => t + 1);
+    updateHistoryState();
   };
 
   // Pointer event handlers
@@ -509,7 +515,7 @@ export const DrawingCanvasModal: React.FC<DrawingCanvasModalProps> = ({
             <button 
               className="editor-icon-btn" 
               onClick={handleUndo} 
-              disabled={historyIndexRef.current < 0}
+              disabled={!canUndo}
               title="Undo stroke"
             >
               <RotateCcw size={15} />
@@ -517,7 +523,7 @@ export const DrawingCanvasModal: React.FC<DrawingCanvasModalProps> = ({
             <button 
               className="editor-icon-btn" 
               onClick={handleRedo} 
-              disabled={historyIndexRef.current >= strokesRef.current.length - 1}
+              disabled={!canRedo}
               title="Redo stroke"
             >
               <RotateCw size={15} />

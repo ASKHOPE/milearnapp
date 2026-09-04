@@ -23,21 +23,15 @@ export const NoteOutline: React.FC<NoteOutlineProps> = ({
   onClose,
   onScrollToHeading
 }) => {
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    const defaultX = typeof window !== 'undefined' ? Math.max(window.innerWidth - 330, 20) : 20;
+    return { x: defaultX, y: 120 };
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isMinimized, setIsMinimized] = useState(false);
   const [hoveredHeadingId, setHoveredHeadingId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  // Initialize position to top-right of the viewport
-  useEffect(() => {
-    if (isOpen && !position) {
-      const defaultX = Math.max(window.innerWidth - 330, 20);
-      const defaultY = 120;
-      setPosition({ x: defaultX, y: defaultY });
-    }
-  }, [isOpen, position]);
 
   // Handle Dragging
   useEffect(() => {

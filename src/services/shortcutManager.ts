@@ -43,7 +43,7 @@ export const shortcutManager = {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(HOTKEYS_STORAGE_KEY, JSON.stringify(bindings));
       }
-    } catch (err) {}
+    } catch {}
   },
 
   resetHotkeys(): HotkeyBindings {
@@ -74,7 +74,7 @@ export const shortcutManager = {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(MOUSE_STORAGE_KEY, JSON.stringify(settings));
       }
-    } catch (err) {}
+    } catch {}
   },
 
   /**

@@ -13,6 +13,8 @@ import { AppModals } from './components/AppModals';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './styles/main.css';
 
+const generateNoteId = (): string => 'n-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+
 export const App: React.FC = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -278,7 +280,7 @@ export const App: React.FC = () => {
     }
 
     const newNote: Note = {
-      id: 'n-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+      id: generateNoteId(),
       title: 'Untitled Note',
       content: '',
       folderId: targetFolder,

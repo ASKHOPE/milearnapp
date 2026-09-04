@@ -2,7 +2,6 @@ import { describe, it, expect } from 'bun:test';
 import { 
   SAMPLE_WORKSPACES, 
   SAMPLE_BOOKS, 
-  SAMPLE_FOLDERS, 
   SAMPLE_NOTES, 
   SAMPLE_DRAWING_DATA 
 } from '../src/services/seedData';

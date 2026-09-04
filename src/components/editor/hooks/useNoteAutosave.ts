@@ -25,16 +25,19 @@ export function useNoteAutosave({
     content: note?.content || ''
   });
 
-  // Track note switch
+  const prevNoteIdRef = useRef<string | null>(null);
+
+  // Sync state when active note switches
   useEffect(() => {
-    if (note) {
+    if (note && note.id !== prevNoteIdRef.current) {
+      prevNoteIdRef.current = note.id;
       lastSavedRef.current = {
         title: note.title,
         content: note.content
       };
       setSaveStatus('saved');
     }
-  }, [note?.id]);
+  }, [note]);
 
   // Debounced autosave effect
   useEffect(() => {

@@ -20,7 +20,7 @@ export const VideoEmbedModal: React.FC<VideoEmbedModalProps> = ({
   const parseVideoEmbed = (url: string): { embedUrl: string; provider: string } | null => {
     const trimmed = url.trim();
     // YouTube
-    const ytMatch = trimmed.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+    const ytMatch = trimmed.match(/(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i);
     if (ytMatch && ytMatch[1]) {
       return {
         embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,

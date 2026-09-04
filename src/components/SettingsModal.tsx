@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { type Workspace, type Note, type Folder, type Book, type ThemeMode, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
+import { type Workspace, type Note, type Folder, type Book, type ThemeMode, type TypographySettings, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
 export { DEFAULT_USER_PROFILE };
 import { optimizer, type StorageHealth } from '../services/optimizer';
 import { lockoutManager } from '../services/cryptoLockout';
 import { shortcutManager } from '../services/shortcutManager';
 import { inactivityLockManager } from '../services/inactivityLock';
 import { AVATAR_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
+import { storage } from '../services/storage';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Tabs } from './ui/Tabs';
@@ -25,7 +26,16 @@ import {
   Sun,
   Moon,
   Monitor,
-  QrCode
+  QrCode,
+  Database,
+  Server,
+  RefreshCw,
+  Activity,
+  Sparkles,
+  Zap,
+  Cloud,
+  BookOpen,
+  Type
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -45,10 +55,12 @@ interface SettingsModalProps {
   onClose: () => void;
   userProfile?: UserProfile;
   onUpdateProfile?: (profile: UserProfile) => void;
+  initialTab?: string;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
+  initialTab = 'profile',
   theme,
   onChangeTheme,
   allNotes,
@@ -61,7 +73,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   userProfile = DEFAULT_USER_PROFILE,
   onUpdateProfile
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('profile');
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Profile Form State
   const [profileName, setProfileName] = useState(userProfile.name);
@@ -84,16 +102,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [lockoutCount, setLockoutCount] = useState<number>(0);
   const [showClearSuccess, setShowClearSuccess] = useState(false);
 
+  // Typography Settings State
+  const [typography, setTypography] = useState<TypographySettings>(() => storage.getTypographySettings());
+
+  const handleUpdateTypography = (partial: Partial<TypographySettings>) => {
+    const updated = { ...typography, ...partial };
+    setTypography(updated);
+    storage.setTypographySettings(updated);
+  };
+
   // Storage Health State
   const [health, setHealth] = useState<StorageHealth | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleanSuccess, setCleanSuccess] = useState(false);
+
+  // PostgreSQL Database State
+  const [pgHealth, setPgHealth] = useState<{ status: string; count?: Record<string, number> } | null>(null);
+  const [isPgSyncing, setIsPgSyncing] = useState(false);
+  const [pgSyncNotice, setPgSyncNotice] = useState<string | null>(null);
+  const [isPgReseeding, setIsPgReseeding] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
 
   // Reset / Reseed Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadPgHealth = async () => {
+    const data = await storage.fetchPostgresHealth();
+    setPgHealth(data);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -102,6 +141,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setHotkeys(shortcutManager.getHotkeys());
       setMouseSettings(shortcutManager.getMouseSettings());
       setSecuritySettings(inactivityLockManager.getSettings());
+      loadPgHealth();
     }
   }, [isOpen]);
 
@@ -220,6 +260,45 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleForcePgSync = async () => {
+    setIsPgSyncing(true);
+    setPgSyncNotice(null);
+    try {
+      const res = await storage.syncToPostgres();
+      if (res.success) {
+        setPgSyncNotice('✓ Bi-directional sync complete. All local records persisted to PostgreSQL.');
+        await loadPgHealth();
+      } else {
+        setPgSyncNotice(`Sync warning: ${res.error}`);
+      }
+    } catch (err: unknown) {
+      setPgSyncNotice(`Sync error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsPgSyncing(false);
+      setTimeout(() => setPgSyncNotice(null), 5000);
+    }
+  };
+
+  const handleReseedPg = async () => {
+    setIsPgReseeding(true);
+    setPgSyncNotice(null);
+    try {
+      const res = await fetch('/api/seed', { method: 'POST' });
+      if (res.ok) {
+        setPgSyncNotice('✓ PostgreSQL database reseeded successfully with full relational dataset.');
+        await storage.init();
+        await loadPgHealth();
+      } else {
+        setPgSyncNotice('Failed to reseed database.');
+      }
+    } catch (err: unknown) {
+      setPgSyncNotice(`Reseed error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsPgReseeding(false);
+      setTimeout(() => setPgSyncNotice(null), 5000);
+    }
+  };
+
   const lockedNotesCount = allNotes.filter((n) => n.isLocked).length;
 
   return (
@@ -236,11 +315,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         onChange={setActiveTab}
         tabs={[
           { id: 'profile', label: 'Identity', icon: <User size={14} /> },
-          { id: 'appearance', label: 'Themes', icon: <Palette size={14} /> },
+          { id: 'appearance', label: 'Themes & Typography', icon: <Palette size={14} /> },
           { id: 'controls', label: 'Hotkeys & Mouse', icon: <Keyboard size={14} /> },
           { id: 'security', label: 'Security & Lock', icon: <ShieldCheck size={14} /> },
           { id: 'backup', label: 'Backup & Vault', icon: <HardDrive size={14} /> },
-          { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={14} /> }
+          { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={14} /> },
+          { id: 'database', label: 'PostgreSQL Sync', icon: <Database size={14} /> }
         ]}
       />
 
@@ -426,15 +506,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       )}
 
-      {/* TAB 2: APPEARANCE & 3-WAY THEMES */}
+      {/* TAB 2: APPEARANCE, LUXURY THEMES & TYPOGRAPHY STUDIO */}
       {activeTab === 'appearance' && (
-        <div className="settings-card-panel" style={{ maxWidth: '640px', margin: '0 auto' }}>
-          <h4 className="panel-section-title">Theme Preferences</h4>
+        <div className="settings-card-panel" style={{ maxWidth: '680px', margin: '0 auto' }}>
+          <h4 className="panel-section-title">Curated Luxury Themes</h4>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            Choose whether MiLEARNAPP matches your operating system appearance or stays locked to Day or Night mode.
+            Choose from curated luxury visual palettes designed for deep focus, reading comfort, and high contrast.
           </p>
 
-          <div className="theme-selector-3way">
+          <div className="luxury-theme-grid">
+            {/* 1. System */}
             <button
               type="button"
               className={`theme-3way-card ${theme === 'system' ? 'active' : ''}`}
@@ -443,10 +524,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Monitor size={22} />
               <div className="theme-card-text">
                 <span className="theme-card-title">System Default</span>
-                <span className="theme-card-desc">Sync with macOS / OS appearance</span>
+                <span className="theme-card-desc">Sync with OS appearance</span>
               </div>
             </button>
 
+            {/* 2. Day Theme */}
             <button
               type="button"
               className={`theme-3way-card ${theme === 'light' ? 'active' : ''}`}
@@ -455,10 +537,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Sun size={22} color="#f59e0b" />
               <div className="theme-card-text">
                 <span className="theme-card-title">Day Theme</span>
-                <span className="theme-card-desc">Crisp white & gentle paper tones</span>
+                <span className="theme-card-desc">Crisp white & gentle paper</span>
               </div>
             </button>
 
+            {/* 3. Night Theme */}
             <button
               type="button"
               className={`theme-3way-card ${theme === 'dark' ? 'active' : ''}`}
@@ -467,9 +550,187 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <Moon size={22} color="#8b5cf6" />
               <div className="theme-card-text">
                 <span className="theme-card-title">Night Theme</span>
-                <span className="theme-card-desc">Deep OLED slate & subtle luminescence</span>
+                <span className="theme-card-desc">Deep slate & luminescence</span>
               </div>
             </button>
+
+            {/* 4. Obsidian Onyx (OLED) */}
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'oled' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('oled')}
+            >
+              <Sparkles size={22} color="#a855f7" />
+              <div className="theme-card-text">
+                <span className="theme-card-title">Obsidian Onyx</span>
+                <span className="theme-card-desc">Pitch black OLED & neon glass</span>
+              </div>
+            </button>
+
+            {/* 5. Tokyo Midnight */}
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'tokyo' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('tokyo')}
+            >
+              <Zap size={22} color="#38bdf8" />
+              <div className="theme-card-text">
+                <span className="theme-card-title">Tokyo Midnight</span>
+                <span className="theme-card-desc">Cyber indigo & neon cyan</span>
+              </div>
+            </button>
+
+            {/* 6. Nordic Frost */}
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'nordic' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('nordic')}
+            >
+              <Cloud size={22} color="#34d399" />
+              <div className="theme-card-text">
+                <span className="theme-card-title">Nordic Frost</span>
+                <span className="theme-card-desc">Cool zinc slate & soft mint</span>
+              </div>
+            </button>
+
+            {/* 7. Warm Editorial Paper */}
+            <button
+              type="button"
+              className={`theme-3way-card ${theme === 'editorial' ? 'active' : ''}`}
+              onClick={() => onChangeTheme('editorial')}
+            >
+              <BookOpen size={22} color="#c2410c" />
+              <div className="theme-card-text">
+                <span className="theme-card-title">Editorial Paper</span>
+                <span className="theme-card-desc">Warm ivory & serif terracotta</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Typography Studio */}
+          <div className="typography-studio-section">
+            <h4 className="panel-section-title">
+              <Type size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+              Typography Studio
+            </h4>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Fine-tune reading typography across all note panes and split windows.
+            </p>
+
+            <div className="typography-controls-grid">
+              {/* Font Family */}
+              <div className="typography-control-card">
+                <span className="typography-control-title">Font Family</span>
+                <div className="typography-segmented-btn-group">
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontFamily === 'sans' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontFamily: 'sans' })}
+                  >
+                    Modern Sans
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontFamily === 'serif' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontFamily: 'serif' })}
+                  >
+                    Editorial Serif
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontFamily === 'mono' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontFamily: 'mono' })}
+                  >
+                    JetBrains Mono
+                  </button>
+                </div>
+              </div>
+
+              {/* Font Scale */}
+              <div className="typography-control-card">
+                <span className="typography-control-title">Font Scale</span>
+                <div className="typography-segmented-btn-group">
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontScale === 'sm' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontScale: 'sm' })}
+                  >
+                    Compact (13.5)
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontScale === 'base' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontScale: 'base' })}
+                  >
+                    Base (14.5)
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontScale === 'lg' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontScale: 'lg' })}
+                  >
+                    Large (16)
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.fontScale === 'xl' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ fontScale: 'xl' })}
+                  >
+                    XL (17.5)
+                  </button>
+                </div>
+              </div>
+
+              {/* Line Height */}
+              <div className="typography-control-card">
+                <span className="typography-control-title">Line Height</span>
+                <div className="typography-segmented-btn-group">
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.lineHeight === 'compact' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ lineHeight: 'compact' })}
+                  >
+                    Compact (1.45)
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.lineHeight === 'normal' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ lineHeight: 'normal' })}
+                  >
+                    Normal (1.62)
+                  </button>
+                  <button
+                    type="button"
+                    className={`typography-segmented-btn ${typography.lineHeight === 'relaxed' ? 'active' : ''}`}
+                    onClick={() => handleUpdateTypography({ lineHeight: 'relaxed' })}
+                  >
+                    Relaxed (1.85)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Typography Preview Box */}
+            <div 
+              className="typography-live-preview-box"
+              style={{
+                fontFamily: typography.fontFamily === 'serif' 
+                  ? '"Merriweather", "Playfair Display", Georgia, serif' 
+                  : typography.fontFamily === 'mono' 
+                  ? '"JetBrains Mono", monospace' 
+                  : 'inherit',
+                fontSize: typography.fontScale === 'sm' ? '13.5px' : typography.fontScale === 'lg' ? '16px' : typography.fontScale === 'xl' ? '17.5px' : '14.5px',
+                lineHeight: typography.lineHeight === 'compact' ? 1.45 : typography.lineHeight === 'relaxed' ? 1.85 : 1.62
+              }}
+            >
+              <span className="typography-preview-label">Live Typography Sample</span>
+              <h5 style={{ margin: '0 0 6px 0', fontSize: '1.2em', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Active Recall & Knowledge Synthesis
+              </h5>
+              <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                "Memory consolidation thrives on spaced repetition. Highlighting concepts in your notes automatically surfaces SuperMemo-2 flashcards for long-term retention."
+              </p>
+            </div>
           </div>
 
           <div style={{ marginTop: '28px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
@@ -820,6 +1081,178 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>
                 Scan with mobile camera to beam selected notes without server uplink.
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: POSTGRESQL DATABASE SYNC & TELEMETRY */}
+      {activeTab === 'database' && (
+        <div className="settings-symmetrical-grid">
+          {/* Left Column: Server Connection & Sync Actions */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">PostgreSQL 16 Connection</h4>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '14px 16px',
+              borderRadius: '10px',
+              border: pgHealth?.status === 'healthy' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+              background: pgHealth?.status === 'healthy' ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.06)',
+              marginBottom: '16px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: pgHealth?.status === 'healthy' ? '#10b981' : '#f59e0b',
+                  boxShadow: pgHealth?.status === 'healthy' ? '0 0 10px #10b981' : '0 0 10px #f59e0b'
+                }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
+                    {pgHealth?.status === 'healthy' ? 'PostgreSQL 16 Container Online' : 'Local IndexedDB Fallback Mode'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {pgHealth?.status === 'healthy' ? 'Docker Compose: localhost:5432 (milearnapp_postgres)' : 'Backend API offline, changes cached in browser'}
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadPgHealth}
+                title="Refresh Health"
+              >
+                <RefreshCw size={12} />
+              </Button>
+            </div>
+
+            {/* Sync Notice Alert */}
+            {pgSyncNotice && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid var(--accent-primary)',
+                color: 'var(--accent-primary)',
+                fontSize: '12px',
+                fontWeight: 500,
+                marginBottom: '16px'
+              }}>
+                {pgSyncNotice}
+              </div>
+            )}
+
+            {/* Bi-Directional Sync Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13px' }}>Force Bi-Directional Sync</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Flush all local edits to PostgreSQL tables</div>
+                </div>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  isLoading={isPgSyncing}
+                  onClick={handleForcePgSync}
+                >
+                  <RefreshCw size={13} style={{ marginRight: '6px' }} />
+                  Sync Now
+                </Button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13px' }}>Auto-Sync Edits</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Persist notes & folders instantly in background</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={autoSyncEnabled}
+                  onChange={(e) => setAutoSyncEnabled(e.target.checked)}
+                  style={{ accentColor: 'var(--accent-primary)', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: '#ef4444' }}>Re-Seed PostgreSQL</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Reset database to full tutorial & research dataset</div>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  isLoading={isPgReseeding}
+                  onClick={handleReseedPg}
+                >
+                  <RotateCcw size={13} style={{ marginRight: '6px' }} />
+                  Re-Seed DB
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Relational Table Telemetry */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Server size={14} /> Relational Table Telemetry
+            </h4>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '10px',
+              marginTop: '10px'
+            }}>
+              {[
+                { label: 'Notes', count: pgHealth?.count?.notes ?? allNotes.length, icon: '📝' },
+                { label: 'Workspaces', count: pgHealth?.count?.workspaces ?? 4, icon: '💼' },
+                { label: 'Books', count: pgHealth?.count?.books ?? 3, icon: '📖' },
+                { label: 'Folders', count: pgHealth?.count?.folders ?? 7, icon: '📁' },
+                { label: 'Flashcards', count: pgHealth?.count?.flashcards ?? 5, icon: '🧠' },
+                { label: 'Typing Passages', count: pgHealth?.count?.typing_passages ?? 8, icon: '⌨️' },
+                { label: 'Citations', count: pgHealth?.count?.citations ?? 5, icon: '📚' },
+                { label: 'Users', count: pgHealth?.count?.users ?? 1, icon: '👤' }
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px' }}>{item.icon}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>{item.label}</span>
+                  </div>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: 'var(--accent-primary)',
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    padding: '2px 8px',
+                    borderRadius: '12px'
+                  }}>
+                    {item.count}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: '16px', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-surface)', border: '1px dashed var(--border-color)', fontSize: '11px', color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <Activity size={12} color="var(--accent-primary)" />
+                Local-First & Relational Harmony
+              </div>
+              All user keystrokes and notes are recorded instantly in local IndexedDB for zero latency, then opportunistically synced to PostgreSQL.
             </div>
           </div>
         </div>

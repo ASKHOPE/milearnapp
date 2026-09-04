@@ -1112,36 +1112,84 @@ input:checked + .slider-round:before {
 /* Circular SVG Dial */
 .pomo-dial-container {
   position: relative;
-  width: 240px;
-  height: 240px;
+  width: 260px;
+  height: 260px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 12px auto 20px;
+}
+
+.pomo-dial-glow {
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pomo-dial-glow.active {
+  opacity: 0.28;
+  animation: pomo-glow-pulse 3s infinite alternate ease-in-out;
+}
+
+.pomo-dial-glow.mode-work {
+  background: radial-gradient(circle, #ef4444 0%, rgba(239, 68, 68, 0) 70%);
+}
+
+.pomo-dial-glow.mode-shortBreak {
+  background: radial-gradient(circle, #10b981 0%, rgba(16, 185, 129, 0) 70%);
+}
+
+.pomo-dial-glow.mode-longBreak {
+  background: radial-gradient(circle, #6366f1 0%, rgba(99, 102, 241, 0) 70%);
+}
+
+@keyframes pomo-glow-pulse {
+  0% { transform: scale(0.92); opacity: 0.2; }
+  100% { transform: scale(1.08); opacity: 0.4; }
 }
 
 .pomo-dial-svg {
   position: absolute;
   top: 0;
   left: 0;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
 }
 
 .pomo-track-bg {
   fill: none;
-  stroke: var(--bg-subtle);
+  stroke: var(--bg-subtle, rgba(255, 255, 255, 0.08));
 }
 
 .pomo-track-progress {
   fill: none;
-  stroke: var(--accent-primary);
+  stroke: #ef4444;
   transition: stroke-dashoffset 0.8s ease;
 }
 
+.pomo-track-progress.ticking {
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+}
+
 .pomo-track-progress.mode-shortBreak {
-  stroke: var(--color-success);
+  stroke: var(--color-success, #10b981);
+}
+
+.pomo-track-progress.mode-shortBreak.ticking {
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
 }
 
 .pomo-track-progress.mode-longBreak {
-  stroke: var(--color-info);
+  stroke: var(--accent-primary, #6366f1);
+}
+
+.pomo-track-progress.mode-longBreak.ticking {
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
 }
 
 .pomo-dial-center {
@@ -1153,11 +1201,16 @@ input:checked + .slider-round:before {
 }
 
 .pomo-time-display {
-  font-size: 42px;
-  font-weight: 700;
+  font-size: 44px;
+  font-weight: 800;
   font-family: var(--font-mono);
   color: var(--text-primary);
   letter-spacing: -1px;
+  transition: all 0.2s ease;
+}
+
+.pomo-time-display.active-pulse {
+  text-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
 }
 
 .pomo-mode-tag {
@@ -1604,6 +1657,97 @@ input:checked + .slider-round:before {
 .theme-card-desc {
   font-size: 11px;
   color: var(--text-muted);
+  display: block;
+}
+
+/* Luxury Themes Grid & Typography Studio */
+.luxury-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.typography-studio-section {
+  margin-top: 24px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+}
+
+.typography-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.typography-control-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.typography-control-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.typography-segmented-btn-group {
+  display: flex;
+  background: var(--bg-subtle);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.typography-segmented-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.typography-segmented-btn:hover {
+  color: var(--text-primary);
+}
+
+.typography-segmented-btn.active {
+  background: var(--bg-card);
+  color: var(--accent-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.typography-live-preview-box {
+  background: var(--bg-editor);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin-top: 14px;
+  transition: all 0.2s ease;
+}
+
+.typography-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
   display: block;
 }
 

@@ -3678,3 +3678,67 @@ kbd {
   font-size: 10px;
 }
 
+/* ==========================================================================
+   COLLAPSIBLE DETAILS & SPOILER ACCORDIONS
+   ========================================================================== */
+.markdown-body details,
+.note-collapsible-block {
+  margin: 12px 0;
+  padding: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.markdown-body details[open],
+.note-collapsible-block[open] {
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+}
+
+.markdown-body summary,
+.note-collapsible-summary {
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  transition: background 0.15s ease, color 0.15s ease;
+  list-style: none;
+}
+
+.markdown-body summary::-webkit-details-marker {
+  display: none;
+}
+
+.markdown-body summary::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 13px;
+  transition: transform 0.2s ease;
+  color: var(--accent-primary);
+}
+
+.markdown-body details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.markdown-body summary:hover {
+  background: var(--bg-surface);
+  color: var(--accent-primary);
+}
+
+.markdown-body details > :not(summary) {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+

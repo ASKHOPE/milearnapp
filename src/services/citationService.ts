@@ -83,7 +83,64 @@ export const SEED_CITATIONS: CitationItem[] = [
   }
 ];
 
+export interface LandmarkPaper {
+  title: string;
+  authors: string;
+  year: number;
+  container: string;
+  bibtex: string;
+}
+
 class CitationService {
+  public async fetchCitationsFromDatabase(): Promise<CitationItem[]> {
+    try {
+      const res = await fetch('/api/citations');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: CitationItem[] = data.map((c: any) => ({
+            id: c.id,
+            type: 'article-journal',
+            title: c.title,
+            author: (c.authors || []).map((name: string) => ({ literal: name })),
+            year: c.year,
+            'container-title': c.container,
+            dateAdded: new Date().toISOString()
+          }));
+          this.saveAllCitations(mapped);
+          return mapped;
+        }
+      }
+    } catch {}
+    return this.getCitations();
+  }
+
+  public async getLandmarkPapers(): Promise<LandmarkPaper[]> {
+    try {
+      const res = await fetch('/api/citations');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const landmarks: LandmarkPaper[] = data.filter((c: any) => c.isLandmark).map((c: any) => ({
+            title: c.title,
+            authors: (c.authors || []).join(', '),
+            year: c.year,
+            container: c.container,
+            bibtex: c.bibtex
+          }));
+          localStorage.setItem('milearnapp_landmark_papers', JSON.stringify(landmarks));
+          return landmarks;
+        }
+      }
+    } catch {}
+
+    try {
+      const cached = localStorage.getItem('milearnapp_landmark_papers');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  }
+
   public getCitations(): CitationItem[] {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);

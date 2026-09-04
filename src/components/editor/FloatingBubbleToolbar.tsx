@@ -12,7 +12,11 @@ import {
   AlignLeft, 
   AlignCenter, 
   AlignRight,
-  Palette
+  Palette,
+  Sparkles,
+  Bookmark,
+  Quote,
+  SplitSquareVertical
 } from 'lucide-react';
 
 export interface FloatingBubblePosition {
@@ -25,6 +29,7 @@ interface FloatingBubbleToolbarProps {
   position: FloatingBubblePosition;
   onApplyFormat: (formatType: string, value?: string) => void;
   onClose: () => void;
+  onCreateFlashcard?: () => void;
 }
 
 const HIGHLIGHT_COLORS = [
@@ -49,7 +54,8 @@ const TEXT_COLORS = [
 export const FloatingBubbleToolbar: React.FC<FloatingBubbleToolbarProps> = ({
   position,
   onApplyFormat,
-  onClose: _onClose
+  onClose: _onClose,
+  onCreateFlashcard
 }) => {
   const [activeMenu, setActiveMenu] = useState<'main' | 'highlight' | 'color' | 'align'>('main');
 
@@ -61,7 +67,7 @@ export const FloatingBubbleToolbar: React.FC<FloatingBubbleToolbarProps> = ({
       style={{
         position: 'fixed',
         top: `${Math.max(60, position.top - 48)}px`,
-        left: `${Math.min(window.innerWidth - 380, Math.max(20, position.left))}px`,
+        left: `${Math.min(window.innerWidth - 500, Math.max(20, position.left))}px`,
         zIndex: 9999
       }}
       onMouseDown={(e) => {
@@ -160,6 +166,54 @@ export const FloatingBubbleToolbar: React.FC<FloatingBubbleToolbarProps> = ({
             title="Subscript (<sub>x</sub>)"
           >
             <Subscript size={13} />
+          </button>
+
+          <div className="bubble-divider" />
+
+          {/* Instant Flashcard Creator */}
+          <button
+            type="button"
+            className="bubble-btn"
+            onClick={() => {
+              if (onCreateFlashcard) {
+                onCreateFlashcard();
+              } else {
+                onApplyFormat('flashcard');
+              }
+            }}
+            title="Turn Selection into Flashcard (SM-2 Study Deck)"
+          >
+            <Sparkles size={13} color="#ec4899" />
+          </button>
+
+          {/* Instant Wikilink */}
+          <button
+            type="button"
+            className="bubble-btn"
+            onClick={() => onApplyFormat('wikilink')}
+            title="Convert to Wikilink [[Selection]]"
+          >
+            <Bookmark size={13} color="#0ea5e9" />
+          </button>
+
+          {/* Instant Cloze Deletion */}
+          <button
+            type="button"
+            className="bubble-btn"
+            onClick={() => onApplyFormat('cloze')}
+            title="Cloze Deletion Recall (==text==)"
+          >
+            <SplitSquareVertical size={13} color="#10b981" />
+          </button>
+
+          {/* Blockquote / Callout */}
+          <button
+            type="button"
+            className="bubble-btn"
+            onClick={() => onApplyFormat('quote')}
+            title="Callout / Quote (> text)"
+          >
+            <Quote size={13} />
           </button>
 
           <div className="bubble-divider" />

@@ -20,7 +20,8 @@ import {
 import { 
   citationService, 
   type CitationItem, 
-  type Author 
+  type Author,
+  type LandmarkPaper
 } from '../services/citationService';
 
 interface CitationStudioModalProps {
@@ -29,84 +30,6 @@ interface CitationStudioModalProps {
   onInsertIntoNote: (content: string) => void;
 }
 
-const LANDMARK_PAPERS = [
-  {
-    title: 'Attention Is All You Need',
-    authors: 'Ashish Vaswani, Noam Shazeer, et al.',
-    year: 2017,
-    container: 'NeurIPS',
-    bibtex: `@article{vaswani2017attention,
-  title={Attention is all you need},
-  author={Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N and Kaiser, Lukasz and Polosukhin, Illia},
-  journal={Advances in Neural Information Processing Systems},
-  volume={30},
-  pages={5998--6008},
-  year={2017},
-  url={https://arxiv.org/abs/1706.03762}
-}`
-  },
-  {
-    title: 'A Mathematical Theory of Communication',
-    authors: 'Claude E. Shannon',
-    year: 1948,
-    container: 'Bell System Technical Journal',
-    bibtex: `@article{shannon1948mathematical,
-  title={A mathematical theory of communication},
-  author={Shannon, Claude Elwood},
-  journal={Bell System Technical Journal},
-  volume={27},
-  number={3},
-  pages={379--423},
-  year={1948},
-  publisher={Alcatel-Lucent}
-}`
-  },
-  {
-    title: 'On Computable Numbers, with an Application to the Entscheidungsproblem',
-    authors: 'Alan M. Turing',
-    year: 1936,
-    container: 'Proc. London Math. Soc.',
-    bibtex: `@article{turing1936computable,
-  title={On computable numbers, with an application to the {Entscheidungsproblem}},
-  author={Turing, Alan Mathison},
-  journal={Proceedings of the London Mathematical Society},
-  volume={42},
-  number={1},
-  pages={230--265},
-  year={1936}
-}`
-  },
-  {
-    title: 'Molecular Structure of Nucleic Acids (DNA Double Helix)',
-    authors: 'J. D. Watson & F. H. C. Crick',
-    year: 1953,
-    container: 'Nature',
-    bibtex: `@article{watson1953molecular,
-  title={Molecular structure of nucleic acids: a structure for deoxyribose nucleic acid},
-  author={Watson, James D and Crick, Francis HC},
-  journal={Nature},
-  volume={171},
-  number={4356},
-  pages={737--738},
-  year={1953}
-}`
-  },
-  {
-    title: 'Generative Adversarial Nets',
-    authors: 'Ian Goodfellow, Jean Pouget-Abadie, et al.',
-    year: 2014,
-    container: 'NeurIPS',
-    bibtex: `@article{goodfellow2014generative,
-  title={Generative adversarial nets},
-  author={Goodfellow, Ian and Pouget-Abadie, Jean and Mirza, Mehdi and Xu, Bing and Warde-Farley, David and Ozair, Sherjil and Courville, Aaron and Bengio, Yoshua},
-  journal={Advances in Neural Information Processing Systems},
-  volume={27},
-  pages={2672--2680},
-  year={2014}
-}`
-  }
-];
-
 export const CitationStudioModal: React.FC<CitationStudioModalProps> = ({
   isOpen,
   onClose,
@@ -114,6 +37,7 @@ export const CitationStudioModal: React.FC<CitationStudioModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'library' | 'add' | 'bibliography'>('library');
   const [citations, setCitations] = useState<CitationItem[]>([]);
+  const [landmarkPapers, setLandmarkPapers] = useState<LandmarkPaper[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [styleMode, setStyleMode] = useState<'apa' | 'vancouver'>('apa');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -141,9 +65,11 @@ export const CitationStudioModal: React.FC<CitationStudioModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const list = citationService.getCitations();
-      setCitations(list);
-      setSelectedItemIds(new Set(list.map((c) => c.id)));
+      citationService.getLandmarkPapers().then(setLandmarkPapers);
+      citationService.fetchCitationsFromDatabase().then((list) => {
+        setCitations(list);
+        setSelectedItemIds(new Set(list.map((c) => c.id)));
+      });
       setStatusNotice(null);
       setImportError(null);
     }
@@ -219,7 +145,7 @@ export const CitationStudioModal: React.FC<CitationStudioModalProps> = ({
   };
 
   // Handle Landmark Paper Preset Import
-  const handleImportLandmark = (preset: typeof LANDMARK_PAPERS[0]) => {
+  const handleImportLandmark = (preset: LandmarkPaper) => {
     try {
       const parsed = citationService.parseInput(preset.bibtex);
       parsed.forEach((item) => citationService.saveCitation(item));
@@ -903,7 +829,7 @@ export const CitationStudioModal: React.FC<CitationStudioModalProps> = ({
                   Or Instant Landmark Papers
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {LANDMARK_PAPERS.map((landmark) => (
+                  {landmarkPapers.map((landmark) => (
                     <div
                       key={landmark.title}
                       style={{

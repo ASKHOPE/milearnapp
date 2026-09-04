@@ -1,0 +1,214 @@
+// ==============================================================================
+// Prisma Schema for MiLEARNAPP (PostgreSQL + Vercel Database Integration)
+// ==============================================================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum CardType {
+  QA
+  CONCEPT
+  CLOZE
+  CORNELL
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String?         @unique
+  name          String?
+  bio           String?
+  role          String          @default("Systems Architect")
+  avatarType    String          @default("emoji")
+  avatarValue   String          @default("⚡")
+  mood          String?         @default("Deep Focus")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  workspaces    Workspace[]
+  notes         Note[]
+  folders       Folder[]
+  books         Book[]
+  flashcards    Flashcard[]
+  typingLogs    TypingLog[]
+  studySessions StudySession[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  icon        String    @default("💼")
+  color       String    @default("#6366f1")
+  description String?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folders     Folder[]
+  books       Book[]
+  notes       Note[]
+
+  @@map("workspaces")
+}
+
+model Folder {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String?
+  name        String
+  parentId    String?
+  color       String?
+  icon        String?
+  createdAt   DateTime  @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent      Folder?    @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[]   @relation("FolderHierarchy")
+  notes       Note[]
+
+  @@map("folders")
+}
+
+model Book {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String?
+  title       String
+  icon        String    @default("📖")
+  color       String    @default("#10b981")
+  description String?
+  createdAt   DateTime  @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notes       Note[]
+
+  @@map("books")
+}
+
+model Note {
+  id            String        @id @default(cuid())
+  userId        String
+  workspaceId   String?
+  folderId      String?
+  bookId        String?
+  parentPageId  String?
+  pageOrder     Int           @default(0)
+  title         String
+  content       String        @db.Text
+  tags          String[]      @default([])
+  isFavorite    Boolean       @default(false)
+  isPinned      Boolean       @default(false)
+  isArchived    Boolean       @default(false)
+  isTrashed     Boolean       @default(false)
+  trashedAt     DateTime?
+  isLocked      Boolean       @default(false)
+  encryptedData Json?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace     Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folder        Folder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  book          Book?         @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  attachments   Attachment[]
+  flashcards    Flashcard[]
+
+  @@index([userId, workspaceId])
+  @@index([folderId])
+  @@index([bookId])
+  @@map("notes")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  noteId    String
+  name      String
+  type      String   // 'image' | 'pdf' | 'document' | 'audio'
+  size      Int
+  mimeType  String
+  dataUrl   String   @db.Text
+  createdAt DateTime @default(now())
+
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model Flashcard {
+  id             String    @id @default(cuid())
+  userId         String
+  noteId         String?
+  noteTitle      String
+  question       String    @db.Text
+  answer         String    @db.Text
+  type           CardType  @default(QA)
+  repetition     Int       @default(0)
+  interval       Int       @default(1)
+  easeFactor     Float     @default(2.5)
+  nextReviewDate String    // YYYY-MM-DD
+  lastReviewed   String?
+  gradeHistory   Json?     // [{ date, grade }]
+  isManual       Boolean   @default(false)
+  tags           String[]  @default([])
+  deckCategory   String?
+  createdAt      DateTime  @default(now())
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note           Note?     @relation(fields: [noteId], references: [id], onDelete: SetNull)
+
+  @@index([userId, nextReviewDate])
+  @@map("flashcards")
+}
+
+model TypingLog {
+  id              String   @id @default(cuid())
+  userId          String
+  wpm             Int
+  rawWpm          Int
+  cpm             Int
+  accuracy        Float
+  totalKeystrokes Int
+  errorKeystrokes Int
+  backspaceCount  Int
+  averageHoldTime Int
+  averageFlightTime Int
+  consistencyScore Int
+  durationSeconds Int
+  difficulty      String   @default("intermediate")
+  passageTitle    String?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("typing_logs")
+}
+
+model StudySession {
+  id            String   @id @default(cuid())
+  userId        String
+  mode          String   // 'srs' | 'quiz'
+  cardsReviewed Int
+  retentionRate Float
+  score         Int      @default(0)
+  streak        Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("study_sessions")
+}

@@ -193,27 +193,50 @@ export const NoteList: React.FC<NoteListProps> = ({
       .trim();
   };
 
-  // Collapsed Panel Strip
-  if (isCollapsed) {
-    return (
-      <section className="notes-list-pane collapsed">
-        <button
-          className="btn-expand-notes-pane"
-          onClick={onToggleCollapse}
-          title="Expand notes list"
-        >
-          <ChevronRight size={15} />
-          <span className="collapsed-notes-count">{filteredNotes.length}</span>
-        </button>
-      </section>
-    );
-  }
-
   return (
-    <section className="notes-list-pane">
-      {/* Right Edge Center Floating Hover Collapse Handle */}
-      {onToggleCollapse && (
-        <div className="notes-pane-collapse-trigger-edge" title="Collapse Notes List" onClick={onToggleCollapse}>
+    <section className={`notes-list-pane ${isCollapsed ? 'collapsed' : ''}`}>
+      {isCollapsed ? (
+        <div 
+          className="notes-list-collapsed-strip" 
+          onClick={onToggleCollapse} 
+          title="Click anywhere to expand Notes List"
+        >
+          <button
+            type="button"
+            className="btn-expand-notes-pane"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse?.();
+            }}
+            title="Expand Notes List"
+          >
+            <ChevronRight size={15} />
+          </button>
+
+          {onCreateNote && currentFilter !== 'trash' && currentFilter !== 'archive' && (
+            <button
+              type="button"
+              className="collapsed-quick-add-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateNote();
+              }}
+              title="Create New Note (Cmd+N)"
+            >
+              <Plus size={14} />
+            </button>
+          )}
+
+          <div className="collapsed-notes-badge">
+            <span>{columnTitle}</span>
+            <span className="collapsed-count-pill">{filteredNotes.length}</span>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Right Edge Center Floating Hover Collapse Handle */}
+          {onToggleCollapse && (
+            <div className="notes-pane-collapse-trigger-edge" title="Collapse Notes List" onClick={onToggleCollapse}>
           <div className="notes-pane-collapse-edge-handle">
             <ChevronLeft size={14} />
           </div>
@@ -459,6 +482,8 @@ export const NoteList: React.FC<NoteListProps> = ({
           })
         )}
       </div>
+        </>
+      )}
     </section>
   );
 };

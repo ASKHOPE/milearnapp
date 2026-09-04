@@ -157,4 +157,60 @@ The speed of light in vacuum is ==299,792,458 m/s== exactly.
     expect(dueToday.length).toBe(2);
     expect(dueToday.map((c) => c.id)).toEqual(['1', '2']);
   });
+
+  it('evaluates note retention status accurately (unreviewed, due, struggling, mastered)', () => {
+    // 1. Unreviewed (0 cards)
+    const unreviewed = flashcardService.getNoteRetention('empty-note', []);
+    expect(unreviewed.status).toBe('unreviewed');
+    expect(unreviewed.cardCount).toBe(0);
+
+    // 2. Due cards
+    const dueCard: Flashcard = {
+      id: 'due-1',
+      noteId: 'due-note',
+      noteTitle: 'Due Topic',
+      question: 'Q',
+      answer: 'A',
+      type: 'qa',
+      repetition: 1,
+      interval: 1,
+      easeFactor: 2.5,
+      nextReviewDate: '2020-01-01' // Past date -> Due
+    };
+    const dueRetention = flashcardService.getNoteRetention('due-note', [dueCard]);
+    expect(dueRetention.status).toBe('due');
+    expect(dueRetention.dueCount).toBe(1);
+
+    // 3. Struggling (low ease factor)
+    const strugglingCard: Flashcard = {
+      id: 'strug-1',
+      noteId: 'strug-note',
+      noteTitle: 'Hard Topic',
+      question: 'Q',
+      answer: 'A',
+      type: 'qa',
+      repetition: 1,
+      interval: 5,
+      easeFactor: 1.6, // < 2.0
+      nextReviewDate: '2099-01-01' // Not due yet
+    };
+    const strugglingRetention = flashcardService.getNoteRetention('strug-note', [strugglingCard]);
+    expect(strugglingRetention.status).toBe('struggling');
+
+    // 4. Mastered (high interval / repetition)
+    const masteredCard: Flashcard = {
+      id: 'mast-1',
+      noteId: 'mast-note',
+      noteTitle: 'Mastered Topic',
+      question: 'Q',
+      answer: 'A',
+      type: 'qa',
+      repetition: 3,
+      interval: 21, // >= 14
+      easeFactor: 2.6,
+      nextReviewDate: '2099-01-01'
+    };
+    const masteredRetention = flashcardService.getNoteRetention('mast-note', [masteredCard]);
+    expect(masteredRetention.status).toBe('mastered');
+  });
 });

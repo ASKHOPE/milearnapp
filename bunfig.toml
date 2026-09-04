@@ -1,0 +1,5 @@
+[test]
+# Only execute unit and integration test files, ignore Playwright browser tests
+root = "tests"
+preload = []
+coverage = false

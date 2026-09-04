@@ -58,6 +58,7 @@ import { MermaidEditorModal } from './editor/MermaidEditorModal';
 import { scanTextToDiagram } from '../services/textToDiagram';
 import { FloatingBubbleToolbar, type FloatingBubblePosition } from './editor/FloatingBubbleToolbar';
 import { BlockActionsMenu } from './editor/BlockActionsMenu';
+import { flashcardService } from '../services/flashcards';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -288,6 +289,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     left: 0,
     visible: false
   });
+  const [flashcardToast, setFlashcardToast] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -628,6 +630,33 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         prefix = '<kbd>';
         suffix = '</kbd>';
         break;
+      case 'wikilink':
+        prefix = '[[';
+        suffix = ']]';
+        break;
+      case 'cloze':
+        prefix = '==';
+        suffix = '==';
+        break;
+      case 'quote':
+        prefix = '> ';
+        suffix = '';
+        break;
+      case 'flashcard': {
+        const cardTitle = selectedText.trim() || 'Key Concept';
+        flashcardService.addManualCard({
+          noteId: note.id,
+          noteTitle: note.title || 'Untitled Note',
+          question: cardTitle,
+          answer: `Key concept highlighted from note: "${note.title || 'Untitled'}"`,
+          type: 'concept',
+          tags: note.tags || []
+        });
+        setFlashcardToast(`Flashcard created: "${cardTitle.slice(0, 24)}${cardTitle.length > 24 ? '...' : ''}" added to SM-2 Deck`);
+        setTimeout(() => setFlashcardToast(null), 3200);
+        setBubblePosition((prev) => ({ ...prev, visible: false }));
+        return;
+      }
       case 'link':
         setLinkInitialText(selectedText);
         setIsLinkModalOpen(true);
@@ -2568,7 +2597,37 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         position={bubblePosition}
         onApplyFormat={handleApplyBubbleFormat}
         onClose={() => setBubblePosition((prev) => ({ ...prev, visible: false }))}
+        onCreateFlashcard={() => handleApplyBubbleFormat('flashcard')}
       />
+
+      {/* Instant Flashcard Creation Toast */}
+      {flashcardToast && (
+        <div
+          className="flashcard-created-toast"
+          style={{
+            position: 'fixed',
+            bottom: '28px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--bg-surface-elevated, #1e293b)',
+            color: 'var(--text-primary, #fff)',
+            padding: '8px 18px',
+            borderRadius: '24px',
+            boxShadow: 'var(--shadow-modal, 0 10px 30px rgba(0,0,0,0.35))',
+            border: '1px solid var(--border-active, #8b5cf6)',
+            fontSize: '13px',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 99999,
+            pointerEvents: 'none'
+          }}
+        >
+          <span style={{ fontSize: '15px' }}>🎴</span>
+          <span>{flashcardToast}</span>
+        </div>
+      )}
 
       {/* Floating Autosave & Word / Character Metrics Badge (Bottom-Right Corner) */}
       <EditorFooterStatus

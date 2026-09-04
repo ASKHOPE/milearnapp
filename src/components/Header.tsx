@@ -13,13 +13,16 @@ import {
   Monitor,
   Zap,
   Sparkles,
+  Cloud,
+  BookOpen,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Pin,
   PinOff,
   Keyboard,
-  BookA
+  BookA,
+  Globe
 } from 'lucide-react';
 import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
 import { typingMetrics, type TypingSessionStats } from '../services/typingMetrics';
@@ -37,11 +40,12 @@ interface HeaderProps {
   onOpenInternalMind?: () => void;
   onOpenLinkTree: () => void;
   onOpenProfile: () => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
   onOpenStudyMode: () => void;
   onOpenPomodoro: () => void;
   onOpenTypingMetrics?: () => void;
   onOpenDictionary?: () => void;
+  onOpenWebClipper?: () => void;
   onToggleMobileSidebar: () => void;
   onQuickNote?: () => void;
 }
@@ -66,6 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPomodoro,
   onOpenTypingMetrics,
   onOpenDictionary,
+  onOpenWebClipper,
   onToggleMobileSidebar,
   onQuickNote
 }) => {
@@ -258,11 +263,13 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* WIDGET 2: Live On-Device Typing Metrics Visual Meter (NOT A POPUP) */}
+            {/* WIDGET 2: Live On-Device Typing Practice Meter & Game Launcher */}
             {pinnedTools.includes('typing') && (
-              <div
+              <button
+                type="button"
                 className="header-pinned-tool-btn header-pinned-widget typing-meter-widget"
-                title={`Live Typing Rhythm: ${typingStats.wpm} WPM · ${typingStats.accuracy}% Accuracy · ${typingStats.cpm} CPM (Updates live on keystroke)`}
+                onClick={onOpenTypingMetrics}
+                title={`Practice Typing Game: ${typingStats.wpm} WPM · ${typingStats.accuracy}% Accuracy (Click to Play Sprint)`}
               >
                 <Keyboard size={13} color="#6366f1" />
                 <span className="pinned-widget-text">
@@ -270,7 +277,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="pinned-widget-dot">·</span>
                   <span className="pinned-widget-acc">{typingStats.accuracy}%</span>
                 </span>
-              </div>
+              </button>
             )}
 
             {/* ICON 1: Study Cards (SRS Flashcards) */}
@@ -330,6 +337,18 @@ export const Header: React.FC<HeaderProps> = ({
                 title="English Dictionary & Word Lookup"
               >
                 <BookA size={14} color="#0ea5e9" />
+              </button>
+            )}
+
+            {/* ICON 6: Web Clipper */}
+            {pinnedTools.includes('webclipper') && onOpenWebClipper && (
+              <button
+                type="button"
+                className="header-pinned-tool-btn"
+                onClick={onOpenWebClipper}
+                title="Web Clipper & Content Structurer"
+              >
+                <Globe size={14} color="var(--accent-primary, #6366f1)" />
               </button>
             )}
           </div>
@@ -549,37 +568,103 @@ export const Header: React.FC<HeaderProps> = ({
                     </button>
                   </div>
                 )}
+
+                {/* 8. Web Clipper & Content Structurer */}
+                {onOpenWebClipper && (
+                  <div className="tray-item-row-wrap">
+                    <button
+                      type="button"
+                      className="tray-item-btn"
+                      onClick={() => { onOpenWebClipper(); setIsToolsTrayOpen(false); }}
+                      title="Open Web Clipper & Content Structurer"
+                    >
+                      <Globe size={15} color="var(--accent-primary, #6366f1)" />
+                      <div className="tray-item-text">
+                        <strong>Web Clipper</strong>
+                        <span>Structure web content into markdown notes</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-tool-pin ${pinnedTools.includes('webclipper') ? 'pinned' : ''}`}
+                      onClick={(e) => togglePin('webclipper', e)}
+                      title={pinnedTools.includes('webclipper') ? 'Unpin from top nav' : 'Pin icon to top nav'}
+                    >
+                      {pinnedTools.includes('webclipper') ? <PinOff size={13} /> : <Pin size={13} />}
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
 
-        {/* 3-Way Theme Toggle: System -> Day -> Night */}
+        {/* PostgreSQL Live Sync Status Pill */}
+        <button
+          type="button"
+          className="header-pg-status-pill"
+          onClick={() => onOpenSettings?.('database')}
+          title="PostgreSQL Database Sync: Click to open Database Settings"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 10px',
+            borderRadius: '20px',
+            background: 'var(--bg-card, rgba(255, 255, 255, 0.05))',
+            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
+            fontSize: '11px',
+            fontWeight: 600,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <span style={{
+            width: '7px',
+            height: '7px',
+            borderRadius: '50%',
+            background: '#10b981',
+            boxShadow: '0 0 6px #10b981'
+          }} />
+          <span>Postgres Synced</span>
+        </button>
+
+        {/* Multi-Theme Toggle: System -> Day -> Night -> OLED -> Tokyo -> Nordic -> Editorial */}
         <button
           className="theme-toggle-btn"
           onClick={onToggleTheme}
-          title={
-            theme === 'system'
-              ? 'Theme: System Default (Click for Day Theme)'
-              : theme === 'light'
-                ? 'Theme: Day Theme (Click for Night Theme)'
-                : 'Theme: Night Theme (Click for System Default)'
-          }
+          title={`Theme: ${
+            theme === 'system' ? 'System Default' :
+            theme === 'light' ? 'Day Theme' :
+            theme === 'dark' ? 'Night Theme' :
+            theme === 'oled' ? 'Obsidian Onyx (OLED)' :
+            theme === 'tokyo' ? 'Tokyo Midnight' :
+            theme === 'nordic' ? 'Nordic Frost' : 'Editorial Paper'
+          } (Click to Cycle Luxury Themes)`}
           aria-label="Toggle Theme"
         >
           {theme === 'system' ? (
             <Monitor size={15} />
           ) : theme === 'light' ? (
             <Sun size={15} color="#f59e0b" />
-          ) : (
+          ) : theme === 'dark' ? (
             <Moon size={15} color="#8b5cf6" />
+          ) : theme === 'oled' ? (
+            <Sparkles size={15} color="#a855f7" />
+          ) : theme === 'tokyo' ? (
+            <Zap size={15} color="#38bdf8" />
+          ) : theme === 'nordic' ? (
+            <Cloud size={15} color="#34d399" />
+          ) : (
+            <BookOpen size={15} color="#c2410c" />
           )}
         </button>
 
         {/* Combined Profile & Settings Tablet (Profile Avatar + Name + Settings Gear Icon) */}
         <div
           className="header-profile-tablet"
-          onClick={onOpenSettings || onOpenProfile}
+          onClick={() => (onOpenSettings ? onOpenSettings('profile') : onOpenProfile())}
           title="Account, Identity & Settings (Cmd+,)"
         >
           <div className="profile-tablet-avatar">

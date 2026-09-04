@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import type { Note, Folder, GraphNode, GraphLink } from '../types';
+import { flashcardService } from '../services/flashcards';
 import { 
   Network, 
   X, 
@@ -45,6 +46,8 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
   const dragStartRef = useRef({ x: 0, y: 0 });
   const draggedNodeRef = useRef<GraphNode | null>(null);
   const mouseMovedDistanceRef = useRef(0);
+
+  const retentionMap = useMemo(() => flashcardService.getRetentionMap(notes), [notes]);
 
   // 1. Build Graph Nodes & Links
   const { graphNodes, graphLinks, folderCentroids } = useMemo(() => {
@@ -93,6 +96,7 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
         tags: note.tags || [],
         connectionCount: 0,
         attachmentCount: note.attachments?.length || 0,
+        retention: retentionMap.get(note.id),
         // Start near cluster center with deterministic jitter
         x: center.x + (hashX - 0.5) * 120,
         y: center.y + (hashY - 0.5) * 120,
@@ -124,13 +128,25 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
     });
 
     return { graphNodes: nodes, graphLinks: links, folderCentroids: folderCenters };
-  }, [notes, folders]);
+  }, [notes, folders, retentionMap]);
 
   // Metrics
   const totalNotes = notes.length;
   const totalLinks = graphLinks.length;
   const totalAttachments = notes.reduce((acc, n) => acc + (n.attachments?.length || 0), 0);
   const connectedNodes = graphNodes.filter((n) => n.connectionCount > 0).length;
+
+  const retentionMetrics = useMemo(() => {
+    let mastered = 0;
+    let due = 0;
+    graphNodes.forEach((n) => {
+      if (n.retention?.status === 'mastered') mastered++;
+      if (n.retention?.status === 'due') due++;
+    });
+    const reviewedTotal = graphNodes.filter((n) => n.retention && n.retention.status !== 'unreviewed').length;
+    const masteryPercent = reviewedTotal > 0 ? Math.round((mastered / reviewedTotal) * 100) : 0;
+    return { mastered, due, masteryPercent };
+  }, [graphNodes]);
 
   // Zoom to Fit Helper
   const handleZoomToFit = () => {
@@ -370,10 +386,31 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
             ctx.fillStyle = '#8b5cf6';
             ctx.fillText(`#${node.tags[0]}`, cardX + 11, cardY + 69);
           }
+
+          // Retention Pill Badge (top right of micro card)
+          if (node.retention && node.retention.status !== 'unreviewed') {
+            ctx.fillStyle = `${node.retention.color}25`;
+            ctx.beginPath();
+            ctx.roundRect(cardX + cardW - 74, cardY + 6, 68, 14, 4);
+            ctx.fill();
+            ctx.font = 'bold 9px Inter, sans-serif';
+            ctx.fillStyle = node.retention.color;
+            ctx.textAlign = 'center';
+            ctx.fillText(node.retention.label, cardX + cardW - 40, cardY + 16);
+          }
           return;
         }
 
         // --- STANDARD & GALAXY VIEW (zoom <= 2.2): Render as circular node ---
+        // Draw SM-2 retention aura halo if reviewed
+        if (node.retention && node.retention.status !== 'unreviewed') {
+          ctx.beginPath();
+          ctx.arc(nodeX, nodeY, baseRadius + 4, 0, Math.PI * 2);
+          ctx.strokeStyle = `${node.retention.color}77`;
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+
         ctx.beginPath();
         ctx.arc(nodeX, nodeY, baseRadius, 0, Math.PI * 2);
         ctx.fillStyle = isMatch ? (node.folderColor || '#6366f1') : (isDark ? '#27272a' : '#cbd5e1');
@@ -629,6 +666,12 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
                 {totalAttachments}
               </span>
             </div>
+            <div className="kb-metric-card">
+              <span className="kb-metric-label">Retention</span>
+              <span className="kb-metric-value" style={{ color: '#22c55e' }}>
+                {retentionMetrics.masteryPercent}%
+              </span>
+            </div>
           </div>
 
           {/* Canvas Container */}
@@ -728,6 +771,15 @@ export const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   📁 {hoveredNode.folderName} · 🔗 {hoveredNode.connectionCount} connections
                 </span>
+                {hoveredNode.retention && hoveredNode.retention.status !== 'unreviewed' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', marginTop: '2px' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: hoveredNode.retention.color }} />
+                    <span style={{ color: hoveredNode.retention.color, fontWeight: 600 }}>
+                      {hoveredNode.retention.label}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)' }}>· EF {hoveredNode.retention.avgEaseFactor}</span>
+                  </div>
+                )}
                 {hoveredNode.tags?.length > 0 && (
                   <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
                     {hoveredNode.tags.map((t) => (

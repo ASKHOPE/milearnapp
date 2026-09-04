@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import type { PomodoroMode, AmbientSoundTrack } from '../types';
-import { ambientAudio, type AmbientType } from '../services/ambientAudio';
+import type { PomodoroMode } from '../types';
+import { ambientAudio } from '../services/ambientAudio';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
-import { Tabs } from './ui/Tabs';
 import { 
   Play, 
   Pause, 
   RotateCcw, 
   SkipForward, 
-  Volume2, 
-  VolumeX, 
-  Sliders, 
   Timer, 
   Flame, 
   Coffee, 
-  Sparkles
+  Sparkles,
+  Volume2
 } from 'lucide-react';
 import { HourglassPomodoro } from './ui/HourglassPomodoro';
 
@@ -27,28 +23,18 @@ interface FocusPomodoroModalProps {
   onTimerTick?: (secondsLeft: number, isRunning: boolean, mode: PomodoroMode) => void;
 }
 
-const DEFAULT_TRACKS: AmbientSoundTrack[] = [
-  { id: 'rain', name: 'Gentle Rain', icon: '🌧️', isPlaying: false, volume: 0.6 },
-  { id: 'waves', name: 'Ocean Swell', icon: '🌊', isPlaying: false, volume: 0.5 },
-  { id: 'fireplace', name: 'Fireplace Crackle', icon: '🔥', isPlaying: false, volume: 0.4 },
-  { id: 'binaural', name: 'Alpha Focus Beats', icon: '🎧', isPlaying: false, volume: 0.4 },
-  { id: 'brownNoise', name: 'Brown Noise', icon: '📻', isPlaying: false, volume: 0.5 }
-];
-
 export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
   isOpen,
   onClose,
   onTimerTick
 }) => {
-  const [activeTab, setActiveTab] = useState<'timer' | 'ambient'>('timer');
   const [mode, setMode] = useState<PomodoroMode>('work');
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(() => {
     return parseInt(localStorage.getItem('noteflow_pomo_sessions') || '0', 10);
   });
-  const [tracks, setTracks] = useState<AmbientSoundTrack[]>(DEFAULT_TRACKS);
-  const [masterMuted, setMasterMuted] = useState(false);
+  const [isChimeTesting, setIsChimeTesting] = useState(false);
 
   // Total duration in seconds for progress ring
   const totalSeconds = mode === 'work' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60;
@@ -67,7 +53,7 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          // Timer completed!
+          // Timer completed! Play rich synthesized audio chime
           ambientAudio.playCompletionChime();
 
           if (mode === 'work') {
@@ -116,37 +102,10 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
     else handleSetMode('work');
   };
 
-  // Toggle ambient audio track
-  const handleToggleTrack = (trackId: AmbientType) => {
-    setTracks((prev) =>
-      prev.map((t) => {
-        if (t.id === trackId) {
-          const nextPlaying = !t.isPlaying;
-          ambientAudio.setTrackState(trackId, nextPlaying, t.volume);
-          return { ...t, isPlaying: nextPlaying };
-        }
-        return t;
-      })
-    );
-  };
-
-  // Change track volume
-  const handleTrackVolume = (trackId: AmbientType, val: number) => {
-    setTracks((prev) =>
-      prev.map((t) => {
-        if (t.id === trackId) {
-          ambientAudio.setTrackVolume(trackId, val);
-          return { ...t, volume: val };
-        }
-        return t;
-      })
-    );
-  };
-
-  const handleToggleMasterMute = () => {
-    const nextMuted = !masterMuted;
-    setMasterMuted(nextMuted);
-    ambientAudio.setMasterVolume(nextMuted ? 0 : 0.8);
+  const handleTestAudio = () => {
+    setIsChimeTesting(true);
+    ambientAudio.playCompletionChime();
+    setTimeout(() => setIsChimeTesting(false), 1400);
   };
 
   // Format time MM:SS
@@ -155,209 +114,163 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
   const timeFormatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
   // SVG circular ring calculation
-  const radius = 100;
+  const radius = 104;
   const circumference = 2 * Math.PI * radius;
   const progressPercent = (secondsLeft / totalSeconds);
   const strokeDashoffset = circumference - (progressPercent * circumference);
-
-  const activeSoundCount = tracks.filter((t) => t.isPlaying).length;
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Focus Pomodoro & Ambient Sound"
-      subtitle="Deep work intervals with procedural soundscapes"
+      title="Focus Pomodoro & Productivity Timer"
+      subtitle="Interactive focus intervals with automatic completion audio chime"
       icon={<Timer size={20} color="var(--color-primary)" />}
-      maxWidth={620}
+      maxWidth={580}
     >
-      {/* Top Segmented Tabs */}
-      <Tabs
-        activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as any)}
-        tabs={[
-          { id: 'timer', label: 'Pomodoro Timer', icon: <Timer size={15} /> },
-          { 
-            id: 'ambient', 
-            label: 'Sound Mixer', 
-            icon: <Sliders size={15} />,
-            badge: activeSoundCount > 0 ? <Badge variant="primary" dot>{activeSoundCount}</Badge> : undefined
-          }
-        ]}
-      />
+      <div className="pomo-timer-view" style={{ padding: '8px 0 16px' }}>
+        {/* Mode Switcher */}
+        <div className="pomo-mode-selector">
+          <button
+            type="button"
+            className={`pomo-mode-pill ${mode === 'work' ? 'active' : ''}`}
+            onClick={() => handleSetMode('work')}
+          >
+            <Flame size={14} />
+            <span>Deep Focus (25m)</span>
+          </button>
+          <button
+            type="button"
+            className={`pomo-mode-pill ${mode === 'shortBreak' ? 'active' : ''}`}
+            onClick={() => handleSetMode('shortBreak')}
+          >
+            <Coffee size={14} />
+            <span>Short Break (5m)</span>
+          </button>
+          <button
+            type="button"
+            className={`pomo-mode-pill ${mode === 'longBreak' ? 'active' : ''}`}
+            onClick={() => handleSetMode('longBreak')}
+          >
+            <Sparkles size={14} />
+            <span>Long Break (15m)</span>
+          </button>
+        </div>
 
-      {activeTab === 'timer' ? (
-        <div className="pomo-timer-view">
-          {/* Mode Switcher */}
-          <div className="pomo-mode-selector">
-            <button
-              className={`pomo-mode-pill ${mode === 'work' ? 'active' : ''}`}
-              onClick={() => handleSetMode('work')}
-            >
-              <Flame size={14} />
-              <span>Deep Focus (25m)</span>
-            </button>
-            <button
-              className={`pomo-mode-pill ${mode === 'shortBreak' ? 'active' : ''}`}
-              onClick={() => handleSetMode('shortBreak')}
-            >
-              <Coffee size={14} />
-              <span>Short Break (5m)</span>
-            </button>
-            <button
-              className={`pomo-mode-pill ${mode === 'longBreak' ? 'active' : ''}`}
-              onClick={() => handleSetMode('longBreak')}
-            >
-              <Sparkles size={14} />
-              <span>Long Break (15m)</span>
-            </button>
-          </div>
+        {/* Animated Circular SVG Progress Timer */}
+        <div className={`pomo-dial-container ${isRunning ? 'dial-running' : 'dial-idle'}`}>
+          {/* Animated Glow Aura */}
+          <div className={`pomo-dial-glow mode-${mode} ${isRunning ? 'active' : ''}`} />
 
-          {/* Animated Circular SVG Progress Timer */}
-          <div className="pomo-dial-container">
-            <svg className="pomo-dial-svg" width="240" height="240" viewBox="0 0 240 240">
-              {/* Background Track */}
-              <circle
-                cx="120"
-                cy="120"
-                r={radius}
-                className="pomo-track-bg"
-                strokeWidth="10"
-              />
-              {/* Animated Progress Ring */}
-              <circle
-                cx="120"
-                cy="120"
-                r={radius}
-                className={`pomo-track-progress mode-${mode}`}
-                strokeWidth="10"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                transform="rotate(-90 120 120)"
-              />
-            </svg>
+          <svg className="pomo-dial-svg" width="260" height="260" viewBox="0 0 260 260">
+            {/* Background Track */}
+            <circle
+              cx="130"
+              cy="130"
+              r={radius}
+              className="pomo-track-bg"
+              strokeWidth="12"
+            />
+            {/* Animated Progress Ring */}
+            <circle
+              cx="130"
+              cy="130"
+              r={radius}
+              className={`pomo-track-progress mode-${mode} ${isRunning ? 'ticking' : ''}`}
+              strokeWidth="12"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              transform="rotate(-90 130 130)"
+            />
+          </svg>
 
-            {/* Time readout in center */}
-            <div className="pomo-dial-center">
-              <HourglassPomodoro scale={0.55} isRunning={isRunning} className="pomo-hourglass-icon" />
-              <span className="pomo-time-display">{timeFormatted}</span>
-              <span className="pomo-mode-tag">
-                {mode === 'work' ? 'FOCUS TIME' : 'REST & RECHARGE'}
-              </span>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="pomo-controls">
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={handleReset}
-              title="Reset Timer"
-            >
-              <RotateCcw size={18} />
-            </Button>
-
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => setIsRunning(!isRunning)}
-              leftIcon={isRunning ? <Pause size={20} /> : <Play size={20} />}
-              style={{ minWidth: '150px' }}
-            >
-              {isRunning ? 'Pause' : 'Start Focus'}
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={handleSkip}
-              title="Skip Session"
-            >
-              <SkipForward size={18} />
-            </Button>
-          </div>
-
-          {/* Session Progress Stats */}
-          <div className="pomo-session-stats">
-            <div className="pomo-cycles-strip">
-              {[0, 1, 2, 3].map((idx) => {
-                const isDone = (completedSessions % 4) > idx || completedSessions >= 4;
-                return (
-                  <span 
-                    key={idx} 
-                    className={`pomo-cycle-dot ${isDone ? 'done' : ''}`}
-                    title={`Session ${idx + 1}`}
-                  />
-                );
-              })}
-            </div>
-            <span className="pomo-stat-label">
-              <strong>{completedSessions}</strong> Pomodoro session{completedSessions !== 1 ? 's' : ''} completed today ({completedSessions * 25} mins)
+          {/* Time readout in center */}
+          <div className="pomo-dial-center">
+            <HourglassPomodoro scale={0.65} isRunning={isRunning} className="pomo-hourglass-icon" />
+            <span className={`pomo-time-display ${isRunning ? 'active-pulse' : ''}`}>{timeFormatted}</span>
+            <span className="pomo-mode-tag">
+              {mode === 'work' ? 'FOCUS INTERVAL' : 'REST & RECHARGE'}
             </span>
           </div>
         </div>
-      ) : (
-        /* Ambient Audio Mixer View */
-        <div className="pomo-ambient-view">
-          <div className="ambient-header-row">
-            <div>
-              <h4 className="ambient-title">Procedural Soundscape Mixer</h4>
-              <p className="ambient-sub">Mix multiple sounds synthesized 100% in your browser.</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleToggleMasterMute}
-              leftIcon={masterMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-            >
-              {masterMuted ? 'Unmute All' : 'Mute Master'}
-            </Button>
-          </div>
 
-          <div className="ambient-tracks-list">
-            {tracks.map((track) => (
-              <div 
-                key={track.id} 
-                className={`ambient-track-card ${track.isPlaying ? 'active' : ''}`}
-              >
-                <div className="ambient-track-left">
-                  <button
-                    type="button"
-                    className={`ambient-toggle-btn ${track.isPlaying ? 'playing' : ''}`}
-                    onClick={() => handleToggleTrack(track.id)}
-                    title={track.isPlaying ? 'Pause sound' : 'Play sound'}
-                  >
-                    <span className="track-emoji">{track.icon}</span>
-                  </button>
-                  <div>
-                    <span className="track-name">{track.name}</span>
-                    <span className="track-status">
-                      {track.isPlaying ? 'Playing' : 'Paused'}
-                    </span>
-                  </div>
-                </div>
+        {/* Controls */}
+        <div className="pomo-controls">
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleReset}
+            title="Reset Timer"
+          >
+            <RotateCcw size={18} />
+          </Button>
 
-                <div className="ambient-track-right">
-                  <Volume2 size={14} className="slider-vol-icon" />
-                  <input
-                    type="range"
-                    min="0.05"
-                    max="1"
-                    step="0.05"
-                    value={track.volume}
-                    disabled={!track.isPlaying}
-                    onChange={(e) => handleTrackVolume(track.id, parseFloat(e.target.value))}
-                    className="ambient-slider"
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => setIsRunning(!isRunning)}
+            leftIcon={isRunning ? <Pause size={20} /> : <Play size={20} />}
+            style={{ 
+              minWidth: '160px',
+              boxShadow: isRunning ? '0 0 20px rgba(239, 68, 68, 0.4)' : 'none',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isRunning ? 'Pause Focus' : 'Start Focus'}
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleSkip}
+            title="Skip Session"
+          >
+            <SkipForward size={18} />
+          </Button>
+        </div>
+
+        {/* Session Progress Strip & Audio Completion Indicator */}
+        <div className="pomo-session-stats" style={{ marginTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '360px', padding: '0 8px' }}>
+            <div className="pomo-cycles-strip">
+              {[0, 1, 2, 3].map((idx) => {
+                const isCurrentCycle = (completedSessions % 4) > idx;
+                return (
+                  <div
+                    key={idx}
+                    className={`pomo-cycle-dot ${isCurrentCycle ? 'filled' : ''}`}
+                    title={`Session ${idx + 1} of 4`}
                   />
-                  <span className="vol-percent">{Math.round(track.volume * 100)}%</span>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+              <span className="pomo-sessions-label">
+                {completedSessions} focus interval{completedSessions !== 1 ? 's' : ''} completed
+              </span>
+            </div>
+
+            {/* Chime preview trigger */}
+            <button
+              type="button"
+              className="btn-small-ghost"
+              onClick={handleTestAudio}
+              title="Test Completion Chime Audio"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '11px',
+                color: isChimeTesting ? '#10b981' : 'var(--text-muted)',
+                padding: '4px 8px',
+                borderRadius: '6px'
+              }}
+            >
+              <Volume2 size={13} className={isChimeTesting ? 'pulse-icon' : ''} />
+              <span>{isChimeTesting ? 'Playing Chime...' : 'Test Audio'}</span>
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </Modal>
   );
 };

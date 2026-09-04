@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Image as ImageIcon } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { optimizer } from '../../services/optimizer';
 
 interface InsertImageModalProps {
   isOpen: boolean;
@@ -29,12 +30,18 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
       setCaption(file.name.replace(/\.[^/.]+$/, ''));
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setPreviewSrc(result);
-    };
-    reader.readAsDataURL(file);
+    optimizer.compressImage(file)
+      .then((opt) => {
+        setPreviewSrc(opt.dataUrl);
+      })
+      .catch(() => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const result = event.target?.result as string;
+          setPreviewSrc(result);
+        };
+        reader.readAsDataURL(file);
+      });
   };
 
   const handleConfirm = () => {

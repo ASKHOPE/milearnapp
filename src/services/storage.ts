@@ -1,4 +1,5 @@
-import { type Note, type Folder, type ThemeMode, type Workspace, type Book, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
+import { type Note, type Folder, type ThemeMode, type ResolvedTheme, type TypographySettings, type Workspace, type Book, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
+import { validateVaultData } from './validation/schemas';
 
 const DB_NAME = 'noteflow_db';
 const DB_VERSION = 2;
@@ -42,6 +43,49 @@ export { SAMPLE_WORKSPACES, SAMPLE_BOOKS, SAMPLE_FOLDERS, SAMPLE_NOTES };
 export const storage = {
   async init(): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
     const db = await openDB();
+
+    // 1. Dynamic PostgreSQL Synchronization: Fetch live seeded data from PostgreSQL
+    try {
+      const apiRes = await fetch('/api/vault');
+      if (apiRes.ok) {
+        const vault = await apiRes.json();
+        if (vault && Array.isArray(vault.notes) && vault.notes.length > 0) {
+          const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
+          const wsStore = tx.objectStore('workspaces');
+          const bStore = tx.objectStore('books');
+          const fStore = tx.objectStore('folders');
+          const nStore = tx.objectStore('notes');
+
+          wsStore.clear();
+          bStore.clear();
+          fStore.clear();
+          nStore.clear();
+
+          for (const ws of vault.workspaces) wsStore.put(ws);
+          for (const b of vault.books) bStore.put(b);
+          for (const f of vault.folders) fStore.put(f);
+          for (const n of vault.notes) nStore.put(n);
+
+          await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+
+          if (vault.user) {
+            this.setUserProfile(vault.user);
+          }
+
+          return {
+            notes: vault.notes,
+            folders: vault.folders,
+            workspaces: vault.workspaces,
+            books: vault.books
+          };
+        }
+      }
+    } catch {
+      // Offline fallback
+    }
 
     const [workspaces, books, folders, notes] = await Promise.all([
       this.getWorkspaces(),
@@ -164,13 +208,21 @@ export const storage = {
 
   async saveWorkspace(ws: Workspace): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('workspaces', 'readwrite');
       const store = tx.objectStore('workspaces');
       const req = store.put(ws);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace: ws })
+      }).catch(() => {});
+    } catch {}
   },
 
   async deleteWorkspace(id: string): Promise<void> {
@@ -198,13 +250,21 @@ export const storage = {
 
   async saveBook(book: Book): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('books', 'readwrite');
       const store = tx.objectStore('books');
       const req = store.put(book);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book })
+      }).catch(() => {});
+    } catch {}
   },
 
   async deleteBook(id: string): Promise<void> {
@@ -232,13 +292,22 @@ export const storage = {
 
   async saveNote(note: Note): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('notes', 'readwrite');
       const store = tx.objectStore('notes');
       const req = store.put(note);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    // Opportunistically persist to PostgreSQL database
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note })
+      }).catch(() => {});
+    } catch {}
   },
 
   async deleteNote(id: string): Promise<void> {
@@ -280,13 +349,21 @@ export const storage = {
 
   async saveFolder(folder: Folder): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('folders', 'readwrite');
       const store = tx.objectStore('folders');
       const req = store.put(folder);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder })
+      }).catch(() => {});
+    } catch {}
   },
 
   async deleteFolder(id: string): Promise<void> {
@@ -300,19 +377,69 @@ export const storage = {
     });
   },
 
+  // --- PostgreSQL Synchronization & Diagnostics ---
+  async syncToPostgres(): Promise<{ success: boolean; count?: Record<string, number>; error?: string }> {
+    try {
+      const [workspaces, books, folders, notes] = await Promise.all([
+        this.getWorkspaces(),
+        this.getBooks(),
+        this.getFolders(),
+        this.getNotes()
+      ]);
+
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullSync: { workspaces, books, folders, notes }
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Sync HTTP error ${res.status}`);
+      }
+
+      const healthRes = await fetch('/api/health');
+      const healthData = healthRes.ok ? await healthRes.json() : null;
+
+      return {
+        success: true,
+        count: healthData?.count
+      };
+    } catch (err: unknown) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      };
+    }
+  },
+
+  async fetchPostgresHealth(): Promise<{ status: string; count?: Record<string, number> }> {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        return await res.json();
+      }
+      return { status: 'offline' };
+    } catch {
+      return { status: 'offline' };
+    }
+  },
+
   // --- Theme ---
   getTheme(): ThemeMode {
     try {
       const saved = localStorage.getItem('noteflow_theme') as ThemeMode;
-      if (saved === 'system' || saved === 'light' || saved === 'dark') return saved;
+      const validThemes: ThemeMode[] = ['system', 'light', 'dark', 'oled', 'tokyo', 'nordic', 'editorial'];
+      if (saved && validThemes.includes(saved)) return saved;
       return 'system';
     } catch {
       return 'system';
     }
   },
 
-  resolveTheme(theme: ThemeMode): 'light' | 'dark' {
-    if (theme === 'light' || theme === 'dark') return theme;
+  resolveTheme(theme: ThemeMode): ResolvedTheme {
+    if (theme !== 'system') return theme;
     if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
@@ -325,9 +452,37 @@ export const storage = {
       const resolved = this.resolveTheme(theme);
       document.documentElement.setAttribute('data-theme', resolved);
       const meta = document.querySelector('meta[name="color-scheme"]');
-      if (meta) meta.setAttribute('content', resolved);
+      if (meta) {
+        meta.setAttribute('content', resolved === 'light' || resolved === 'editorial' ? 'light' : 'dark');
+      }
     } catch (e) {
       console.error('Failed to save theme', e);
+    }
+  },
+
+  // --- Typography Settings ---
+  getTypographySettings(): TypographySettings {
+    try {
+      const saved = localStorage.getItem('milearnapp_typography');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return {
+      fontFamily: 'sans',
+      fontScale: 'base',
+      lineHeight: 'normal'
+    };
+  },
+
+  setTypographySettings(settings: TypographySettings) {
+    try {
+      localStorage.setItem('milearnapp_typography', JSON.stringify(settings));
+      document.documentElement.setAttribute('data-font', settings.fontFamily);
+      document.documentElement.setAttribute('data-scale', settings.fontScale);
+      document.documentElement.setAttribute('data-line-height', settings.lineHeight);
+    } catch (e) {
+      console.error('Failed to save typography settings', e);
     }
   },
 
@@ -407,9 +562,11 @@ export const storage = {
 
   async importAllData(jsonStr: string): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
     const parsed = JSON.parse(jsonStr);
-    if (!parsed.notes || !parsed.folders) {
-      throw new Error('Invalid Noteflow backup format');
+    const validation = validateVaultData(parsed);
+    if (!validation.success || !validation.data) {
+      throw new Error(`Invalid Noteflow backup format: ${validation.error || 'Schema validation failed'}`);
     }
+    const validatedData = validation.data;
 
     const db = await openDB();
     const tx = db.transaction(['notes', 'folders', 'workspaces', 'books'], 'readwrite');
@@ -433,16 +590,16 @@ export const storage = {
       c1.onerror = () => reject(c1.error);
     });
 
-    for (const ws of parsed.workspaces || SAMPLE_WORKSPACES) {
+    for (const ws of validatedData.workspaces) {
       wsStore.put(ws);
     }
-    for (const b of parsed.books || SAMPLE_BOOKS) {
+    for (const b of validatedData.books) {
       bookStore.put(b);
     }
-    for (const folder of parsed.folders) {
+    for (const folder of validatedData.folders) {
       folderStore.put(folder);
     }
-    for (const note of parsed.notes) {
+    for (const note of validatedData.notes) {
       noteStore.put(note);
     }
 
@@ -451,10 +608,10 @@ export const storage = {
     });
 
     return { 
-      notes: parsed.notes, 
-      folders: parsed.folders, 
-      workspaces: parsed.workspaces || SAMPLE_WORKSPACES,
-      books: parsed.books || SAMPLE_BOOKS
+      notes: validatedData.notes, 
+      folders: validatedData.folders, 
+      workspaces: validatedData.workspaces,
+      books: validatedData.books
     };
   }
 };

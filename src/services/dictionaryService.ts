@@ -86,6 +86,41 @@ class DictionaryService {
   constructor() {
     this.loadCustomData();
     this.initEnDictionary();
+    this.syncWithDatabase().catch(() => {});
+  }
+
+  public async syncWithDatabase(): Promise<void> {
+    try {
+      const res = await fetch('/api/dictionary');
+      if (res.ok) {
+        const data = await res.json();
+        if (data) {
+          if (Array.isArray(data.customWords) && data.customWords.length > 0) {
+            this.customWords = data.customWords.map((cw: any) => ({
+              id: cw.id,
+              word: cw.word,
+              definition: cw.definition,
+              partOfSpeech: cw.partOfSpeech,
+              example: cw.example,
+              tags: cw.tags || [],
+              createdAt: new Date().toISOString()
+            }));
+            localStorage.setItem('milearnapp_custom_dictionary', JSON.stringify(this.customWords));
+          }
+          if (Array.isArray(data.abbreviations) && data.abbreviations.length > 0) {
+            this.abbreviations = data.abbreviations.map((ab: any) => ({
+              id: ab.id,
+              shortForm: ab.prefix.replace(/^;/, '').toUpperCase(),
+              fullForm: ab.expansion,
+              category: ab.category || 'Tech',
+              description: ab.description || '',
+              createdAt: new Date().toISOString()
+            }));
+            localStorage.setItem('milearnapp_abbreviations_list', JSON.stringify(this.abbreviations));
+          }
+        }
+      }
+    } catch {}
   }
 
   private loadCustomData() {

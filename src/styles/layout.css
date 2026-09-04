@@ -1766,6 +1766,26 @@
   transition: all 0.15s ease;
 }
 
+.collapsed-quick-add-btn {
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-xs);
+  color: var(--accent-primary);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.collapsed-quick-add-btn:hover {
+  background: var(--accent-primary);
+  color: #ffffff;
+  transform: scale(1.06);
+}
+
 .btn-collapse-notes-pane {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);

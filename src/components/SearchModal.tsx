@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Note, Folder } from '../types';
+import { searchWorkerBridge } from '../services/searchWorkerBridge';
 import { 
   Search, 
   X, 
@@ -29,42 +30,47 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'image' | 'pdf' | 'document' | 'audio' | 'favorite'>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [resultIds, setResultIds] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Fast O(1) lookup map
+  const noteMap = useMemo(() => new Map(notes.map(n => [n.id, n])), [notes]);
+
+  // Index notes in background worker whenever notes or modal state changes
   useEffect(() => {
     if (isOpen) {
+      searchWorkerBridge.indexNotes(notes);
       setTimeout(() => inputRef.current?.focus(), 50);
       setSelectedIndex(0);
     } else {
       setQuery('');
       setActiveFilter('all');
+      setResultIds(null);
     }
-  }, [isOpen]);
+  }, [isOpen, notes]);
+
+  // Execute search queries in background thread
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let active = true;
+    searchWorkerBridge.search(query, activeFilter).then((res) => {
+      if (active) {
+        setResultIds(res.resultIds);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [query, activeFilter, isOpen]);
 
   if (!isOpen) return null;
 
-  // Filter notes
-  const results = notes.filter((note) => {
-    // Media filter
-    if (activeFilter === 'favorite' && !note.isFavorite) return false;
-    if (activeFilter === 'image' && !note.attachments?.some((a) => a.type === 'image')) return false;
-    if (activeFilter === 'pdf' && !note.attachments?.some((a) => a.type === 'pdf')) return false;
-    if (activeFilter === 'document' && !note.attachments?.some((a) => a.type === 'document')) return false;
-    if (activeFilter === 'audio' && !note.attachments?.some((a) => a.type === 'audio')) return false;
-
-    if (!query.trim()) return true;
-
-    const q = query.toLowerCase();
-    const folder = folders.find((f) => f.id === note.folderId);
-
-    const matchTitle = note.title.toLowerCase().includes(q);
-    const matchContent = note.content.toLowerCase().includes(q);
-    const matchTags = note.tags?.some((t) => t.toLowerCase().includes(q));
-    const matchFolder = folder?.name.toLowerCase().includes(q);
-    const matchAttachment = note.attachments?.some((a) => a.name.toLowerCase().includes(q));
-
-    return matchTitle || matchContent || matchTags || matchFolder || matchAttachment;
-  });
+  // Resolve matching notes
+  const results = resultIds !== null
+    ? resultIds.map(id => noteMap.get(id)).filter((n): n is Note => Boolean(n))
+    : notes;
 
   // Highlight helper
   const highlightText = (text: string, highlight: string) => {

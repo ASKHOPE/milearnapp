@@ -1,5 +1,11 @@
-export type ThemeMode = 'system' | 'light' | 'dark';
-export type ResolvedTheme = 'light' | 'dark';
+export type ThemeMode = 'system' | 'light' | 'dark' | 'oled' | 'tokyo' | 'nordic' | 'editorial';
+export type ResolvedTheme = 'light' | 'dark' | 'oled' | 'tokyo' | 'nordic' | 'editorial';
+
+export interface TypographySettings {
+  fontFamily: 'sans' | 'serif' | 'mono';
+  fontScale: 'sm' | 'base' | 'lg' | 'xl';
+  lineHeight: 'compact' | 'normal' | 'relaxed';
+}
 
 export interface UserProfile {
   name: string;
@@ -121,6 +127,14 @@ export interface GraphNode {
   tags: string[];
   connectionCount: number;
   attachmentCount: number;
+  retention?: {
+    status: 'mastered' | 'due' | 'struggling' | 'unreviewed';
+    color: string;
+    label: string;
+    avgEaseFactor: number;
+    dueCount: number;
+    cardCount: number;
+  };
   x?: number;
   y?: number;
   vx?: number;
@@ -147,6 +161,9 @@ export interface Flashcard {
   nextReviewDate: string; // YYYY-MM-DD
   lastReviewed?: string;
   gradeHistory?: { date: string; grade: number }[];
+  isManual?: boolean;
+  tags?: string[];
+  deckCategory?: string;
 }
 
 // --- Pomodoro & Ambient Sound Types ---

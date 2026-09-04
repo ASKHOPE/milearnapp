@@ -12,6 +12,7 @@ const InternalMindModal = lazy(() => import('./InternalMindModal').then(m => ({ 
 const TypingMetricsModal = lazy(() => import('./TypingMetricsModal').then(m => ({ default: m.TypingMetricsModal })));
 const DictionaryAbbreviationsModal = lazy(() => import('./DictionaryAbbreviationsModal').then(m => ({ default: m.DictionaryAbbreviationsModal })));
 const LibraryFileManager = lazy(() => import('./LibraryFileManager').then(m => ({ default: m.LibraryFileManager })));
+const WebClipperModal = lazy(() => import('./WebClipperModal').then(m => ({ default: m.WebClipperModal })));
 
 export interface AppModalsProps {
   // Settings
@@ -30,6 +31,7 @@ export interface AppModalsProps {
   onReseedTutorialVault: () => Promise<void>;
   userProfile: UserProfile;
   onUpdateProfile: (profile: UserProfile) => void;
+  settingsInitialTab?: string;
 
   // Knowledge Base
   isKnowledgeBaseOpen: boolean;
@@ -83,6 +85,10 @@ export interface AppModalsProps {
   onDuplicateNote: (sourceNote: Note) => void;
   onAddPageToBook: (bookId: string) => void;
   onCreateNote: () => void;
+  // Web Clipper
+  isWebClipperOpen?: boolean;
+  onCloseWebClipper?: () => void;
+  onSaveClippedNote?: (note: Note) => void;
 }
 
 export const AppModals: React.FC<AppModalsProps> = ({
@@ -101,6 +107,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
   onReseedTutorialVault,
   userProfile,
   onUpdateProfile,
+  settingsInitialTab,
 
   isKnowledgeBaseOpen,
   onCloseKnowledgeBase,
@@ -145,6 +152,9 @@ export const AppModals: React.FC<AppModalsProps> = ({
   onDuplicateNote,
   onAddPageToBook,
   onCreateNote,
+  isWebClipperOpen,
+  onCloseWebClipper,
+  onSaveClippedNote
 }) => {
   const filteredWorkspaceNotes = workspaceNotes.filter((n) => !n.isTrashed);
   const resolvedWorkspace: Workspace = activeWorkspace || {
@@ -177,6 +187,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
             onClose={onCloseSettings}
             userProfile={userProfile}
             onUpdateProfile={onUpdateProfile}
+            initialTab={settingsInitialTab}
           />
         </ErrorBoundary>
       )}
@@ -262,6 +273,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
           <TypingMetricsModal
             isOpen={isTypingMetricsOpen}
             onClose={onCloseTypingMetrics}
+            notes={allNotes}
           />
         </ErrorBoundary>
       )}
@@ -303,6 +315,23 @@ export const AppModals: React.FC<AppModalsProps> = ({
             onDuplicateNote={onDuplicateNote}
             onAddPageToBook={onAddPageToBook}
             onCreateNote={onCreateNote}
+          />
+        </ErrorBoundary>
+      )}
+
+      {/* Web Clipper & Content Structurer Studio */}
+      {isWebClipperOpen && onCloseWebClipper && (
+        <ErrorBoundary name="Web Clipper Modal">
+          <WebClipperModal
+            isOpen={isWebClipperOpen}
+            onClose={onCloseWebClipper}
+            folders={workspaceFolders}
+            activeWorkspace={resolvedWorkspace}
+            onSaveClippedNote={(note) => {
+              if (onSaveClippedNote) {
+                onSaveClippedNote(note);
+              }
+            }}
           />
         </ErrorBoundary>
       )}

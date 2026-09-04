@@ -247,10 +247,135 @@ export class FlashcardService {
       });
     });
 
-    // Retain cards from notes not currently in the batch if needed
+    // Retain manual user-created cards and cards from notes not currently in the batch
+    existingCards.forEach((c) => {
+      if (c.isManual && !seenIds.has(c.id)) {
+        updatedList.push(c);
+      }
+    });
+
     this.saveFlashcards(updatedList);
     return updatedList;
   }
+
+  /**
+   * Adds a user-created manual flashcard / quiz question
+   */
+  public addManualCard(card: Omit<Flashcard, 'id' | 'repetition' | 'interval' | 'easeFactor' | 'nextReviewDate'>): Flashcard {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newCard: Flashcard = {
+      ...card,
+      id: 'manual-fc-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+      repetition: 0,
+      interval: 1,
+      easeFactor: 2.5,
+      nextReviewDate: todayStr,
+      isManual: true
+    };
+
+    const existing = this.getFlashcards();
+    const updated = [newCard, ...existing];
+    this.saveFlashcards(updated);
+    return newCard;
+  }
+
+  /**
+   * Deletes a flashcard from storage
+   */
+  public deleteCard(cardId: string): void {
+    const existing = this.getFlashcards();
+    const updated = existing.filter((c) => c.id !== cardId);
+    this.saveFlashcards(updated);
+  }
+
+  /**
+   * Evaluates retention level for a specific note based on SuperMemo-2 card metrics
+   */
+  public getNoteRetention(noteId: string, cards?: Flashcard[]): NoteRetentionInfo {
+    const allCards = cards || this.getFlashcards();
+    const noteCards = allCards.filter((c) => c.noteId === noteId);
+
+    if (noteCards.length === 0) {
+      return {
+        status: 'unreviewed',
+        cardCount: 0,
+        dueCount: 0,
+        avgEaseFactor: 2.5,
+        color: '#94a3b8',
+        label: 'Unreviewed'
+      };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dueCount = noteCards.filter((c) => c.nextReviewDate <= todayStr).length;
+    const avgEase = noteCards.reduce((acc, c) => acc + (c.easeFactor || 2.5), 0) / noteCards.length;
+
+    if (dueCount > 0) {
+      return {
+        status: 'due',
+        cardCount: noteCards.length,
+        dueCount,
+        avgEaseFactor: Math.round(avgEase * 10) / 10,
+        color: '#eab308',
+        label: `${dueCount} Due`
+      };
+    }
+
+    if (avgEase < 2.0) {
+      return {
+        status: 'struggling',
+        cardCount: noteCards.length,
+        dueCount: 0,
+        avgEaseFactor: Math.round(avgEase * 10) / 10,
+        color: '#ef4444',
+        label: 'Struggling'
+      };
+    }
+
+    const isMastered = noteCards.some((c) => (c.interval || 0) >= 14 || ((c.repetition || 0) >= 2 && (c.easeFactor || 0) >= 2.4));
+    if (isMastered) {
+      return {
+        status: 'mastered',
+        cardCount: noteCards.length,
+        dueCount: 0,
+        avgEaseFactor: Math.round(avgEase * 10) / 10,
+        color: '#22c55e',
+        label: 'Mastered'
+      };
+    }
+
+    return {
+      status: 'due',
+      cardCount: noteCards.length,
+      dueCount: 0,
+      avgEaseFactor: Math.round(avgEase * 10) / 10,
+      color: '#3b82f6',
+      label: 'Learning'
+    };
+  }
+
+  /**
+   * Generates a fast lookup Map of retention metrics for a list of notes
+   */
+  public getRetentionMap(notes: Note[]): Map<string, NoteRetentionInfo> {
+    const cards = this.getFlashcards();
+    const map = new Map<string, NoteRetentionInfo>();
+    notes.forEach((n) => {
+      map.set(n.id, this.getNoteRetention(n.id, cards));
+    });
+    return map;
+  }
+}
+
+export type RetentionStatus = 'mastered' | 'due' | 'struggling' | 'unreviewed';
+
+export interface NoteRetentionInfo {
+  status: RetentionStatus;
+  cardCount: number;
+  dueCount: number;
+  avgEaseFactor: number;
+  color: string;
+  label: string;
 }
 
 export const flashcardService = new FlashcardService();

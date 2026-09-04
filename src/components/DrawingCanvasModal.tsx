@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getStroke } from 'perfect-freehand';
 import type { Attachment } from '../types';
+import { optimizer } from '../services/optimizer';
 import { 
   PenTool, 
   Highlighter, 
@@ -449,23 +450,36 @@ export const DrawingCanvasModal: React.FC<DrawingCanvasModalProps> = ({
   };
 
   // Save drawing as attachment into note
-  const handleSaveToNote = () => {
+  const handleSaveToNote = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dataUrl = canvas.toDataURL('image/png');
+    const rawDataUrl = canvas.toDataURL('image/png');
     const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
 
-    const attachment: Attachment = {
-      id: 'sketch-' + Math.random().toString(36).substr(2, 9),
-      name: `Hand-Sketch-${timestamp}.png`,
-      type: 'image',
-      size: Math.round(dataUrl.length * 0.75),
-      mimeType: 'image/png',
-      dataUrl,
-      createdAt: new Date().toISOString()
-    };
-
-    onSaveDrawing(attachment);
+    try {
+      const opt = await optimizer.compressImage(rawDataUrl, 2048, 0.90);
+      const attachment: Attachment = {
+        id: 'sketch-' + Math.random().toString(36).substr(2, 9),
+        name: `Hand-Sketch-${timestamp}.webp`,
+        type: 'image',
+        size: opt.size,
+        mimeType: opt.mimeType,
+        dataUrl: opt.dataUrl,
+        createdAt: new Date().toISOString()
+      };
+      onSaveDrawing(attachment);
+    } catch {
+      const fallbackAttachment: Attachment = {
+        id: 'sketch-' + Math.random().toString(36).substr(2, 9),
+        name: `Hand-Sketch-${timestamp}.png`,
+        type: 'image',
+        size: Math.round(rawDataUrl.length * 0.75),
+        mimeType: 'image/png',
+        dataUrl: rawDataUrl,
+        createdAt: new Date().toISOString()
+      };
+      onSaveDrawing(fallbackAttachment);
+    }
     onClose();
   };
 

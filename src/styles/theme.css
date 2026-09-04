@@ -124,3 +124,264 @@
   --scrollbar-thumb: #373b49;
   --scrollbar-track: transparent;
 }
+
+/* ==========================================================================
+   Luxury Theme 1: Obsidian Onyx (OLED Pitch Black)
+   ========================================================================== */
+[data-theme="oled"] {
+  --bg-app: #000000;
+  --bg-sidebar: #050507;
+  --bg-column: #07080b;
+  --bg-editor: #000000;
+  --bg-card: #0b0c10;
+  --bg-card-hover: #121319;
+  --bg-card-active: #191b24;
+  --bg-card-selected: #161822;
+  
+  --bg-subtle: #0f1015;
+  --bg-surface: #07080c;
+  --bg-surface-elevated: #0f1118;
+  --bg-modal: #07080b;
+  --bg-overlay: rgba(0, 0, 0, 0.9);
+  
+  --border-color: #1a1d26;
+  --border-subtle: #12141c;
+  --border-active: #8b5cf6;
+  --border-focus: #a855f7;
+
+  --text-primary: #ffffff;
+  --text-secondary: #9ea7b8;
+  --text-muted: #565f72;
+  --text-inverse: #000000;
+
+  --accent-primary: #a855f7;
+  --accent-primary-hover: #9333ea;
+  --accent-light: #221035;
+  --accent-gradient: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);
+  
+  --color-success: #34d399;
+  --color-success-bg: #032a1f;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #2b1103;
+  --color-danger: #f87171;
+  --color-danger-bg: #2a0505;
+  --color-info: #38bdf8;
+  --color-info-bg: #041f30;
+  --color-purple: #c084fc;
+  --color-purple-bg: #270442;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.7);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.85);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.95);
+  --shadow-modal: 0 24px 50px rgba(0, 0, 0, 0.98);
+
+  --scrollbar-thumb: #222533;
+  --scrollbar-track: transparent;
+}
+
+/* ==========================================================================
+   Luxury Theme 2: Tokyo Midnight (Cyber Indigo & Cyan)
+   ========================================================================== */
+[data-theme="tokyo"] {
+  --bg-app: #0b0d18;
+  --bg-sidebar: #0f1220;
+  --bg-column: #121526;
+  --bg-editor: #0d101c;
+  --bg-card: #15182e;
+  --bg-card-hover: #1c213d;
+  --bg-card-active: #252b4e;
+  --bg-card-selected: #212745;
+  
+  --bg-subtle: #171b30;
+  --bg-surface: #111425;
+  --bg-surface-elevated: #181d33;
+  --bg-modal: #111426;
+  --bg-overlay: rgba(5, 7, 15, 0.82);
+  
+  --border-color: #212642;
+  --border-subtle: #181d33;
+  --border-active: #38bdf8;
+  --border-focus: #38bdf8;
+
+  --text-primary: #f0f4fc;
+  --text-secondary: #94a0bf;
+  --text-muted: #5e6b8c;
+  --text-inverse: #0b0d18;
+
+  --accent-primary: #38bdf8;
+  --accent-primary-hover: #0284c7;
+  --accent-light: #0d2842;
+  --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #ec4899 100%);
+  
+  --color-success: #34d399;
+  --color-success-bg: #064e3b;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #451a03;
+  --color-danger: #f43f5e;
+  --color-danger-bg: #4c0519;
+  --color-info: #38bdf8;
+  --color-info-bg: #0c2d48;
+  --color-purple: #e879f9;
+  --color-purple-bg: #3b0764;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.7);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.85);
+
+  --scrollbar-thumb: #2d3455;
+  --scrollbar-track: transparent;
+}
+
+/* ==========================================================================
+   Luxury Theme 3: Nordic Frost (Cool Zinc Slate & Mint)
+   ========================================================================== */
+[data-theme="nordic"] {
+  --bg-app: #10131b;
+  --bg-sidebar: #141822;
+  --bg-column: #171c28;
+  --bg-editor: #131722;
+  --bg-card: #1c2230;
+  --bg-card-hover: #232a3c;
+  --bg-card-active: #2b344a;
+  --bg-card-selected: #252e42;
+  
+  --bg-subtle: #1f2536;
+  --bg-surface: #151a25;
+  --bg-surface-elevated: #1e2434;
+  --bg-modal: #151926;
+  --bg-overlay: rgba(8, 11, 18, 0.8);
+  
+  --border-color: #272f44;
+  --border-subtle: #1c2232;
+  --border-active: #34d399;
+  --border-focus: #34d399;
+
+  --text-primary: #f0fdf4;
+  --text-secondary: #94a3b8;
+  --text-muted: #5f6c82;
+  --text-inverse: #10131b;
+
+  --accent-primary: #34d399;
+  --accent-primary-hover: #10b981;
+  --accent-light: #064e3b;
+  --accent-gradient: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
+  
+  --color-success: #34d399;
+  --color-success-bg: #064e3b;
+  --color-warning: #facc15;
+  --color-warning-bg: #422006;
+  --color-danger: #f87171;
+  --color-danger-bg: #450a0a;
+  --color-info: #38bdf8;
+  --color-info-bg: #082f49;
+  --color-purple: #c084fc;
+  --color-purple-bg: #3b0764;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.65);
+  --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.8);
+
+  --scrollbar-thumb: #2b354c;
+  --scrollbar-track: transparent;
+}
+
+/* ==========================================================================
+   Luxury Theme 4: Warm Editorial Paper (Ivory, Serif & Terracotta)
+   ========================================================================== */
+[data-theme="editorial"] {
+  --bg-app: #fbf8f1;
+  --bg-sidebar: #f4eee1;
+  --bg-column: #faf4e8;
+  --bg-editor: #fdfbf7;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f5eedf;
+  --bg-card-active: #ede1cb;
+  --bg-card-selected: #f2e7d3;
+  
+  --bg-subtle: #f1e7d4;
+  --bg-surface: #fbf8f1;
+  --bg-surface-elevated: #ffffff;
+  --bg-modal: #fefdfa;
+  --bg-overlay: rgba(41, 37, 36, 0.48);
+  
+  --border-color: #e5dac5;
+  --border-subtle: #ede3d0;
+  --border-active: #c2410c;
+  --border-focus: #c2410c;
+
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #8c8273;
+  --text-inverse: #ffffff;
+
+  --accent-primary: #c2410c;
+  --accent-primary-hover: #9a3412;
+  --accent-light: #ffedd5;
+  --accent-gradient: linear-gradient(135deg, #c2410c 0%, #b45309 100%);
+  
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-warning: #b45309;
+  --color-warning-bg: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fee2e2;
+  --color-info: #0369a1;
+  --color-info-bg: #e0f2fe;
+  --color-purple: #7e22ce;
+  --color-purple-bg: #f3e8ff;
+
+  --shadow-xs: 0 1px 2px rgba(41, 37, 36, 0.05);
+  --shadow-sm: 0 2px 5px rgba(41, 37, 36, 0.07);
+  --shadow-md: 0 4px 14px rgba(41, 37, 36, 0.09);
+  --shadow-lg: 0 12px 28px rgba(41, 37, 36, 0.12);
+  --shadow-modal: 0 20px 40px rgba(41, 37, 36, 0.16);
+
+  --scrollbar-thumb: #d6c8b0;
+  --scrollbar-track: transparent;
+}
+
+/* ==========================================================================
+   Typography Preferences & Sizing Scale
+   ========================================================================== */
+[data-font="serif"] {
+  --font-sans: "Merriweather", "Playfair Display", Georgia, "Times New Roman", serif;
+  font-family: var(--font-sans);
+}
+
+[data-font="mono"] {
+  --font-sans: "JetBrains Mono", "Fira Code", Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-sans);
+}
+
+[data-scale="sm"] {
+  font-size: 13.5px;
+}
+
+[data-scale="base"] {
+  font-size: 14.5px;
+}
+
+[data-scale="lg"] {
+  font-size: 16px;
+}
+
+[data-scale="xl"] {
+  font-size: 17.5px;
+}
+
+[data-line-height="compact"] {
+  line-height: 1.45;
+}
+
+[data-line-height="normal"] {
+  line-height: 1.62;
+}
+
+[data-line-height="relaxed"] {
+  line-height: 1.85;
+}

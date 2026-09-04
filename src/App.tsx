@@ -45,10 +45,12 @@ export const App: React.FC = () => {
   const [isInternalMindOpen, setIsInternalMindOpen] = useState(false);
   const [isLinkTreeOpen, setIsLinkTreeOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string>('profile');
   const [isStudyModeOpen, setIsStudyModeOpen] = useState(false);
   const [isPomodoroOpen, setIsPomodoroOpen] = useState(false);
   const [isTypingMetricsOpen, setIsTypingMetricsOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
+  const [isWebClipperOpen, setIsWebClipperOpen] = useState(false);
   const [isVaultLockedDueToInactivity, setIsVaultLockedDueToInactivity] = useState(false);
   const [pomodoroSecondsLeft, setPomodoroSecondsLeft] = useState(25 * 60);
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
@@ -75,6 +77,9 @@ export const App: React.FC = () => {
         const savedTheme = storage.getTheme();
         setTheme(savedTheme);
         storage.setTheme(savedTheme);
+
+        const savedTypography = storage.getTypographySettings();
+        storage.setTypographySettings(savedTypography);
 
         const savedProfile = storage.getUserProfile();
         setUserProfile(savedProfile);
@@ -146,13 +151,16 @@ export const App: React.FC = () => {
       setIsStudyModeOpen(false);
       setIsPomodoroOpen(false);
       setIsLibraryOpen(false);
+      setIsWebClipperOpen(false);
       setIsZenMode(false);
     },
   });
 
-  // 3-Way Theme Toggle: System -> Day -> Night
+  // Multi-Theme Toggle: System -> Day -> Night -> OLED Obsidian -> Tokyo Midnight -> Nordic Frost -> Warm Editorial
   const handleToggleTheme = () => {
-    const nextTheme: ThemeMode = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
+    const themes: ThemeMode[] = ['system', 'light', 'dark', 'oled', 'tokyo', 'nordic', 'editorial'];
+    const nextIndex = (themes.indexOf(theme) + 1) % themes.length;
+    const nextTheme = themes[nextIndex];
     setTheme(nextTheme);
     storage.setTheme(nextTheme);
   };
@@ -834,12 +842,13 @@ export const App: React.FC = () => {
         onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
         onOpenInternalMind={() => setIsInternalMindOpen(true)}
         onOpenLinkTree={() => setIsLinkTreeOpen(true)}
-        onOpenProfile={() => setIsSettingsOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenProfile={() => { setSettingsInitialTab('profile'); setIsSettingsOpen(true); }}
+        onOpenSettings={(tab) => { setSettingsInitialTab(tab || 'profile'); setIsSettingsOpen(true); }}
         onOpenStudyMode={() => setIsStudyModeOpen(true)}
         onOpenPomodoro={() => setIsPomodoroOpen(true)}
         onOpenTypingMetrics={() => setIsTypingMetricsOpen(true)}
         onOpenDictionary={() => setIsDictionaryOpen(true)}
+        onOpenWebClipper={() => setIsWebClipperOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         onQuickNote={handleCreateQuickNote}
       />
@@ -1054,6 +1063,7 @@ export const App: React.FC = () => {
         onReseedTutorialVault={handleReseedTutorialVault}
         userProfile={userProfile}
         onUpdateProfile={setUserProfile}
+        settingsInitialTab={settingsInitialTab}
         isKnowledgeBaseOpen={isKnowledgeBaseOpen}
         onCloseKnowledgeBase={() => setIsKnowledgeBaseOpen(false)}
         isLinkTreeOpen={isLinkTreeOpen}
@@ -1096,6 +1106,12 @@ export const App: React.FC = () => {
         onDuplicateNote={handleDuplicateNote}
         onAddPageToBook={handleAddPageToBook}
         onCreateNote={handleCreateNote}
+        isWebClipperOpen={isWebClipperOpen}
+        onCloseWebClipper={() => setIsWebClipperOpen(false)}
+        onSaveClippedNote={(clippedNote) => {
+          setNotes((prev) => [clippedNote, ...prev]);
+          handleOpenNote(clippedNote.id);
+        }}
       />
 
       {/* Inactivity Security Screen Lock */}

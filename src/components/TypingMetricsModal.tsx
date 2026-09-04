@@ -4,49 +4,60 @@ import {
   Zap, 
   Activity, 
   Clock, 
-  Flame, 
   CheckCircle2, 
-  AlertCircle, 
   RotateCcw, 
-  X,
-  BarChart2,
-  TrendingUp,
-  Award
+  X, 
+  TrendingUp, 
+  Award,
+  Play,
+  Trophy,
+  Sparkles,
+  Check
 } from 'lucide-react';
-import { typingMetrics, type TypingSessionStats, type DailyTypingMetrics } from '../services/typingMetrics';
+import { typingMetrics, type TypingSessionStats, type PracticeGameSession, type PassageItem } from '../services/typingMetrics';
+import type { Note } from '../types';
 
 interface TypingMetricsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  notes?: Note[];
 }
 
-const PRACTICE_PASSAGES = [
-  "Local-first software gives users ownership of their data and operates reliably without requiring constant network connectivity.",
-  "Knowledge graphs represent relationships between concepts, transforming unstructured notes into interconnected thought networks.",
-  "The SuperMemo-2 spaced repetition algorithm calculates exponential review intervals to combat the human forgetting curve.",
-  "Keystroke dynamics analyze typing rhythm, flight time, and dwell duration to measure cognitive fluency and typing mastery."
-];
+export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, onClose, notes }) => {
+  const [activeTab, setActiveTab] = useState<'game' | 'history'>('game');
+  const [stats, setStats] = useState<TypingSessionStats>(() => typingMetrics.calculateStats());
+  const [history, setHistory] = useState<PracticeGameSession[]>(() => typingMetrics.getSessionHistory());
 
-export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'practice' | 'live' | 'daily' | 'history'>('practice');
-  const [stats, setStats] = useState<TypingSessionStats>(typingMetrics.calculateStats());
-  const [history, setHistory] = useState<TypingSessionStats[]>([]);
-  const [dailyMetrics, setDailyMetrics] = useState<DailyTypingMetrics | null>(null);
+  // Dynamic Passages loaded from PostgreSQL / Vault
+  const [passages, setPassages] = useState<PassageItem[]>([]);
 
   // Practice Mode State
   const [selectedPassageIdx, setSelectedPassageIdx] = useState(0);
   const [practiceInput, setPracticeInput] = useState('');
   const [isPracticing, setIsPracticing] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [bestWpm, setBestWpm] = useState<number>(() => {
+    const hist = typingMetrics.getSessionHistory();
+    return hist.length > 0 ? Math.max(...hist.map((h) => h.wpm)) : 0;
+  });
 
   useEffect(() => {
     if (isOpen) {
-      const today = new Date().toISOString().split('T')[0];
-      setDailyMetrics(typingMetrics.getDailyMetrics(today));
-      setHistory(typingMetrics.getSessionHistory());
+      const hist = typingMetrics.getSessionHistory();
+      setHistory(hist);
       setStats(typingMetrics.calculateStats());
+      if (hist.length > 0) {
+        setBestWpm(Math.max(...hist.map((h) => h.wpm)));
+      }
+
+      // Fetch dynamic passages from PostgreSQL or user vault notes
+      typingMetrics.getPracticePassages(notes).then((loaded) => {
+        if (loaded && loaded.length > 0) {
+          setPassages(loaded);
+        }
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, notes]);
 
   useEffect(() => {
     const unsubscribe = typingMetrics.subscribe((newStats) => {
@@ -59,12 +70,18 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
 
   if (!isOpen) return null;
 
-  const currentPassage = PRACTICE_PASSAGES[selectedPassageIdx];
+  const currentPassage = passages[selectedPassageIdx] || passages[0] || {
+    id: 'default-passage',
+    title: 'Dynamic Sprint',
+    category: 'Tech' as const,
+    difficulty: 'beginner' as const,
+    text: 'Local-first architecture guarantees real-time responsiveness and full user data autonomy.'
+  };
 
   const handlePracticeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isPracticing) {
+    if (!isPracticing && !isCompleted) {
       setIsPracticing(true);
-      typingMetrics.startSession();
+      typingMetrics.startSession(currentPassage.title);
     }
     typingMetrics.recordKeyDown(e.nativeEvent);
   };
@@ -77,14 +94,14 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
     const val = e.target.value;
     setPracticeInput(val);
 
-    if (val === currentPassage) {
+    if (val === currentPassage.text) {
       setIsCompleted(true);
       setIsPracticing(false);
-      const finalStats = typingMetrics.endSessionAndPersist();
-      setStats(finalStats);
-      const today = new Date().toISOString().split('T')[0];
-      setDailyMetrics(typingMetrics.getDailyMetrics(today));
-      setHistory(typingMetrics.getSessionHistory());
+      const gameRecord = typingMetrics.endSessionAndPersist(currentPassage.difficulty);
+      setStats(gameRecord);
+      const updatedHistory = typingMetrics.getSessionHistory();
+      setHistory(updatedHistory);
+      setBestWpm(Math.max(...updatedHistory.map((h) => h.wpm)));
     }
   };
 
@@ -92,346 +109,425 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
     setPracticeInput('');
     setIsPracticing(false);
     setIsCompleted(false);
-    typingMetrics.startSession();
+    typingMetrics.cancelSession();
   };
 
   return (
     <div className="selector-modal-overlay" onClick={onClose}>
-      <div className="selector-modal-card" style={{ maxWidth: '780px' }} onClick={(e) => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div className="selector-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ 
-              width: '32px', 
-              height: '32px', 
-              borderRadius: '8px', 
-              background: 'rgba(99, 102, 241, 0.15)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
+      <div 
+        className="selector-modal-card" 
+        style={{ maxWidth: '800px', borderRadius: '16px', overflow: 'hidden' }} 
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="selector-modal-header" style={{ borderBottom: '1px solid var(--border-color)', padding: '18px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2))',
+              border: '1px solid rgba(99, 102, 241, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-primary)'
             }}>
-              <Keyboard size={18} color="var(--accent-primary)" />
+              <Keyboard size={20} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '16px' }}>On-Device Typing Metrics</h3>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Rhythm dynamics, WPM, CPM, accuracy, hold & flight time analytics
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700 }}>Typing Practice Game & Sprint</h3>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#10b981',
+                  border: '1px solid rgba(16, 185, 129, 0.3)'
+                }}>
+                  Zero Note Logging
+                </span>
+              </div>
+              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Practice sprints are recorded in your personal speed arcade. Everyday note editing is never logged.
+              </p>
             </div>
           </div>
 
-          <button className="library-close-btn" onClick={onClose}>
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {bestWpm > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '8px',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                color: '#f59e0b',
+                fontSize: '12px',
+                fontWeight: 600
+              }}>
+                <Trophy size={14} />
+                <span>PB: {bestWpm} WPM</span>
+              </div>
+            )}
+            <button type="button" className="editor-icon-btn" onClick={onClose} title="Close">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{ 
-          display: 'flex', 
-          borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))', 
-          background: 'var(--bg-subtle, rgba(255, 255, 255, 0.02))',
-          padding: '4px 16px',
-          gap: '8px'
+        {/* Tab Navigation */}
+        <div style={{
+          display: 'flex',
+          gap: '8px',
+          padding: '12px 24px',
+          background: 'var(--bg-subtle, rgba(0, 0, 0, 0.02))',
+          borderBottom: '1px solid var(--border-color)'
         }}>
           <button
             type="button"
-            className={`library-tab-pill ${activeTab === 'practice' ? 'active' : ''}`}
-            onClick={() => setActiveTab('practice')}
+            className={`library-tab-pill ${activeTab === 'game' ? 'active' : ''}`}
+            onClick={() => setActiveTab('game')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <Zap size={13} />
-            <span>Practice Sprint</span>
-          </button>
-          <button
-            type="button"
-            className={`library-tab-pill ${activeTab === 'live' ? 'active' : ''}`}
-            onClick={() => setActiveTab('live')}
-          >
-            <Activity size={13} />
-            <span>Live Keystroke Telemetry</span>
-          </button>
-          <button
-            type="button"
-            className={`library-tab-pill ${activeTab === 'daily' ? 'active' : ''}`}
-            onClick={() => setActiveTab('daily')}
-          >
-            <BarChart2 size={13} />
-            <span>Daily Activity</span>
+            <Play size={13} />
+            <span>Practice Sprint Game</span>
           </button>
           <button
             type="button"
             className={`library-tab-pill ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => setActiveTab('history')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <TrendingUp size={13} />
-            <span>Session Logs ({history.length})</span>
+            <span>Game Logs & Arcade History ({history.length})</span>
           </button>
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '20px', overflowY: 'auto', maxHeight: '65vh' }}>
-
-          {/* TAB 1: PRACTICE SPRINT */}
-          {activeTab === 'practice' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '24px', overflowY: 'auto', maxHeight: '68vh' }}>
+          {activeTab === 'game' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Passage Selectors */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Select Practice Passage:
+              {/* Passage Category Selector Strip */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Choose Sprint Passage:
                 </span>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {PRACTICE_PASSAGES.map((_, i) => (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {passages.map((pass, i) => (
                     <button
-                      key={i}
+                      key={pass.id}
                       type="button"
-                      className={`btn-small-tab ${selectedPassageIdx === i ? 'active' : ''}`}
                       style={{
-                        padding: '3px 10px',
-                        fontSize: '11px',
-                        borderRadius: '5px',
-                        border: '1px solid var(--border-color)',
-                        background: selectedPassageIdx === i ? 'var(--accent-primary)' : 'transparent',
-                        color: selectedPassageIdx === i ? '#fff' : 'var(--text-muted)',
-                        cursor: 'pointer'
+                        padding: '5px 12px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        border: selectedPassageIdx === i 
+                          ? '1px solid var(--accent-primary)' 
+                          : '1px solid var(--border-color)',
+                        background: selectedPassageIdx === i ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                        color: selectedPassageIdx === i ? 'var(--accent-primary)' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        fontWeight: selectedPassageIdx === i ? 600 : 400,
+                        transition: 'all 0.15s ease'
                       }}
-                      onClick={() => { setSelectedPassageIdx(i); handleResetPractice(); }}
+                      onClick={() => {
+                        setSelectedPassageIdx(i);
+                        handleResetPractice();
+                      }}
                     >
-                      Sprint {i + 1}
+                      {pass.title}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Passage Display Card */}
+              {/* Passage Card Display */}
               <div style={{
-                padding: '16px',
+                position: 'relative',
+                padding: '20px',
                 background: 'var(--bg-card, rgba(255, 255, 255, 0.04))',
                 border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                borderRadius: '10px',
-                fontSize: '14px',
-                lineHeight: 1.6,
+                borderRadius: '12px',
+                fontSize: '16px',
+                lineHeight: 1.7,
                 letterSpacing: '0.01em',
                 userSelect: 'none'
               }}>
-                {currentPassage.split('').map((char, index) => {
-                  let color = 'var(--text-muted)';
-                  let bg = 'transparent';
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '12px',
+                  fontSize: '11px',
+                  color: 'var(--text-muted)'
+                }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{currentPassage.title}</span>
+                  <span>•</span>
+                  <span style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>{currentPassage.difficulty}</span>
+                </div>
 
-                  if (index < practiceInput.length) {
-                    if (practiceInput[index] === char) {
-                      color = '#10b981'; // Correct
-                    } else {
-                      color = '#ef4444'; // Error
-                      bg = 'rgba(239, 68, 68, 0.2)';
+                <div>
+                  {currentPassage.text.split('').map((char, index) => {
+                    let color = 'var(--text-muted)';
+                    let bg = 'transparent';
+
+                    if (index < practiceInput.length) {
+                      if (practiceInput[index] === char) {
+                        color = '#10b981'; // Correct letter
+                      } else {
+                        color = '#ef4444'; // Error
+                        bg = 'rgba(239, 68, 68, 0.25)';
+                      }
+                    } else if (index === practiceInput.length) {
+                      bg = 'rgba(99, 102, 241, 0.35)'; // Active typing cursor target
+                      color = '#ffffff';
                     }
-                  } else if (index === practiceInput.length) {
-                    bg = 'rgba(99, 102, 241, 0.3)'; // Cursor target
-                    color = '#ffffff';
-                  }
 
-                  return (
-                    <span key={index} style={{ color, backgroundColor: bg, borderRadius: '2px' }}>
-                      {char}
-                    </span>
-                  );
-                })}
+                    return (
+                      <span key={index} style={{ color, backgroundColor: bg, borderRadius: '2px' }}>
+                        {char}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Input Field */}
+              {/* Typing Input Field */}
               <div>
                 <input
                   type="text"
                   autoFocus
                   disabled={isCompleted}
-                  placeholder="Type the passage above to test your speed & rhythm..."
+                  placeholder="Click here and start typing to begin sprint..."
                   value={practiceInput}
                   onKeyDown={handlePracticeKeyDown}
                   onKeyUp={handlePracticeKeyUp}
                   onChange={handlePracticeChange}
                   style={{
                     width: '100%',
-                    padding: '12px 14px',
-                    fontSize: '14px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-primary, #0c0e14)',
-                    border: isCompleted ? '2px solid #10b981' : '1px solid var(--border-color)',
-                    color: '#ffffff',
+                    padding: '14px 18px',
+                    fontSize: '15px',
+                    borderRadius: '10px',
+                    border: isCompleted ? '2px solid #10b981' : '1px solid var(--accent-primary)',
+                    background: 'var(--bg-input, var(--bg-card))',
+                    color: 'var(--text-primary)',
                     outline: 'none',
-                    boxSizing: 'border-box'
+                    boxShadow: isPracticing ? '0 0 0 3px rgba(99, 102, 241, 0.2)' : 'none',
+                    transition: 'all 0.2s ease'
                   }}
                 />
               </div>
 
-              {/* Live Status Bar */}
+              {/* Live Game Telemetry Meter */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '10px'
+                gap: '12px'
               }}>
-                <div style={{ padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net Speed</span>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-primary)' }}>{stats.wpm} <span style={{ fontSize: '12px' }}>WPM</span></div>
+                <div style={{
+                  padding: '14px',
+                  background: 'var(--bg-card)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--accent-primary)', marginBottom: '4px' }}>
+                    <Zap size={15} />
+                    <span style={{ fontSize: '11px', fontWeight: 600 }}>SPEED</span>
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent-primary)' }}>
+                    {stats.wpm} <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>WPM</span>
+                  </div>
                 </div>
 
-                <div style={{ padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Keystroke CPM</span>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#0ea5e9' }}>{stats.cpm} <span style={{ fontSize: '12px' }}>CPM</span></div>
+                <div style={{
+                  padding: '14px',
+                  background: 'var(--bg-card)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#10b981', marginBottom: '4px' }}>
+                    <CheckCircle2 size={15} />
+                    <span style={{ fontSize: '11px', fontWeight: 600 }}>ACCURACY</span>
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#10b981' }}>
+                    {stats.accuracy}%
+                  </div>
                 </div>
 
-                <div style={{ padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Accuracy</span>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: stats.accuracy >= 95 ? '#10b981' : '#f59e0b' }}>{stats.accuracy}%</div>
+                <div style={{
+                  padding: '14px',
+                  background: 'var(--bg-card)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f59e0b', marginBottom: '4px' }}>
+                    <Clock size={15} />
+                    <span style={{ fontSize: '11px', fontWeight: 600 }}>ELAPSED</span>
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#f59e0b' }}>
+                    {stats.durationSeconds}s
+                  </div>
                 </div>
 
-                <div style={{ padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Rhythm Consistency</span>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#8b5cf6' }}>{stats.consistencyScore}%</div>
+                <div style={{
+                  padding: '14px',
+                  background: 'var(--bg-card)',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#8b5cf6', marginBottom: '4px' }}>
+                    <Activity size={15} />
+                    <span style={{ fontSize: '11px', fontWeight: 600 }}>RHYTHM</span>
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#8b5cf6' }}>
+                    {stats.consistencyScore}%
+                  </div>
                 </div>
               </div>
 
+              {/* Completion Banner */}
               {isCompleted && (
                 <div style={{
-                  padding: '14px',
-                  background: 'rgba(16, 185, 129, 0.12)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: '10px',
+                  padding: '18px 24px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(99, 102, 241, 0.15))',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={20} color="#10b981" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      background: '#10b981',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff'
+                    }}>
+                      <Check size={22} />
+                    </div>
                     <div>
-                      <strong style={{ color: '#10b981', display: 'block', fontSize: '13px' }}>Sprint Completed Successfully!</strong>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Session logged to your local vault.</span>
+                      <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#10b981' }}>
+                        Sprint Completed!
+                      </h4>
+                      <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        You scored <strong>{stats.wpm} WPM</strong> with <strong>{stats.accuracy}% accuracy</strong>. Saved to game log!
+                      </p>
                     </div>
                   </div>
 
                   <button
                     type="button"
-                    className="library-btn-primary"
+                    className="btn-small-primary"
                     onClick={handleResetPractice}
+                    style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
-                    <RotateCcw size={13} />
-                    <span>Try Again</span>
+                    <RotateCcw size={14} />
+                    <span>Sprint Again</span>
                   </button>
                 </div>
               )}
             </div>
-          )}
-
-          {/* TAB 2: LIVE KEYSTROKE TELEMETRY */}
-          {activeTab === 'live' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '12px'
-              }}>
-                <div style={{ padding: '14px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                    <Clock size={14} color="var(--accent-primary)" />
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>Key Hold / Dwell Time</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.averageHoldTime} <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>ms</span></div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duration each key remains depressed</span>
-                </div>
-
-                <div style={{ padding: '14px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                    <Flame size={14} color="#f59e0b" />
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>Key Flight Time</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.averageFlightTime} <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>ms</span></div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Latency transitioning between keys</span>
-                </div>
-
-                <div style={{ padding: '14px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                    <AlertCircle size={14} color="#ef4444" />
-                    <span style={{ fontSize: '12px', fontWeight: 600 }}>Error & Corrections</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: 700 }}>{stats.errorKeystrokes} <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>({stats.backspaceCount} backspaces)</span></div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Corrections within session</span>
-                </div>
+          ) : (
+            /* TAB 2: GAME LOGS & ARCADE HISTORY */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Logged Sprint Games ({history.length})
+                </span>
+                {history.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn-small-ghost danger"
+                    onClick={() => {
+                      if (confirm('Clear all practice typing records?')) {
+                        typingMetrics.clearHistory();
+                        setHistory([]);
+                        setBestWpm(0);
+                      }
+                    }}
+                    style={{ fontSize: '11px', padding: '4px 10px' }}
+                  >
+                    Clear History
+                  </button>
+                )}
               </div>
 
-              <div style={{
-                padding: '14px',
-                background: 'var(--bg-card)',
-                borderRadius: '10px',
-                border: '1px solid var(--border-color)'
-              }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600 }}>Keystroke Dynamics Overview</h4>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                  This typing engine continuously tracks your muscle memory patterns entirely inside your browser memory with zero network transmissions. Flight time and dwell variance provide objective metrics on typing fatigue and flow state.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: DAILY ACTIVITY */}
-          {activeTab === 'daily' && dailyMetrics && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '12px'
-              }}>
-                <div style={{ padding: '14px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Today's Total Words</span>
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent-primary)' }}>{dailyMetrics.totalWordsTyped}</div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>~{dailyMetrics.totalCharactersTyped} characters</span>
-                </div>
-
-                <div style={{ padding: '14px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Average / Peak WPM</span>
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>{dailyMetrics.averageWpm} <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>/ {dailyMetrics.peakWpm} WPM</span></div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Across {dailyMetrics.sessionCount} sessions</span>
-                </div>
-
-                <div style={{ padding: '14px', background: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Active Typing Time</span>
-                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#8b5cf6' }}>{Math.round(dailyMetrics.totalTimeSeconds / 60)} <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>mins</span></div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Overall Accuracy: {dailyMetrics.averageAccuracy}%</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: SESSION HISTORY */}
-          {activeTab === 'history' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {history.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                  No recorded sessions yet. Complete a Practice Sprint to build your log!
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px 20px',
+                  background: 'var(--bg-card)',
+                  borderRadius: '12px',
+                  border: '1px dashed var(--border-color)',
+                  color: 'var(--text-muted)'
+                }}>
+                  <Sparkles size={32} color="var(--accent-primary)" style={{ margin: '0 auto 12px' }} />
+                  <h4 style={{ margin: '0 0 6px', fontSize: '15px', color: 'var(--text-primary)' }}>No sprint games recorded yet</h4>
+                  <p style={{ margin: 0, fontSize: '12px' }}>Complete a practice sprint above to record your speed and accuracy in the arcade log.</p>
                 </div>
               ) : (
-                history.map((sess, idx) => (
-                  <div 
-                    key={idx} 
+                history.map((sess) => (
+                  <div
+                    key={sess.id}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '10px 14px',
+                      padding: '12px 16px',
                       background: 'var(--bg-card)',
                       border: '1px solid var(--border-color)',
-                      borderRadius: '8px',
-                      fontSize: '12px'
+                      borderRadius: '10px',
+                      fontSize: '13px'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Award size={15} color="var(--accent-primary)" />
-                      <strong>{sess.wpm} WPM</strong>
-                      <span style={{ color: 'var(--text-muted)' }}>· {sess.cpm} CPM</span>
-                      <span style={{ color: sess.accuracy >= 95 ? '#10b981' : '#f59e0b' }}>· {sess.accuracy}% Acc</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: sess.wpm >= 60 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                        color: sess.wpm >= 60 ? '#10b981' : 'var(--accent-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Award size={16} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <strong style={{ fontSize: '15px' }}>{sess.wpm} WPM</strong>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>· {sess.cpm} CPM</span>
+                          <span style={{
+                            color: sess.accuracy >= 95 ? '#10b981' : '#f59e0b',
+                            fontWeight: 600,
+                            fontSize: '12px'
+                          }}>
+                            · {sess.accuracy}% Acc
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {sess.passageTitle || 'Practice Sprint'} ({sess.difficulty})
+                        </span>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)' }}>
-                      <span>Hold: {sess.averageHoldTime}ms</span>
-                      <span>Flight: {sess.averageFlightTime}ms</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                      <span>Rhythm: {sess.consistencyScore}%</span>
                       <span>{new Date(sess.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
@@ -439,9 +535,7 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
               )}
             </div>
           )}
-
         </div>
-
       </div>
     </div>
   );

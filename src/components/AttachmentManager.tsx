@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { PdfViewerModal } from './PdfViewerModal';
 import { EpubViewerModal } from './EpubViewerModal';
+import { optimizer } from '../services/optimizer';
 
 interface AttachmentManagerProps {
   attachments: Attachment[];
@@ -69,10 +70,29 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const processFiles = (files: FileList | null) => {
     if (!files) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
+    Array.from(files).forEach(async (file) => {
       const type = detectType(file);
 
+      if (type === 'image') {
+        try {
+          const opt = await optimizer.compressImage(file);
+          const newAttachment: Attachment = {
+            id: 'att-' + Math.random().toString(36).substr(2, 9),
+            name: file.name.replace(/\.[^/.]+$/, '') + '.webp',
+            type: 'image',
+            size: opt.size,
+            mimeType: opt.mimeType,
+            dataUrl: opt.dataUrl,
+            createdAt: new Date().toISOString()
+          };
+          onAddAttachment(newAttachment);
+          return;
+        } catch {
+          // fallback to raw reader if optimization fails
+        }
+      }
+
+      const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
         const newAttachment: Attachment = {
@@ -87,12 +107,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         onAddAttachment(newAttachment);
       };
 
-      if (type === 'image' || type === 'audio' || type === 'pdf') {
-        reader.readAsDataURL(file);
-      } else {
-        // Read as data URL for downloading
-        reader.readAsDataURL(file);
-      }
+      reader.readAsDataURL(file);
     });
   };
 

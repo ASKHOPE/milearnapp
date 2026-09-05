@@ -7,7 +7,6 @@ import {
   Folder, 
   Tag, 
   ChevronRight, 
-  ChevronLeft,
   ChevronDown, 
   ChevronUp,
   Trash2, 
@@ -50,6 +49,7 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   onSelectWorkspace: (id: string) => void;
   onCreateWorkspace: (name: string, icon: string, color: string, description: string) => void;
+  onRenameWorkspace?: (id: string, newName: string, newIcon?: string, newColor?: string) => void;
   onDeleteWorkspace: (id: string) => void;
   onCreateBook: (title: string, icon: string, color: string) => void;
   onDeleteBook: (bookId: string) => void;
@@ -66,8 +66,10 @@ interface SidebarProps {
   onCloseMobile: () => void;
   onOpenLibrary?: () => void;
   isLibraryOpen?: boolean;
+  showCalendar?: boolean;
   theme?: ThemeMode;
   onToggleTheme?: () => void;
+  onChangeTheme?: (theme: ThemeMode) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -84,10 +86,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   isCollapsed = false,
   onToggleCollapse,
+  showCalendar = true,
   theme = 'system',
   onToggleTheme,
+  onChangeTheme,
   onSelectWorkspace,
   onCreateWorkspace,
+  onRenameWorkspace,
   onDeleteWorkspace,
   onCreateBook,
   onDeleteBook,
@@ -110,6 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isFoldersExpanded, setIsFoldersExpanded] = useState(true);
   const [isBooksExpanded, setIsBooksExpanded] = useState(true);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
+  const [isThemeCustomMenuOpen, setIsThemeCustomMenuOpen] = useState(false);
 
   // Popup Modal States
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
@@ -297,20 +303,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (isCollapsed) {
     return (
       <aside className="app-sidebar collapsed">
-        {onToggleCollapse && (
-          <button
-            type="button"
-            className="edge-middle-toggle-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCollapse();
-            }}
-            title="Expand Sidebar (Cmd+\)"
-            aria-label="Expand Sidebar"
-          >
-            <ChevronRight size={13} />
-          </button>
-        )}
         <div className="sidebar-collapsed-rail">
           {/* Top Rail Expand Button */}
           {onToggleCollapse && (
@@ -520,20 +512,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       <aside className={`app-sidebar ${isOpenMobile ? 'open' : ''}`}>
-        {onToggleCollapse && (
-          <button
-            type="button"
-            className="edge-middle-toggle-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCollapse();
-            }}
-            title="Collapse Sidebar (Cmd+\)"
-            aria-label="Collapse Sidebar"
-          >
-            <ChevronLeft size={13} />
-          </button>
-        )}
         {/* Top Header: Persona Switcher with right-aligned collapse button */}
         <div className="sidebar-top-header">
           <div className="sidebar-ws-container">
@@ -543,6 +521,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               notesCountByWorkspace={notesCountByWorkspace}
               onSelectWorkspace={onSelectWorkspace}
               onCreateWorkspace={onCreateWorkspace}
+              onRenameWorkspace={onRenameWorkspace}
               onDeleteWorkspace={onDeleteWorkspace}
             />
           </div>
@@ -859,40 +838,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Section: Calendar & Daily Notes (Pinned directly above Bin & Archive footer) */}
-        <div className="sidebar-calendar-accordion pinned-above-bins">
-          <div 
-            className="cal-accordion-header"
-            onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-            title={`Today: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} (Click to ${isCalendarExpanded ? 'collapse' : 'expand'})`}
-          >
-            <div className="cal-header-left">
-              <CalendarIcon size={14} color="var(--accent-primary)" />
-              <div className="cal-header-title-wrap">
-                <span className="cal-header-title">Calendar & Daily Log</span>
-                <span className="cal-header-date-badge">
-                  {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                </span>
-              </div>
-            </div>
-            <button 
-              type="button" 
-              className="btn-cal-chevron"
-              aria-label={isCalendarExpanded ? 'Collapse Calendar' : 'Expand Calendar'}
+        {showCalendar && (
+          <div className="sidebar-calendar-accordion pinned-above-bins">
+            <div 
+              className="cal-accordion-header"
+              onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+              title={`Today: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} (Click to ${isCalendarExpanded ? 'collapse' : 'expand'})`}
             >
-              {isCalendarExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-            </button>
-          </div>
-
-          {isCalendarExpanded && (
-            <div className="cal-accordion-body">
-              <CalendarWidget
-                notes={notes}
-                onSelectDate={onSelectDate}
-                onOpenTodayNote={onOpenTodayNote}
-              />
+              <div className="cal-header-left">
+                <CalendarIcon size={14} color="var(--accent-primary)" />
+                <div className="cal-header-title-wrap">
+                  <span className="cal-header-title">Calendar & Daily Log</span>
+                  <span className="cal-header-date-badge">
+                    {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="btn-cal-chevron"
+                aria-label={isCalendarExpanded ? 'Collapse Calendar' : 'Expand Calendar'}
+              >
+                {isCalendarExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
             </div>
-          )}
-        </div>
+
+            {isCalendarExpanded && (
+              <div className="cal-accordion-body">
+                <CalendarWidget
+                  notes={notes}
+                  onSelectDate={onSelectDate}
+                  onOpenTodayNote={onOpenTodayNote}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sidebar Footer: Archive & Bin Buttons */}
         <div className="sidebar-footer-bins">
@@ -929,41 +910,134 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Theme Switcher beneath Archive and Bin */}
-        {onToggleTheme && (
+        {/* Theme Switcher beneath Archive and Bin: Quick Day, Night, System selector & Custom dropdown */}
+        {onChangeTheme && (
           <div className="sidebar-footer-theme">
-            <button
-              type="button"
-              className="sidebar-theme-toggle-pill"
-              onClick={onToggleTheme}
-              title={`Theme: ${
-                theme === 'system' ? 'System Default' :
-                theme === 'light' ? 'Day Theme' :
-                theme === 'dark' ? 'Night Theme' :
-                theme === 'oled' ? 'Obsidian Onyx' :
-                theme === 'tokyo' ? 'Tokyo Midnight' :
-                theme === 'nordic' ? 'Nordic Frost' : 'Warm Editorial'
-              } (Click to Cycle Themes)`}
-            >
-              <div className="sidebar-theme-icon-wrap">
-                {theme === 'system' ? <Monitor size={14} /> :
-                 theme === 'light' ? <Sun size={14} color="#f59e0b" /> :
-                 theme === 'dark' ? <Moon size={14} color="#8b5cf6" /> :
-                 theme === 'oled' ? <Sparkles size={14} color="#a855f7" /> :
-                 theme === 'tokyo' ? <Zap size={14} color="#38bdf8" /> :
-                 theme === 'nordic' ? <Cloud size={14} color="#34d399" /> :
-                 <BookOpen size={14} color="#c2410c" />}
+            <div className="sidebar-theme-quick-bar">
+              <button
+                type="button"
+                className={`sidebar-theme-quick-btn ${theme === 'light' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('light')}
+                title="Switch to Day Theme"
+              >
+                <Sun size={12} color="#f59e0b" />
+                <span>Day</span>
+              </button>
+
+              <button
+                type="button"
+                className={`sidebar-theme-quick-btn ${theme === 'dark' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('dark')}
+                title="Switch to Night Theme"
+              >
+                <Moon size={12} color="#8b5cf6" />
+                <span>Night</span>
+              </button>
+
+              <button
+                type="button"
+                className={`sidebar-theme-quick-btn ${theme === 'system' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('system')}
+                title="Sync with System Theme"
+              >
+                <Monitor size={12} />
+                <span>Auto</span>
+              </button>
+
+              {/* Custom Extra Options Dropdown */}
+              <div className="sidebar-theme-custom-wrap">
+                <button
+                  type="button"
+                  className={`sidebar-theme-quick-btn custom ${!['light', 'dark', 'system'].includes(theme) ? 'active' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsThemeCustomMenuOpen((prev) => !prev);
+                  }}
+                  title="More Luxury Custom Themes (OLED, Tokyo, Nordic, Editorial)"
+                >
+                  <Sparkles size={12} color="#ec4899" />
+                  <span>Custom</span>
+                  <ChevronDown size={10} />
+                </button>
+
+                {isThemeCustomMenuOpen && (
+                  <>
+                    <div 
+                      className="dropdown-backdrop" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsThemeCustomMenuOpen(false);
+                      }} 
+                    />
+                    <div className="sidebar-theme-custom-popover" onClick={(e) => e.stopPropagation()}>
+                      <div className="sidebar-theme-popover-header">
+                        <span>Luxury Themes</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`sidebar-theme-option-item ${theme === 'oled' ? 'active' : ''}`}
+                        onClick={() => {
+                          onChangeTheme('oled');
+                          setIsThemeCustomMenuOpen(false);
+                        }}
+                      >
+                        <Sparkles size={13} color="#a855f7" />
+                        <div className="theme-opt-text">
+                          <strong>Obsidian Onyx</strong>
+                          <span>Pure black OLED</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`sidebar-theme-option-item ${theme === 'tokyo' ? 'active' : ''}`}
+                        onClick={() => {
+                          onChangeTheme('tokyo');
+                          setIsThemeCustomMenuOpen(false);
+                        }}
+                      >
+                        <Zap size={13} color="#38bdf8" />
+                        <div className="theme-opt-text">
+                          <strong>Tokyo Midnight</strong>
+                          <span>Cyber cyan glow</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`sidebar-theme-option-item ${theme === 'nordic' ? 'active' : ''}`}
+                        onClick={() => {
+                          onChangeTheme('nordic');
+                          setIsThemeCustomMenuOpen(false);
+                        }}
+                      >
+                        <Cloud size={13} color="#34d399" />
+                        <div className="theme-opt-text">
+                          <strong>Nordic Frost</strong>
+                          <span>Zinc & soft mint</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`sidebar-theme-option-item ${theme === 'editorial' ? 'active' : ''}`}
+                        onClick={() => {
+                          onChangeTheme('editorial');
+                          setIsThemeCustomMenuOpen(false);
+                        }}
+                      >
+                        <BookOpen size={13} color="#c2410c" />
+                        <div className="theme-opt-text">
+                          <strong>Editorial Paper</strong>
+                          <span>Ivory & warm serif</span>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-              <span className="sidebar-theme-name">
-                {theme === 'system' ? 'System Theme' :
-                 theme === 'light' ? 'Day Light' :
-                 theme === 'dark' ? 'Night Dark' :
-                 theme === 'oled' ? 'Obsidian Onyx' :
-                 theme === 'tokyo' ? 'Tokyo Midnight' :
-                 theme === 'nordic' ? 'Nordic Frost' : 'Warm Editorial'}
-              </span>
-              <span className="sidebar-theme-chip">Theme</span>
-            </button>
+            </div>
           </div>
         )}
       </aside>

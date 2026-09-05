@@ -49,6 +49,114 @@ export interface PassageItem {
   text: string;
 }
 
+export const MONKEY_TYPE_PRESETS: PassageItem[] = [
+  // EASY: Top common smooth English words
+  {
+    id: 'easy-words-1',
+    title: 'Easy: Common Words (15)',
+    category: 'Wisdom',
+    difficulty: 'beginner',
+    text: 'the quick brown fox jumps over the lazy dog and runs into the warm sun'
+  },
+  {
+    id: 'easy-words-2',
+    title: 'Easy: Smooth Cadence (25)',
+    category: 'Wisdom',
+    difficulty: 'beginner',
+    text: 'time will come when you need to know how to write fast and clean every day with good flow'
+  },
+  {
+    id: 'easy-words-3',
+    title: 'Easy: Daily Vocabulary (30)',
+    category: 'Wisdom',
+    difficulty: 'beginner',
+    text: 'they say that practice makes perfect so take small steps each morning to build your speed and calm your mind without any fear'
+  },
+  {
+    id: 'easy-words-4',
+    title: 'Easy: Clear Focus (20)',
+    category: 'Wisdom',
+    difficulty: 'beginner',
+    text: 'keep your fingers relaxed on the home row and let each key press feel light and smooth'
+  },
+
+  // NORMAL: Everyday knowledge & natural punctuation
+  {
+    id: 'norm-words-1',
+    title: 'Normal: Local-First Autonomy (25)',
+    category: 'Tech',
+    difficulty: 'intermediate',
+    text: 'Local-first architecture ensures that your data stays on your own machine, enabling offline access, immediate feedback, and complete privacy at all times.'
+  },
+  {
+    id: 'norm-words-2',
+    title: 'Normal: Cognitive Clarity (28)',
+    category: 'Science',
+    difficulty: 'intermediate',
+    text: 'Writing down your thoughts into a structured second brain reduces mental clutter, allowing deep focus on solving hard problems with confidence and joy.'
+  },
+  {
+    id: 'norm-words-3',
+    title: 'Normal: Spaced Learning (25)',
+    category: 'Wisdom',
+    difficulty: 'intermediate',
+    text: 'Reviewing difficult concepts right before you forget them strengthens neural pathways, transforming fleeting ideas into permanent understanding over time.'
+  },
+  {
+    id: 'norm-words-4',
+    title: 'Normal: Modern Web (24)',
+    category: 'Tech',
+    difficulty: 'intermediate',
+    text: 'Modern web applications combine responsive typography, rich aesthetics, and instant local state to deliver an experience indistinguishable from native apps.'
+  },
+
+  // HARD: Complex technical vocabulary, punctuation & numbers
+  {
+    id: 'hard-words-1',
+    title: 'Hard: Distributed Consensus (35)',
+    category: 'Tech',
+    difficulty: 'expert',
+    text: 'Byzantine fault-tolerant protocols, such as PBFT & Raft, maintain state synchronization across n >= 3f + 1 nodes; ensuring quorum commit safety despite asynchronous network partitions and arbitrary message loss.'
+  },
+  {
+    id: 'hard-words-2',
+    title: 'Hard: Quantum & Cryptography (30)',
+    category: 'Science',
+    difficulty: 'expert',
+    text: 'Zero-knowledge proofs (zk-SNARKs) verify quadratic arithmetic programs with succinct O(1) proofs, preserving cryptographic privacy while validating computational integrity across decentralized ledgers with 256-bit security.'
+  },
+  {
+    id: 'hard-words-3',
+    title: 'Hard: Matrix Calculus (30)',
+    category: 'Science',
+    difficulty: 'expert',
+    text: 'Eigenvalue decomposition of Hermitian operators yields orthogonal eigenvectors: lambda_i * v_i = H * v_i, governing continuous-time Schrödinger evolution in complex Hilbert space H_n with norm ||psi|| = 1.'
+  },
+
+  // CODE: Real code snippets with symbols
+  {
+    id: 'code-snippet-1',
+    title: 'Code: TypeScript Function',
+    category: 'Code',
+    difficulty: 'code',
+    text: 'const calculateWpm = (chars: number, minutes: number): number => Math.round((chars / 5) / minutes);'
+  },
+  {
+    id: 'code-snippet-2',
+    title: 'Code: React Hook Pipeline',
+    category: 'Code',
+    difficulty: 'code',
+    text: 'const [state, setState] = useState(() => initialData.filter(item => item.isActive && item.score > 0));'
+  },
+  {
+    id: 'code-snippet-3',
+    title: 'Code: SQL Query & Index',
+    category: 'Code',
+    difficulty: 'code',
+    text: 'SELECT id, title, created_at FROM notes WHERE is_archived = false ORDER BY updated_at DESC LIMIT 50;'
+  }
+];
+
 class TypingMetricsService {
   private currentKeystrokes: KeystrokeEvent[] = [];
   private lastKeyUpTime: number = 0;
@@ -56,6 +164,9 @@ class TypingMetricsService {
   private sessionStartTime: number = 0;
   private isListening: boolean = false;
   private currentPassageTitle: string = 'Practice Sprint';
+  private currentExpectedText: string = '';
+  private currentTypedChars: string = '';
+  private sessionErrorCount: number = 0;
 
   private listeners: Set<(stats: TypingSessionStats) => void> = new Set();
 
@@ -69,13 +180,25 @@ class TypingMetricsService {
     return this.isListening;
   }
 
-  public startSession(passageTitle = 'Practice Sprint') {
+  public startSession(passageTitle = 'Practice Sprint', expectedText = '') {
     this.currentKeystrokes = [];
     this.activeKeyDowns.clear();
     this.sessionStartTime = performance.now();
     this.lastKeyUpTime = performance.now();
     this.isListening = true;
     this.currentPassageTitle = passageTitle;
+    this.currentExpectedText = expectedText;
+    this.currentTypedChars = '';
+    this.sessionErrorCount = 0;
+    this.notifySubscribers();
+  }
+
+  public setExpectedText(text: string) {
+    this.currentExpectedText = text;
+  }
+
+  public updateLiveInput(typed: string) {
+    this.currentTypedChars = typed;
     this.notifySubscribers();
   }
 
@@ -114,7 +237,7 @@ class TypingMetricsService {
     }, 4000);
   }
 
-  public recordKeyDown(e: KeyboardEvent) {
+  public recordKeyDown(e: KeyboardEvent, currentInput?: string) {
     if (!this.isListening) {
       this.recordAmbientKeystroke(e);
       return;
@@ -131,12 +254,23 @@ class TypingMetricsService {
     const flightTime = this.lastKeyUpTime > 0 ? Math.max(0, now - this.lastKeyUpTime) : 0;
     const isBackspaceOrDelete = key === 'Backspace' || key === 'Delete';
 
+    let isMistake = isBackspaceOrDelete;
+    if (this.currentExpectedText && !isBackspaceOrDelete && key.length === 1) {
+      const idx = currentInput !== undefined ? currentInput.length : this.currentTypedChars.length;
+      if (idx < this.currentExpectedText.length) {
+        if (key !== this.currentExpectedText[idx]) {
+          isMistake = true;
+          this.sessionErrorCount++;
+        }
+      }
+    }
+
     const event: KeystrokeEvent = {
       key,
       code: e.code,
       pressTime: now,
       flightTime,
-      isError: isBackspaceOrDelete
+      isError: isMistake
     };
 
     this.currentKeystrokes.push(event);
@@ -236,6 +370,8 @@ class TypingMetricsService {
     for (const stroke of this.currentKeystrokes) {
       if (stroke.key === 'Backspace' || stroke.key === 'Delete') {
         backspaceCount++;
+      }
+      if (stroke.isError) {
         errorCount++;
       }
       if (stroke.holdTime !== undefined) {
@@ -249,8 +385,19 @@ class TypingMetricsService {
       }
     }
 
-    const correctKeystrokes = Math.max(0, totalKeystrokes - errorCount);
-    const accuracy = totalKeystrokes > 0 ? (correctKeystrokes / totalKeystrokes) * 100 : 100;
+    // Also compare currentTypedChars against currentExpectedText
+    let liveMismatch = 0;
+    if (this.currentExpectedText && this.currentTypedChars) {
+      for (let i = 0; i < this.currentTypedChars.length; i++) {
+        if (i < this.currentExpectedText.length && this.currentTypedChars[i] !== this.currentExpectedText[i]) {
+          liveMismatch++;
+        }
+      }
+    }
+
+    const effectiveErrors = Math.max(errorCount, liveMismatch, this.sessionErrorCount);
+    const correctKeystrokes = Math.max(0, totalKeystrokes - effectiveErrors);
+    const accuracy = totalKeystrokes > 0 ? Math.max(0, Math.min(100, (correctKeystrokes / totalKeystrokes) * 100)) : 100;
 
     const rawWpm = durationMinutes > 0 ? Math.round((totalKeystrokes / 5) / durationMinutes) : 0;
     const netWpm = durationMinutes > 0 ? Math.round((correctKeystrokes / 5) / durationMinutes) : 0;
@@ -338,7 +485,7 @@ class TypingMetricsService {
   }
 
   public async getPracticePassages(vaultNotes?: Array<{ id: string; title: string; content?: string }>): Promise<PassageItem[]> {
-    let basePassages: PassageItem[] = [];
+    let basePassages: PassageItem[] = [...MONKEY_TYPE_PRESETS];
 
     // 1. Fetch live from PostgreSQL backend
     try {
@@ -346,18 +493,18 @@ class TypingMetricsService {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          basePassages = data;
+          basePassages = [...MONKEY_TYPE_PRESETS, ...data];
           localStorage.setItem('milearnapp_typing_passages', JSON.stringify(data));
         }
       }
     } catch {}
 
     // 2. Cache fallback
-    if (basePassages.length === 0) {
+    if (basePassages.length === MONKEY_TYPE_PRESETS.length) {
       try {
         const cached = localStorage.getItem('milearnapp_typing_passages');
         if (cached) {
-          basePassages = JSON.parse(cached);
+          basePassages = [...MONKEY_TYPE_PRESETS, ...JSON.parse(cached)];
         }
       } catch {}
     }
@@ -365,20 +512,20 @@ class TypingMetricsService {
     // 3. Dynamic Vault Passages from active user notes
     const dynamicVaultPassages: PassageItem[] = [];
     if (vaultNotes && vaultNotes.length > 0) {
-      vaultNotes.slice(0, 5).forEach((n) => {
+      vaultNotes.slice(0, 3).forEach((n) => {
         if (!n.content || n.content.length < 50) return;
         const cleanText = n.content
           .replace(/[#*`_~[\]()]/g, '')
           .replace(/\n+/g, ' ')
           .trim()
-          .slice(0, 180);
+          .slice(0, 140);
 
-        if (cleanText.length > 30) {
+        if (cleanText.length > 25) {
           dynamicVaultPassages.push({
             id: `note-pass-${n.id}`,
-            title: `Vault: ${n.title}`,
+            title: `Vault: ${n.title.slice(0, 20)}`,
             category: 'Tech',
-            difficulty: cleanText.length > 120 ? 'intermediate' : 'beginner',
+            difficulty: cleanText.length > 100 ? 'intermediate' : 'beginner',
             text: cleanText
           });
         }

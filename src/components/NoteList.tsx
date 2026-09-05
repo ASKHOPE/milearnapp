@@ -17,8 +17,6 @@ import {
   RotateCcw,
   Lock,
   Archive,
-  ChevronLeft,
-  ChevronRight,
   X,
   SlidersHorizontal,
   Columns2
@@ -170,53 +168,38 @@ export const NoteList: React.FC<NoteListProps> = ({
 
   return (
     <section className={`notes-list-pane ${isCollapsed ? 'collapsed' : ''}`}>
-      {/* Middle Edge Floating Toggle Button */}
-      {onToggleCollapse && (
-        <button
-          type="button"
-          className="edge-middle-toggle-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleCollapse();
-          }}
-          title={isCollapsed ? "Expand Notes List" : "Collapse Notes List"}
-          aria-label={isCollapsed ? "Expand Notes List" : "Collapse Notes List"}
-        >
-          {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-        </button>
-      )}
+      {/* Collapsed Strip View (visible when collapsed and not hovering) */}
+      <div 
+        className="notes-list-collapsed-strip" 
+        onClick={onToggleCollapse} 
+        title="Notes List (hover to browse)"
+      >
+        {onCreateNote && currentFilter !== 'trash' && currentFilter !== 'archive' && (
+          <button
+            type="button"
+            className="collapsed-quick-add-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateNote();
+            }}
+            title="Create New Note (Cmd+N)"
+          >
+            <Plus size={14} />
+          </button>
+        )}
 
-      {isCollapsed ? (
-        <div 
-          className="notes-list-collapsed-strip" 
-          onClick={onToggleCollapse} 
-          title="Click anywhere to expand Notes List"
-        >
-          {onCreateNote && currentFilter !== 'trash' && currentFilter !== 'archive' && (
-            <button
-              type="button"
-              className="collapsed-quick-add-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateNote();
-              }}
-              title="Create New Note (Cmd+N)"
-            >
-              <Plus size={14} />
-            </button>
-          )}
-
-          <div className="collapsed-notes-badge">
-            <span>{columnTitle}</span>
-            <span className="collapsed-count-pill">{filteredNotes.length}</span>
-          </div>
+        <div className="collapsed-notes-badge">
+          <span>{columnTitle}</span>
+          <span className="collapsed-count-pill">{filteredNotes.length}</span>
         </div>
-      ) : (
-        <>
-          {/* Sleek Modern List Header */}
-          <div className="notelist-sleek-header">
-            <div className="notelist-header-title-wrap">
-              <h3 className="notelist-heading-title">{columnTitle}</h3>
+      </div>
+
+      {/* Main NoteList Content (Shown normally, or revealed on hover when collapsed) */}
+      <div className="notes-list-main-content">
+        {/* Sleek Modern List Header */}
+        <div className="notelist-sleek-header">
+          <div className="notelist-header-title-wrap">
+            <h3 className="notelist-heading-title">{columnTitle}</h3>
               <span className="notelist-count-chip">{filteredNotes.length}</span>
             </div>
 
@@ -441,8 +424,7 @@ export const NoteList: React.FC<NoteListProps> = ({
           })
         )}
       </div>
-        </>
-      )}
+      </div>
     </section>
   );
 };

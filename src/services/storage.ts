@@ -460,6 +460,27 @@ export const storage = {
     }
   },
 
+  // --- UI Layout & Interaction Settings ---
+  getUiLayoutSettings(): { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean } {
+    try {
+      const saved = localStorage.getItem('milearnapp_ui_layout');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      showSidebarCalendar: true,
+      sidebarCollapsed: false,
+      noteListCollapsed: false
+    };
+  },
+
+  setUiLayoutSettings(settings: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }) {
+    try {
+      localStorage.setItem('milearnapp_ui_layout', JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save UI layout settings', e);
+    }
+  },
+
   // --- Typography Settings ---
   getTypographySettings(): TypographySettings {
     try {

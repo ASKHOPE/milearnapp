@@ -31,7 +31,8 @@ import {
   Download,
   FileCode,
   FileText,
-  Sparkles
+  Sparkles,
+  Image as ImageIcon
 } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { VoiceRecorder } from './VoiceRecorder';
@@ -1858,8 +1859,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
                 {isShareMenuOpen && (
                   <>
-                    <div className="dropdown-backdrop" onClick={() => setIsShareMenuOpen(false)} />
-                    <div className="tab-share-dropdown-menu">
+                    <div className="dropdown-backdrop" onClick={(e) => { e.stopPropagation(); setIsShareMenuOpen(false); }} />
+                    <div className="tab-share-dropdown-menu" onClick={(e) => e.stopPropagation()}>
                       <div className="share-menu-header">
                         <span>Export & Share Note</span>
                       </div>
@@ -1921,6 +1922,38 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                         <div className="share-item-details">
                           <strong>Export Plain Text (.txt)</strong>
                           <span>Clean unformatted text</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          setIsExportModalOpen(true);
+                        }}
+                        title="Social PNG Image Card Preview & Download"
+                      >
+                        <ImageIcon size={13} color="#6366f1" />
+                        <div className="share-item-details">
+                          <strong>Social Image Card (PNG)</strong>
+                          <span>Aesthetic 16:9 visual card</span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        onClick={() => {
+                          setIsShareMenuOpen(false);
+                          if (note?.content) {
+                            navigator.clipboard.writeText(note.content);
+                          }
+                        }}
+                        title="Copy raw note text to clipboard"
+                      >
+                        <Copy size={13} color="#f59e0b" />
+                        <div className="share-item-details">
+                          <strong>Copy Note Content</strong>
+                          <span>Copy markdown text to clipboard</span>
                         </div>
                       </button>
                       <button
@@ -2629,10 +2662,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       )}
 
-      {/* Floating Autosave & Word / Character Metrics Badge (Bottom-Right Corner) */}
+      {/* Floating Autosave, Document Metrics & Mode Switcher (Bottom Status Bar) */}
       <EditorFooterStatus
         saveStatus={saveStatus}
         content={note.content || ''}
+        mode={mode}
+        setMode={setMode}
       />
     </main>
   );

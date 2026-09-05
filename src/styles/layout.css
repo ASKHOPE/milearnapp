@@ -1342,6 +1342,7 @@
 .workspace-switcher-container {
   position: relative;
   margin-bottom: 12px;
+  z-index: 90;
 }
 
 .workspace-active-pill {
@@ -1403,7 +1404,7 @@
   border: 1px solid var(--border-active);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  z-index: 50;
+  z-index: 1000;
   overflow: hidden;
   animation: modalFadeIn 0.12s ease-out;
 }
@@ -1452,14 +1453,24 @@
   display: block;
 }
 
+.workspace-action-icon-btn,
 .workspace-delete-btn {
   width: 22px;
   height: 22px;
   border-radius: 4px;
+  background: transparent;
+  border: none;
   color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.workspace-action-icon-btn:hover {
+  color: var(--accent-primary);
+  background: var(--accent-light);
 }
 
 .workspace-delete-btn:hover {
@@ -1791,33 +1802,6 @@
   transform: scale(1.06);
 }
 
-.btn-collapse-notes-pane {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xs);
-  color: var(--text-muted);
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-right: 4px;
-  padding: 0;
-}
-
-.btn-collapse-notes-pane:hover {
-  background: var(--bg-surface);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-.btn-expand-notes-pane:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
 .collapsed-notes-badge {
   writing-mode: vertical-rl;
   text-orientation: mixed;
@@ -1839,7 +1823,60 @@
   font-weight: 700;
 }
 
-/* Compact Note Cards with Hover Expansion */
+/* --- Detached Floating Popup Card on Hover --- */
+.notes-list-pane.collapsed .notes-list-main-content {
+  position: absolute;
+  top: 12px;
+  left: calc(100% + 12px);
+  width: 320px;
+  height: calc(100vh - 84px);
+  max-height: 820px;
+  background: var(--bg-modal);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 0, 0, 0.16);
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px) scale(0.97);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(16px);
+}
+
+/* Hovering the strip or the card keeps the detached card open with comfortable persistence */
+.notes-list-pane.collapsed:hover .notes-list-main-content,
+.notes-list-pane.collapsed .notes-list-main-content:hover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) scale(1);
+}
+
+/* Invisible bridge between the collapsed strip and the floating popup card so hover isn't lost */
+.notes-list-pane.collapsed::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 16px;
+  height: 100%;
+  z-index: 1199;
+}
+
+/* When not collapsed, main content fills pane normally */
+.notes-list-pane:not(.collapsed) .notes-list-collapsed-strip {
+  display: none;
+}
+
+.notes-list-pane:not(.collapsed) .notes-list-main-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
 .note-card.compact-card {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
@@ -4017,37 +4054,6 @@
   }
 }
 
-/* ==========================================================================
-   Middle Edge Floating Toggle Button (<> / < / >)
-   ========================================================================== */
-.edge-middle-toggle-btn {
-  position: absolute;
-  top: 50%;
-  right: -11px;
-  transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.16));
-  color: var(--text-secondary, #94a3b8);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 60;
-  padding: 0;
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.edge-middle-toggle-btn:hover {
-  background: var(--accent-primary, #6366f1);
-  color: #ffffff;
-  border-color: var(--accent-primary, #6366f1);
-  transform: translateY(-50%) scale(1.12);
-  box-shadow: 0 3px 12px rgba(99, 102, 241, 0.45);
-}
 
 /* ==========================================================================
    PostgreSQL Status Pulsing Dot in Header Settings Gear
@@ -4094,53 +4100,122 @@
   border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
 }
 
-.sidebar-theme-toggle-pill {
+.sidebar-theme-quick-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.04));
+  padding: 3px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  position: relative;
+}
+
+.sidebar-theme-quick-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.sidebar-theme-quick-btn:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #ffffff);
+}
+
+.sidebar-theme-quick-btn.active {
+  background: var(--bg-card, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #ffffff);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-theme-custom-wrap {
+  position: relative;
+  flex: 1.2;
+}
+
+.sidebar-theme-quick-btn.custom {
   width: 100%;
+}
+
+.sidebar-theme-custom-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: -20px;
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 175px;
+}
+
+.sidebar-theme-popover-header {
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #64748b);
+}
+
+.sidebar-theme-option-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm, 8px);
-  background: var(--bg-tertiary, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--text-secondary, #cbd5e1);
   font-size: 11.5px;
-  font-weight: 500;
+  text-align: left;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.sidebar-theme-toggle-pill:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.1));
-  border-color: var(--accent-primary, #6366f1);
+.sidebar-theme-option-item:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
   color: var(--text-primary, #ffffff);
-  transform: translateY(-1px);
 }
 
-.sidebar-theme-icon-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.sidebar-theme-name {
-  flex: 1;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sidebar-theme-chip {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: var(--accent-subtle, rgba(99, 102, 241, 0.15));
+.sidebar-theme-option-item.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
   color: var(--accent-primary, #818cf8);
-  font-weight: 700;
+}
+
+.theme-opt-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-opt-text strong {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.theme-opt-text span {
+  font-size: 9.5px;
+  color: var(--text-muted, #94a3b8);
 }
 
 .rail-nav-btn.rail-theme-btn {

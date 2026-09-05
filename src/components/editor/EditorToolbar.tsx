@@ -7,7 +7,6 @@ import {
   Hash,
   Copy,
   Move,
-  Share2,
   Pin,
   Star,
   Lock,
@@ -18,9 +17,7 @@ import {
   Archive,
   Trash2,
   LogOut,
-  Heading1,
-  Heading2,
-  Heading3,
+  Type,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -56,9 +53,6 @@ import {
   Image as ImageIcon,
   Video as VideoIcon,
   ChevronDown,
-  Sparkles,
-  Columns,
-  Edit3,
   Search,
   PenTool,
   ListTree,
@@ -151,8 +145,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   folders,
   books,
   isZenMode,
-  mode,
-  setMode,
+  mode: _mode,
+  setMode: _setMode,
   wordCount,
   charCount,
   isRow1Open,
@@ -201,7 +195,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   setIsMoveModalOpen,
   setMoveFolderChoice,
   setMoveBookChoice,
-  setIsExportModalOpen,
+  setIsExportModalOpen: _setIsExportModalOpen,
   setIsCryptoModalOpen,
   setCryptoModalMode,
   setIsInteractiveFlowOpen,
@@ -367,16 +361,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
           <button
             type="button"
-            className="toolbar-btn"
-            onClick={() => setIsExportModalOpen(true)}
-            title="Export & Share"
-          >
-            <Share2 size={13} color="var(--accent-primary)" />
-            <span>Export</span>
-          </button>
-
-          <button
-            type="button"
             className={`toolbar-btn ${note.isPinned ? 'active' : ''}`}
             onClick={() => onUpdateNote({ ...note, isPinned: !note.isPinned })}
             disabled={note.isTrashed}
@@ -466,18 +450,42 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       {/* ROW 2: TYPOGRAPHY */}
       {isRow2Open && (
         <div className="toolbar-row-body row-2-typography">
-          <button type="button" className="toolbar-btn" onClick={() => insertFormatting('# ')} disabled={note.isTrashed} title="Heading 1">
-            <Heading1 size={14} />
-            <span>H1</span>
-          </button>
-          <button type="button" className="toolbar-btn" onClick={() => insertFormatting('## ')} disabled={note.isTrashed} title="Heading 2">
-            <Heading2 size={14} />
-            <span>H2</span>
-          </button>
-          <button type="button" className="toolbar-btn" onClick={() => insertFormatting('### ')} disabled={note.isTrashed} title="Heading 3">
-            <Heading3 size={14} />
-            <span>H3</span>
-          </button>
+          <div className="toolbar-inline-select header-dropdown-wrapper">
+            <Type size={13} color="var(--text-muted)" />
+            <select
+              className="editor-font-select header-selector-dropdown"
+              value=""
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) return;
+                if (val.startsWith('#')) {
+                  insertFormatting(val);
+                } else if (val === 'quote') {
+                  insertFormatting('> ');
+                } else if (val === 'subtitle') {
+                  insertFormatting('### *', '*');
+                } else if (val === 'code') {
+                  insertFormatting('```\n', '\n```');
+                } else if (val === 'p') {
+                  insertFormatting('');
+                }
+                e.target.value = '';
+              }}
+              disabled={note.isTrashed}
+              title="Header & Text Style Selector"
+            >
+              <option value="" disabled hidden>Style: Heading / Text</option>
+              <option value="# ">Heading 1 (H1 - Huge)</option>
+              <option value="## ">Heading 2 (H2 - Large)</option>
+              <option value="### ">Heading 3 (H3 - Section)</option>
+              <option value="#### ">Heading 4 (H4 - Medium)</option>
+              <option value="##### ">Heading 5 (H5 - Small)</option>
+              <option value="subtitle">Subtitle / Lead</option>
+              <option value="p">Normal Sentence / Paragraph</option>
+              <option value="quote">Blockquote (&gt;)</option>
+              <option value="code">Code Block (```)</option>
+            </select>
+          </div>
 
           <div className="toolbar-divider" />
 
@@ -885,37 +893,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* View Mode Selector: Live, Split, Markdown */}
-          <div className="mode-toggle-group" style={{ marginLeft: 'auto' }}>
-            <button
-              type="button"
-              className={`mode-btn ${mode === 'live' ? 'active' : ''}`}
-              onClick={() => setMode('live')}
-              title="Interactive Live Document (WYSIWYG)"
-            >
-              <Sparkles size={11} style={{ marginRight: '3px' }} />
-              <span>Live</span>
-            </button>
-            <button
-              type="button"
-              className={`mode-btn ${mode === 'split' ? 'active' : ''}`}
-              onClick={() => setMode('split')}
-              title="Side-by-Side Split View"
-            >
-              <Columns size={11} style={{ marginRight: '3px' }} />
-              <span>Split</span>
-            </button>
-            <button
-              type="button"
-              className={`mode-btn ${mode === 'source' ? 'active' : ''}`}
-              onClick={() => setMode('source')}
-              title="Raw Markdown Source Editor"
-            >
-              <Edit3 size={11} style={{ marginRight: '3px' }} />
-              <span>Markdown</span>
-            </button>
           </div>
         </div>
       )}

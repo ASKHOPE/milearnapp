@@ -32,6 +32,8 @@ export interface AppModalsProps {
   userProfile: UserProfile;
   onUpdateProfile: (profile: UserProfile) => void;
   settingsInitialTab?: string;
+  uiLayout?: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean };
+  onUpdateUiLayout?: (partial: Partial<{ showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }>) => void;
 
   // Knowledge Base
   isKnowledgeBaseOpen: boolean;
@@ -108,6 +110,8 @@ export const AppModals: React.FC<AppModalsProps> = ({
   userProfile,
   onUpdateProfile,
   settingsInitialTab,
+  uiLayout,
+  onUpdateUiLayout,
 
   isKnowledgeBaseOpen,
   onCloseKnowledgeBase,
@@ -188,6 +192,8 @@ export const AppModals: React.FC<AppModalsProps> = ({
             userProfile={userProfile}
             onUpdateProfile={onUpdateProfile}
             initialTab={settingsInitialTab}
+            uiLayout={uiLayout}
+            onUpdateUiLayout={onUpdateUiLayout}
           />
         </ErrorBoundary>
       )}

@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Keyboard, 
   Zap, 
-  Activity, 
   Clock, 
   CheckCircle2, 
   RotateCcw, 
@@ -12,7 +11,9 @@ import {
   Play,
   Trophy,
   Sparkles,
-  Check
+  Check,
+  Timer,
+  FileText
 } from 'lucide-react';
 import { typingMetrics, type TypingSessionStats, type PracticeGameSession, type PassageItem } from '../services/typingMetrics';
 import type { Note } from '../types';
@@ -32,6 +33,7 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
   const [passages, setPassages] = useState<PassageItem[]>([]);
 
   // Practice Mode State
+  const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | 'beginner' | 'intermediate' | 'expert' | 'code'>('beginner');
   const [selectedPassageIdx, setSelectedPassageIdx] = useState(0);
   const [practiceInput, setPracticeInput] = useState('');
   const [isPracticing, setIsPracticing] = useState(false);
@@ -40,6 +42,20 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
     const hist = typingMetrics.getSessionHistory();
     return hist.length > 0 ? Math.max(...hist.map((h) => h.wpm)) : 0;
   });
+
+  // Customizer Controls
+  const [sprintMode, setSprintMode] = useState<'time' | 'passage'>('time');
+  const [timeLimit, setTimeLimit] = useState<number>(30); // 15, 30, 60, 120 or custom
+  const [customTimeInput, setCustomTimeInput] = useState<string>('45');
+  const [isCustomTime, setIsCustomTime] = useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = useState<number>(30);
+
+  // Text Customization Modifiers
+  const [includeCaps, setIncludeCaps] = useState<boolean>(true);
+  const [includeNumbers, setIncludeNumbers] = useState<boolean>(false);
+  const [includeSymbols, setIncludeSymbols] = useState<boolean>(false);
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -68,22 +84,105 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
     };
   }, []);
 
-  if (!isOpen) return null;
+  // Filter passages by chosen difficulty tab
+  const filteredPassages = useMemo(() => {
+    return selectedDifficulty === 'all'
+      ? passages
+      : passages.filter((p) => p.difficulty === selectedDifficulty);
+  }, [passages, selectedDifficulty]);
 
-  const currentPassage = passages[selectedPassageIdx] || passages[0] || {
+  const activePassagesList = filteredPassages.length > 0 ? filteredPassages : passages;
+  const rawCurrentPassage = activePassagesList[selectedPassageIdx] || activePassagesList[0] || {
     id: 'default-passage',
     title: 'Dynamic Sprint',
     category: 'Tech' as const,
     difficulty: 'beginner' as const,
-    text: 'Local-first architecture guarantees real-time responsiveness and full user data autonomy.'
+    text: 'the quick brown fox jumps over the lazy dog and runs into the warm sun and brings energy to every living being across the open field'
   };
+
+  // Transform passage text according to active customization options
+  const transformedText = useMemo(() => {
+    let base = rawCurrentPassage.text;
+    // Repeat short sentences so there is plenty of text space for long timed sprints
+    if (base.length < 120) {
+      base = `${base} ${base} ${base}`;
+    } else if (base.length < 240) {
+      base = `${base} ${base}`;
+    }
+
+    if (!includeCaps) {
+      base = base.toLowerCase();
+    } else {
+      // Capitalize first letters of sentences
+      base = base.replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
+    }
+
+    if (includeNumbers) {
+      const words = base.split(' ');
+      base = words.map((w, i) => (i % 6 === 3 ? `${w} ${(i * 7 + 12) % 99 + 1}` : w)).join(' ');
+    }
+
+    if (includeSymbols) {
+      const symbols = ['!', '@', '#', '$', '%', '&', '*', '(', ')', '_', '+', '=', '{', '}', ';', ':'];
+      const words = base.split(' ');
+      base = words.map((w, i) => (i % 5 === 2 ? `${w}${symbols[i % symbols.length]}` : w)).join(' ');
+    }
+
+    return base.trim();
+  }, [rawCurrentPassage.text, includeCaps, includeNumbers, includeSymbols]);
+
+  // Timed Sprint Countdown logic
+  const handleCompleteSprintRef = useRef<() => void>(() => {});
+
+  const handleCompleteSprint = () => {
+    setIsCompleted(true);
+    setIsPracticing(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    const gameRecord = typingMetrics.endSessionAndPersist(rawCurrentPassage.difficulty);
+    setStats(gameRecord);
+    const updatedHistory = typingMetrics.getSessionHistory();
+    setHistory(updatedHistory);
+    if (updatedHistory.length > 0) {
+      setBestWpm(Math.max(...updatedHistory.map((h) => h.wpm)));
+    }
+  };
+
+  handleCompleteSprintRef.current = handleCompleteSprint;
+
+  useEffect(() => {
+    if (isPracticing && sprintMode === 'time') {
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
+            handleCompleteSprintRef.current();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isPracticing, sprintMode]);
 
   const handlePracticeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isPracticing && !isCompleted) {
       setIsPracticing(true);
-      typingMetrics.startSession(currentPassage.title);
+      typingMetrics.startSession(rawCurrentPassage.title, transformedText);
     }
-    typingMetrics.recordKeyDown(e.nativeEvent);
+    typingMetrics.recordKeyDown(e.nativeEvent, practiceInput);
   };
 
   const handlePracticeKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -91,40 +190,46 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
   };
 
   const handlePracticeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isCompleted) return;
     const val = e.target.value;
     setPracticeInput(val);
+    typingMetrics.updateLiveInput(val);
 
-    if (val === currentPassage.text) {
-      setIsCompleted(true);
-      setIsPracticing(false);
-      const gameRecord = typingMetrics.endSessionAndPersist(currentPassage.difficulty);
-      setStats(gameRecord);
-      const updatedHistory = typingMetrics.getSessionHistory();
-      setHistory(updatedHistory);
-      setBestWpm(Math.max(...updatedHistory.map((h) => h.wpm)));
+    // Passage completion
+    if (sprintMode === 'passage' && val === transformedText) {
+      handleCompleteSprint();
     }
   };
 
-  const handleResetPractice = () => {
+  const handleResetPractice = (customTime?: number) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     setPracticeInput('');
     setIsPracticing(false);
     setIsCompleted(false);
+    const selectedTime = customTime !== undefined ? customTime : (isCustomTime ? parseInt(customTimeInput) || 30 : timeLimit);
+    setTimeLeft(selectedTime);
     typingMetrics.cancelSession();
+    setStats(typingMetrics.calculateStats());
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="selector-modal-overlay" onClick={onClose}>
       <div 
         className="selector-modal-card" 
-        style={{ maxWidth: '800px', borderRadius: '16px', overflow: 'hidden' }} 
+        style={{ maxWidth: '860px', borderRadius: '16px', overflow: 'hidden' }} 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="selector-modal-header" style={{ borderBottom: '1px solid var(--border-color)', padding: '18px 24px' }}>
+        <div className="selector-modal-header" style={{ borderBottom: '1px solid var(--border-color)', padding: '16px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '40px',
-              height: '40px',
+              width: '38px',
+              height: '38px',
               borderRadius: '10px',
               background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2))',
               border: '1px solid rgba(99, 102, 241, 0.4)',
@@ -152,7 +257,7 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                 </span>
               </div>
               <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                Practice sprints are recorded in your personal speed arcade. Everyday note editing is never logged.
+                Customize time sprints, text sets, capital letters, numbers, and symbols.
               </p>
             </div>
           </div>
@@ -185,7 +290,7 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
         <div style={{
           display: 'flex',
           gap: '8px',
-          padding: '12px 24px',
+          padding: '10px 24px',
           background: 'var(--bg-subtle, rgba(0, 0, 0, 0.02))',
           borderBottom: '1px solid var(--border-color)'
         }}>
@@ -210,71 +315,322 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '24px', overflowY: 'auto', maxHeight: '68vh' }}>
+        <div style={{ padding: '20px 24px', overflowY: 'auto', maxHeight: '70vh' }}>
           {activeTab === 'game' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               
-              {/* Passage Category Selector Strip */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Choose Sprint Passage:
-                </span>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {passages.map((pass, i) => (
-                    <button
-                      key={pass.id}
-                      type="button"
-                      style={{
-                        padding: '5px 12px',
-                        fontSize: '12px',
-                        borderRadius: '8px',
-                        border: selectedPassageIdx === i 
-                          ? '1px solid var(--accent-primary)' 
-                          : '1px solid var(--border-color)',
-                        background: selectedPassageIdx === i ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                        color: selectedPassageIdx === i ? 'var(--accent-primary)' : 'var(--text-muted)',
-                        cursor: 'pointer',
-                        fontWeight: selectedPassageIdx === i ? 600 : 400,
-                        transition: 'all 0.15s ease'
-                      }}
-                      onClick={() => {
-                        setSelectedPassageIdx(i);
+              {/* Comprehensive Customizer Control Bar */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                padding: '12px 16px',
+                background: 'var(--bg-subtle, rgba(255, 255, 255, 0.03))',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)'
+              }}>
+                {/* Row 1: Mode (Time vs Passage) & Time Selection */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                  {/* Sprint Mode: Time vs Full Passage */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>
+                      Sprint Mode:
+                    </span>
+                    <div style={{ display: 'flex', gap: '3px', background: 'rgba(0, 0, 0, 0.25)', padding: '2px', borderRadius: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSprintMode('time');
+                          handleResetPractice();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '4px 10px',
+                          fontSize: '11.5px',
+                          fontWeight: sprintMode === 'time' ? 700 : 500,
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: sprintMode === 'time' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                          color: sprintMode === 'time' ? '#fff' : 'var(--text-muted)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Timer size={12} />
+                        <span>Timed Test</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSprintMode('passage');
+                          handleResetPractice();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          padding: '4px 10px',
+                          fontSize: '11.5px',
+                          fontWeight: sprintMode === 'passage' ? 700 : 500,
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: sprintMode === 'passage' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                          color: sprintMode === 'passage' ? '#fff' : 'var(--text-muted)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <FileText size={12} />
+                        <span>Full Passage</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Timed Presets & Custom Seconds */}
+                  {sprintMode === 'time' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>Time:</span>
+                      {[15, 30, 60, 120].map((sec) => {
+                        const isSelected = !isCustomTime && timeLimit === sec;
+                        return (
+                          <button
+                            key={sec}
+                            type="button"
+                            onClick={() => {
+                              setIsCustomTime(false);
+                              setTimeLimit(sec);
+                              handleResetPractice(sec);
+                            }}
+                            style={{
+                              padding: '3px 8px',
+                              fontSize: '11px',
+                              borderRadius: '6px',
+                              border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                              background: isSelected ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                              color: isSelected ? 'var(--accent-primary)' : 'var(--text-muted)',
+                              cursor: 'pointer',
+                              fontWeight: isSelected ? 700 : 500
+                            }}
+                          >
+                            {sec >= 60 ? `${sec / 60}m` : `${sec}s`}
+                          </button>
+                        );
+                      })}
+
+                      {/* Custom Time Option */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCustomTime(true);
+                            const val = parseInt(customTimeInput) || 45;
+                            handleResetPractice(val);
+                          }}
+                          style={{
+                            padding: '3px 8px',
+                            fontSize: '11px',
+                            borderRadius: '6px',
+                            border: isCustomTime ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                            background: isCustomTime ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                            color: isCustomTime ? 'var(--accent-primary)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            fontWeight: isCustomTime ? 700 : 500
+                          }}
+                        >
+                          Custom:
+                        </button>
+                        <input
+                          type="number"
+                          min="5"
+                          max="600"
+                          value={customTimeInput}
+                          onChange={(e) => {
+                            setCustomTimeInput(e.target.value);
+                            setIsCustomTime(true);
+                            const val = parseInt(e.target.value) || 30;
+                            handleResetPractice(val);
+                          }}
+                          style={{
+                            width: '50px',
+                            padding: '2px 6px',
+                            fontSize: '11px',
+                            borderRadius: '5px',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-input)',
+                            color: 'var(--text-primary)',
+                            outline: 'none',
+                            textAlign: 'center'
+                          }}
+                        />
+                        <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>sec</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Row 2: Text Customization & Compact Passage Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '10px' }}>
+                  {/* Text Style Customizers: Capital letters, Numbers, Symbols */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)' }}>
+                      Text Modifiers:
+                    </span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeCaps}
+                        onChange={(e) => {
+                          setIncludeCaps(e.target.checked);
+                          handleResetPractice();
+                        }}
+                        style={{ accentColor: 'var(--accent-primary)' }}
+                      />
+                      <span>Capitals (Aa)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeNumbers}
+                        onChange={(e) => {
+                          setIncludeNumbers(e.target.checked);
+                          handleResetPractice();
+                        }}
+                        style={{ accentColor: 'var(--accent-primary)' }}
+                      />
+                      <span>Numbers (123)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeSymbols}
+                        onChange={(e) => {
+                          setIncludeSymbols(e.target.checked);
+                          handleResetPractice();
+                        }}
+                        style={{ accentColor: 'var(--accent-primary)' }}
+                      />
+                      <span>Symbols (#$%)</span>
+                    </label>
+                  </div>
+
+                  {/* Reduced Passage Selector Dropdown */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      Passage:
+                    </span>
+                    <select
+                      value={selectedPassageIdx}
+                      onChange={(e) => {
+                        setSelectedPassageIdx(Number(e.target.value));
                         handleResetPractice();
                       }}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11.5px',
+                        fontWeight: 500,
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-card, #161b22)',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        maxWidth: '250px'
+                      }}
                     >
-                      {pass.title}
-                    </button>
-                  ))}
+                      {activePassagesList.map((pass, i) => (
+                        <option key={pass.id} value={i}>
+                          {pass.title} ({pass.difficulty})
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Difficulty Pill Filter */}
+                    <div style={{ display: 'flex', gap: '2px', background: 'rgba(0, 0, 0, 0.2)', padding: '2px', borderRadius: '6px' }}>
+                      {(['all', 'beginner', 'intermediate', 'expert', 'code'] as const).map((diff) => {
+                        const shortLabels: Record<string, string> = {
+                          all: 'All',
+                          beginner: 'Easy',
+                          intermediate: 'Norm',
+                          expert: 'Hard',
+                          code: 'Code'
+                        };
+                        const isActive = selectedDifficulty === diff;
+                        return (
+                          <button
+                            key={diff}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDifficulty(diff);
+                              setSelectedPassageIdx(0);
+                              handleResetPractice();
+                            }}
+                            style={{
+                              padding: '2px 6px',
+                              fontSize: '10.5px',
+                              fontWeight: isActive ? 700 : 500,
+                              borderRadius: '4px',
+                              border: 'none',
+                              background: isActive ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                              color: isActive ? '#fff' : 'var(--text-muted)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {shortLabels[diff]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Passage Card Display */}
+              {/* Generous Visible Sentences Space Card */}
               <div style={{
                 position: 'relative',
-                padding: '20px',
-                background: 'var(--bg-card, rgba(255, 255, 255, 0.04))',
+                padding: '22px 26px',
+                background: 'var(--bg-card, rgba(255, 255, 255, 0.03))',
                 border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-                borderRadius: '12px',
-                fontSize: '16px',
-                lineHeight: 1.7,
-                letterSpacing: '0.01em',
-                userSelect: 'none'
+                borderRadius: '14px',
+                fontSize: '18px',
+                lineHeight: 1.85,
+                letterSpacing: '0.015em',
+                userSelect: 'none',
+                minHeight: '140px',
+                maxHeight: '220px',
+                overflowY: 'auto'
               }}>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '12px',
-                  fontSize: '11px',
+                  justifyContent: 'space-between',
+                  marginBottom: '10px',
+                  fontSize: '11.5px',
                   color: 'var(--text-muted)'
                 }}>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{currentPassage.title}</span>
-                  <span>•</span>
-                  <span style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>{currentPassage.difficulty}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{rawCurrentPassage.title}</span>
+                    <span>•</span>
+                    <span style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>{rawCurrentPassage.difficulty}</span>
+                  </div>
+
+                  {sprintMode === 'time' && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      color: timeLeft <= 5 ? '#ef4444' : 'var(--accent-primary)',
+                      fontWeight: 700,
+                      fontSize: '13px'
+                    }}>
+                      <Timer size={14} />
+                      <span>{timeLeft}s remaining</span>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  {currentPassage.text.split('').map((char, index) => {
+                {/* Visible Multi-Sentence Stream with Accurate Live Character Highlighting */}
+                <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                  {transformedText.split('').map((char, index) => {
                     let color = 'var(--text-muted)';
                     let bg = 'transparent';
 
@@ -313,85 +669,70 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                   style={{
                     width: '100%',
                     padding: '14px 18px',
-                    fontSize: '15px',
+                    fontSize: '16px',
                     borderRadius: '10px',
                     border: isCompleted ? '2px solid #10b981' : '1px solid var(--accent-primary)',
                     background: 'var(--bg-input, var(--bg-card))',
                     color: 'var(--text-primary)',
                     outline: 'none',
                     boxShadow: isPracticing ? '0 0 0 3px rgba(99, 102, 241, 0.2)' : 'none',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    fontFamily: 'var(--font-mono, monospace)'
                   }}
                 />
               </div>
 
-              {/* Live Game Telemetry Meter */}
+              {/* Live Game Telemetry Meter (Speed, Accuracy, Time) */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '12px'
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '14px'
               }}>
                 <div style={{
-                  padding: '14px',
+                  padding: '14px 12px',
                   background: 'var(--bg-card)',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
                   textAlign: 'center'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--accent-primary)', marginBottom: '4px' }}>
-                    <Zap size={15} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: 'var(--accent-primary)', marginBottom: '3px' }}>
+                    <Zap size={14} />
                     <span style={{ fontSize: '11px', fontWeight: 600 }}>SPEED</span>
                   </div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--accent-primary)' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--accent-primary)' }}>
                     {stats.wpm} <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>WPM</span>
                   </div>
                 </div>
 
                 <div style={{
-                  padding: '14px',
+                  padding: '14px 12px',
                   background: 'var(--bg-card)',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
                   textAlign: 'center'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#10b981', marginBottom: '4px' }}>
-                    <CheckCircle2 size={15} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#10b981', marginBottom: '3px' }}>
+                    <CheckCircle2 size={14} />
                     <span style={{ fontSize: '11px', fontWeight: 600 }}>ACCURACY</span>
                   </div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#10b981' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 800, color: '#10b981' }}>
                     {stats.accuracy}%
                   </div>
                 </div>
 
                 <div style={{
-                  padding: '14px',
+                  padding: '14px 12px',
                   background: 'var(--bg-card)',
                   borderRadius: '10px',
                   border: '1px solid var(--border-color)',
                   textAlign: 'center'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f59e0b', marginBottom: '4px' }}>
-                    <Clock size={15} />
-                    <span style={{ fontSize: '11px', fontWeight: 600 }}>ELAPSED</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f59e0b', marginBottom: '3px' }}>
+                    <Clock size={14} />
+                    <span style={{ fontSize: '11px', fontWeight: 600 }}>{sprintMode === 'time' ? 'REMAINING' : 'ELAPSED'}</span>
                   </div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#f59e0b' }}>
-                    {stats.durationSeconds}s
-                  </div>
-                </div>
-
-                <div style={{
-                  padding: '14px',
-                  background: 'var(--bg-card)',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-color)',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#8b5cf6', marginBottom: '4px' }}>
-                    <Activity size={15} />
-                    <span style={{ fontSize: '11px', fontWeight: 600 }}>RHYTHM</span>
-                  </div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#8b5cf6' }}>
-                    {stats.consistencyScore}%
+                  <div style={{ fontSize: '26px', fontWeight: 800, color: '#f59e0b' }}>
+                    {sprintMode === 'time' ? `${timeLeft}s` : `${stats.durationSeconds}s`}
                   </div>
                 </div>
               </div>
@@ -433,7 +774,7 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                   <button
                     type="button"
                     className="btn-small-primary"
-                    onClick={handleResetPractice}
+                    onClick={() => handleResetPractice()}
                     style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <RotateCcw size={14} />
@@ -527,7 +868,6 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                      <span>Rhythm: {sess.consistencyScore}%</span>
                       <span>{new Date(sess.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>

@@ -9,7 +9,6 @@ import { AVATAR_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
 import { storage } from '../services/storage';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
-import { Tabs } from './ui/Tabs';
 import { 
   User, 
   Palette,
@@ -35,7 +34,10 @@ import {
   Zap,
   Cloud,
   BookOpen,
-  Type
+  Type,
+  Layout,
+  Calendar,
+  Columns3
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -56,6 +58,8 @@ interface SettingsModalProps {
   userProfile?: UserProfile;
   onUpdateProfile?: (profile: UserProfile) => void;
   initialTab?: string;
+  uiLayout?: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean };
+  onUpdateUiLayout?: (partial: Partial<{ showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }>) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -71,7 +75,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onReseedTutorialVault,
   onClose,
   userProfile = DEFAULT_USER_PROFILE,
-  onUpdateProfile
+  onUpdateProfile,
+  uiLayout,
+  onUpdateUiLayout
 }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
 
@@ -301,30 +307,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const lockedNotesCount = allNotes.filter((n) => n.isLocked).length;
 
+  const settingsTabs = [
+    { id: 'profile', label: 'Identity', icon: <User size={15} /> },
+    { id: 'appearance', label: 'Themes & Typography', icon: <Palette size={15} /> },
+    { id: 'controls', label: 'Hotkeys & Mouse', icon: <Keyboard size={15} /> },
+    { id: 'security', label: 'Security & Lock', icon: <ShieldCheck size={15} /> },
+    { id: 'backup', label: 'Backup & Vault', icon: <HardDrive size={15} /> },
+    { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={15} /> },
+    { id: 'database', label: 'PostgreSQL Sync', icon: <Database size={15} /> }
+  ];
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Settings & System Preferences"
       subtitle="Identity, themes, custom hotkeys, zero-knowledge security, and local vault controls"
-      maxWidth="880px"
+      maxWidth="960px"
+      className="settings-modal-dialog"
     >
-      {/* Symmetrical Header Navigation Tabs */}
-      <Tabs
-        activeTab={activeTab}
-        onChange={setActiveTab}
-        tabs={[
-          { id: 'profile', label: 'Identity', icon: <User size={14} /> },
-          { id: 'appearance', label: 'Themes & Typography', icon: <Palette size={14} /> },
-          { id: 'controls', label: 'Hotkeys & Mouse', icon: <Keyboard size={14} /> },
-          { id: 'security', label: 'Security & Lock', icon: <ShieldCheck size={14} /> },
-          { id: 'backup', label: 'Backup & Vault', icon: <HardDrive size={14} /> },
-          { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={14} /> },
-          { id: 'database', label: 'PostgreSQL Sync', icon: <Database size={14} /> }
-        ]}
-      />
+      <div className="settings-master-container">
+        {/* Left Settings Sidebar Navigation */}
+        <aside className="settings-sidebar-nav">
+          <div className="settings-sidebar-header">
+            <span>Preferences</span>
+          </div>
+          <div className="settings-nav-items">
+            {settingsTabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`settings-nav-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <span className="settings-nav-icon">{tab.icon}</span>
+                  <span className="settings-nav-label">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
 
-      {/* TAB 1: IDENTITY & PROFILE */}
+        {/* Right Settings Content Area */}
+        <main className="settings-content-pane">
+          {/* TAB 1: IDENTITY & PROFILE */}
       {activeTab === 'profile' && (
         <div className="settings-symmetrical-grid">
           {/* Left Column: Form Controls */}
@@ -730,6 +758,127 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
                 "Memory consolidation thrives on spaced repetition. Highlighting concepts in your notes automatically surfaces SuperMemo-2 flashcards for long-term retention."
               </p>
+            </div>
+          </div>
+
+          {/* UI Interaction & Layout Dashboard (Rails, Collapsed/Expanded, Sidebar Calendar) */}
+          <div style={{ marginTop: '28px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+            <h4 className="panel-section-title">
+              <Layout size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+              UI Layout & Interaction Dashboard
+            </h4>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Customize sidebar rails, collapsed default states, calendar visibility, and theme behaviors.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Option 1: Calendar in Sidebar */}
+              <div className="settings-toggle-row">
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'rgba(99, 102, 241, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--accent-primary)',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <Calendar size={16} />
+                  </div>
+                  <div>
+                    <span className="settings-toggle-title">Show Calendar in Sidebar</span>
+                    <span className="settings-toggle-sub">
+                      Display the interactive Calendar & Daily Log accordion directly inside the primary navigation sidebar above the Archive and Bin buttons.
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={uiLayout ? uiLayout.showSidebarCalendar : true}
+                  onChange={(e) => {
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ showSidebarCalendar: e.target.checked });
+                    }
+                  }}
+                  className="settings-checkbox"
+                />
+              </div>
+
+              {/* Option 2: Primary Sidebar Default State (Expanded vs Collapsed Icon Rail) */}
+              <div className="settings-toggle-row">
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#10b981',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <Columns3 size={16} />
+                  </div>
+                  <div>
+                    <span className="settings-toggle-title">Primary Sidebar Rail Mode</span>
+                    <span className="settings-toggle-sub">
+                      When enabled, the primary navigation sidebar collapses into a slim icon rail to maximize screen space for reading and editing.
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={uiLayout ? uiLayout.sidebarCollapsed : false}
+                  onChange={(e) => {
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ sidebarCollapsed: e.target.checked });
+                    }
+                  }}
+                  className="settings-checkbox"
+                />
+              </div>
+
+              {/* Option 3: Second Sidebar (Notes List Pane) Hover Bar / Collapsed Mode */}
+              <div className="settings-toggle-row">
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#f59e0b',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <Layout size={16} />
+                  </div>
+                  <div>
+                    <span className="settings-toggle-title">Notes List Hover Strip Mode</span>
+                    <span className="settings-toggle-sub">
+                      Collapses the middle note list into a sleek vertical hover strip that smoothly expands on hover with comfortable persistence.
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={uiLayout ? uiLayout.noteListCollapsed : false}
+                  onChange={(e) => {
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ noteListCollapsed: e.target.checked });
+                    }
+                  }}
+                  className="settings-checkbox"
+                />
+              </div>
             </div>
           </div>
 
@@ -1257,6 +1406,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
       )}
+        </main>
+      </div>
     </Modal>
   );
 };

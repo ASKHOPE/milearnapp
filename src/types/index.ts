@@ -7,6 +7,12 @@ export interface TypographySettings {
   lineHeight: 'compact' | 'normal' | 'relaxed';
 }
 
+export interface UiLayoutSettings {
+  showSidebarCalendar: boolean;
+  sidebarCollapsed: boolean;
+  noteListCollapsed: boolean;
+}
+
 export interface UserProfile {
   name: string;
   bio: string;

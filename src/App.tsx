@@ -32,8 +32,11 @@ export const App: React.FC = () => {
   const [currentFilter, setCurrentFilter] = useState<ViewFilter>('all');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [isNotesCollapsed, setIsNotesCollapsed] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  // UI & Layout Preferences
+  const [uiLayout, setUiLayout] = useState(() => storage.getUiLayoutSettings());
+  const [isNotesCollapsed, setIsNotesCollapsed] = useState(() => storage.getUiLayoutSettings().noteListCollapsed);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => storage.getUiLayoutSettings().sidebarCollapsed);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // Modals, Study, Inactivity & Focus
@@ -346,6 +349,21 @@ export const App: React.FC = () => {
     setWorkspaces(updated);
     await storage.saveWorkspace(newWs);
     handleSelectWorkspace(newWs.id);
+  };
+
+  // Rename / Update Workspace
+  const handleRenameWorkspace = async (id: string, newName: string, newIcon?: string, newColor?: string) => {
+    const target = workspaces.find((w) => w.id === id);
+    if (!target) return;
+    const updatedWs: Workspace = {
+      ...target,
+      name: newName.trim() || target.name,
+      icon: newIcon || target.icon,
+      color: newColor || target.color
+    };
+    const updatedList = workspaces.map((w) => (w.id === id ? updatedWs : w));
+    setWorkspaces(updatedList);
+    await storage.saveWorkspace(updatedWs);
   };
 
   // Delete Workspace
@@ -817,6 +835,20 @@ export const App: React.FC = () => {
   const workspaceFolders = folders.filter((f) => (f.workspaceId || 'ws-personal') === activeWorkspaceId);
   const workspaceBooks = books.filter((b) => (b.workspaceId || 'ws-work') === activeWorkspaceId);
 
+  const handleUpdateUiLayout = (partial: Partial<{ showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }>) => {
+    setUiLayout((prev) => {
+      const next = { ...prev, ...partial };
+      storage.setUiLayoutSettings(next);
+      if (partial.sidebarCollapsed !== undefined) {
+        setIsSidebarCollapsed(partial.sidebarCollapsed);
+      }
+      if (partial.noteListCollapsed !== undefined) {
+        setIsNotesCollapsed(partial.noteListCollapsed);
+      }
+      return next;
+    });
+  };
+
   const currentNote = notes.find((n) => n.id === selectedNoteId) || null;
 
   if (isLoading) {
@@ -869,9 +901,15 @@ export const App: React.FC = () => {
           selectedTag={selectedTag}
           isOpenMobile={isMobileSidebarOpen}
           isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onToggleCollapse={() => {
+            const next = !isSidebarCollapsed;
+            setIsSidebarCollapsed(next);
+            handleUpdateUiLayout({ sidebarCollapsed: next });
+          }}
+          showCalendar={uiLayout.showSidebarCalendar}
           onSelectWorkspace={handleSelectWorkspace}
           onCreateWorkspace={handleCreateWorkspace}
+          onRenameWorkspace={handleRenameWorkspace}
           onDeleteWorkspace={handleDeleteWorkspace}
           onCreateBook={handleCreateBook}
           onDeleteBook={handleDeleteBook}
@@ -898,6 +936,7 @@ export const App: React.FC = () => {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
           theme={theme}
           onToggleTheme={handleToggleTheme}
+          onChangeTheme={handleChangeTheme}
         />
 
         {/* Pane 2: Notes List with Search, Sorting & Compact Hover Preview Cards */}
@@ -1066,6 +1105,8 @@ export const App: React.FC = () => {
         userProfile={userProfile}
         onUpdateProfile={setUserProfile}
         settingsInitialTab={settingsInitialTab}
+        uiLayout={uiLayout}
+        onUpdateUiLayout={handleUpdateUiLayout}
         isKnowledgeBaseOpen={isKnowledgeBaseOpen}
         onCloseKnowledgeBase={() => setIsKnowledgeBaseOpen(false)}
         isLinkTreeOpen={isLinkTreeOpen}

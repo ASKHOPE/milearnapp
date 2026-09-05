@@ -28,12 +28,12 @@ export const BookPageNavigator: React.FC<BookPageNavigatorProps> = ({
     <div className="book-page-navigator">
       {/* Previous Page Button */}
       <button
-        className="book-nav-btn"
+        className="book-nav-btn prev"
         disabled={!prevPage}
         onClick={() => prevPage && onSelectPage(prevPage.id)}
         title={prevPage ? `Go to previous page: ${prevPage.title}` : 'First page'}
       >
-        <ChevronLeft size={16} />
+        <ChevronLeft size={16} className="book-nav-arrow" />
         <div className="book-nav-btn-text">
           <span className="book-nav-label">Previous</span>
           <span className="book-nav-title">{prevPage ? prevPage.title : 'None'}</span>
@@ -70,7 +70,7 @@ export const BookPageNavigator: React.FC<BookPageNavigatorProps> = ({
           <span className="book-nav-label">Next</span>
           <span className="book-nav-title">{nextPage ? nextPage.title : 'End of Book'}</span>
         </div>
-        <ChevronRight size={16} />
+        <ChevronRight size={16} className="book-nav-arrow" />
       </button>
     </div>
   );

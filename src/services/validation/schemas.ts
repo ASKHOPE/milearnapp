@@ -92,16 +92,25 @@ export const FlashcardSchema = z.object({
   deckCategory: z.string().optional()
 });
 
+export const FullSyncSchema = z.object({
+  workspaces: z.array(WorkspaceSchema).optional(),
+  books: z.array(BookSchema).optional(),
+  folders: z.array(FolderSchema).optional(),
+  notes: z.array(NoteSchema).optional(),
+  flashcards: z.array(FlashcardSchema).optional()
+});
+
 export const SyncPayloadSchema = z.object({
   note: NoteSchema.optional(),
   folder: FolderSchema.optional(),
   workspace: WorkspaceSchema.optional(),
   book: BookSchema.optional(),
-  flashcard: FlashcardSchema.optional()
+  flashcard: FlashcardSchema.optional(),
+  fullSync: FullSyncSchema.optional()
 }).refine((data) => {
-  return Boolean(data.note || data.folder || data.workspace || data.book || data.flashcard);
+  return Boolean(data.note || data.folder || data.workspace || data.book || data.flashcard || data.fullSync);
 }, {
-  message: 'Sync payload must contain at least one entity (note, folder, workspace, book, or flashcard)'
+  message: 'Sync payload must contain at least one entity (note, folder, workspace, book, flashcard, or fullSync)'
 });
 
 export const VaultDataSchema = z.object({
@@ -171,6 +180,7 @@ export function validateVaultData(data: unknown): ValidationResult<{
   folders: Folder[];
   workspaces: Workspace[];
   books: Book[];
+  flashcards?: Flashcard[];
 }> {
   const res = VaultDataSchema.safeParse(data);
   if (res.success) {
@@ -180,7 +190,8 @@ export function validateVaultData(data: unknown): ValidationResult<{
         notes: res.data.notes as Note[],
         folders: res.data.folders as Folder[],
         workspaces: res.data.workspaces as Workspace[],
-        books: res.data.books as Book[]
+        books: res.data.books as Book[],
+        flashcards: res.data.flashcards as Flashcard[] | undefined
       }
     };
   }

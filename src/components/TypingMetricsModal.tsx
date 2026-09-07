@@ -150,7 +150,9 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
     }
   };
 
-  handleCompleteSprintRef.current = handleCompleteSprint;
+  useEffect(() => {
+    handleCompleteSprintRef.current = handleCompleteSprint;
+  });
 
   useEffect(() => {
     if (isPracticing && sprintMode === 'time') {

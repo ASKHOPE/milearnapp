@@ -81,7 +81,7 @@ export async function runSeed() {
         VALUES (
           ${book.id},
           ${defaultUserId},
-          ${book.workspaceId || 'ws-milearn'},
+          ${book.workspaceId || 'ws-personal'},
           ${book.title},
           ${book.icon || '📖'},
           ${book.color || '#10b981'},
@@ -105,7 +105,7 @@ export async function runSeed() {
         VALUES (
           ${folder.id},
           ${defaultUserId},
-          ${folder.workspaceId || 'ws-milearn'},
+          ${folder.workspaceId || 'ws-personal'},
           ${folder.name},
           ${folder.parentId || null},
           ${folder.color || null},
@@ -133,7 +133,7 @@ export async function runSeed() {
         VALUES (
           ${note.id},
           ${defaultUserId},
-          ${note.workspaceId || 'ws-milearn'},
+          ${note.workspaceId || 'ws-personal'},
           ${note.folderId || null},
           ${note.bookId || null},
           ${note.parentPageId || null},

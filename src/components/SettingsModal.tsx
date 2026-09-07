@@ -37,8 +37,16 @@ import {
   Type,
   Layout,
   Calendar,
-  Columns3
+  Columns3,
+  HelpCircle,
+  FileText,
+  Lock,
+  Bug
 } from 'lucide-react';
+import { TutorialFaqTab } from './settings/TutorialFaqTab';
+import { TermsOfServiceTab } from './settings/TermsOfServiceTab';
+import { PrivacyPolicyTab } from './settings/PrivacyPolicyTab';
+import { DebuggerDiagnosticsTab } from './settings/DebuggerDiagnosticsTab';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -307,7 +315,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const lockedNotesCount = allNotes.filter((n) => n.isLocked).length;
 
-  const settingsTabs = [
+  const preferencesTabs = [
     { id: 'profile', label: 'Identity', icon: <User size={15} /> },
     { id: 'appearance', label: 'Themes & Typography', icon: <Palette size={15} /> },
     { id: 'controls', label: 'Hotkeys & Mouse', icon: <Keyboard size={15} /> },
@@ -315,6 +323,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'backup', label: 'Backup & Vault', icon: <HardDrive size={15} /> },
     { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={15} /> },
     { id: 'database', label: 'PostgreSQL Sync', icon: <Database size={15} /> }
+  ];
+
+  const helpLegalTabs = [
+    { id: 'debugger', label: 'Diagnostics & Debugger', icon: <Bug size={15} /> },
+    { id: 'tutorial', label: 'Tutorial & FAQ', icon: <HelpCircle size={15} /> },
+    { id: 'tos', label: 'Terms of Service', icon: <FileText size={15} /> },
+    { id: 'privacy', label: 'Privacy Policy', icon: <Lock size={15} /> }
   ];
 
   return (
@@ -330,10 +345,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Left Settings Sidebar Navigation */}
         <aside className="settings-sidebar-nav">
           <div className="settings-sidebar-header">
-            <span>Preferences</span>
+            <span>System & Vault</span>
           </div>
           <div className="settings-nav-items">
-            {settingsTabs.map((tab) => {
+            {preferencesTabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`settings-nav-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <span className="settings-nav-icon">{tab.icon}</span>
+                  <span className="settings-nav-label">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="settings-sidebar-header" style={{ marginTop: '12px' }}>
+            <span>Guide & Legal</span>
+          </div>
+          <div className="settings-nav-items">
+            {helpLegalTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
@@ -1406,6 +1441,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* TAB 8: DIAGNOSTICS & DEBUGGER */}
+      {activeTab === 'debugger' && <DebuggerDiagnosticsTab />}
+
+      {/* TAB 9: TUTORIAL & FAQ */}
+      {activeTab === 'tutorial' && <TutorialFaqTab />}
+
+      {/* TAB 10: TERMS OF SERVICE */}
+      {activeTab === 'tos' && <TermsOfServiceTab />}
+
+      {/* TAB 11: PRIVACY POLICY */}
+      {activeTab === 'privacy' && <PrivacyPolicyTab />}
         </main>
       </div>
     </Modal>

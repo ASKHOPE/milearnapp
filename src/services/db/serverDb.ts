@@ -148,7 +148,7 @@ export const serverDb = {
       const foldersRes = await client.query(`SELECT * FROM folders ORDER BY created_at ASC`);
       const folders: Folder[] = foldersRes.rows.map(r => ({
         id: r.id,
-        workspaceId: r.workspace_id || 'ws-milearn',
+        workspaceId: r.workspace_id || 'ws-personal',
         name: r.name,
         parentId: r.parent_id || null,
         color: r.color || undefined,
@@ -160,7 +160,7 @@ export const serverDb = {
       const notesRes = await client.query(`SELECT * FROM notes ORDER BY updated_at DESC`);
       const notes: Note[] = notesRes.rows.map(r => ({
         id: r.id,
-        workspaceId: r.workspace_id || 'ws-milearn',
+        workspaceId: r.workspace_id || 'ws-personal',
         folderId: r.folder_id || null,
         bookId: r.book_id || null,
         parentPageId: r.parent_page_id || null,
@@ -295,7 +295,7 @@ export const serverDb = {
         [
           note.id,
           userId,
-          note.workspaceId || 'ws-milearn',
+          note.workspaceId || 'ws-personal',
           note.folderId || null,
           note.bookId || null,
           note.parentPageId || null,
@@ -333,7 +333,7 @@ export const serverDb = {
           color = EXCLUDED.color,
           icon = EXCLUDED.icon;
         `,
-        [folder.id, userId, folder.workspaceId || 'ws-milearn', folder.name, folder.parentId || null, folder.color || null, folder.icon || null]
+        [folder.id, userId, folder.workspaceId || 'ws-personal', folder.name, folder.parentId || null, folder.color || null, folder.icon || null]
       );
     } finally {
       client.release();
@@ -380,7 +380,7 @@ export const serverDb = {
           color = EXCLUDED.color,
           description = EXCLUDED.description;
         `,
-        [book.id, userId, book.workspaceId || 'ws-milearn', book.title, book.icon || '📖', book.color || '#10b981', book.description || null]
+        [book.id, userId, book.workspaceId || 'ws-personal', book.title, book.icon || '📖', book.color || '#10b981', book.description || null]
       );
     } finally {
       client.release();

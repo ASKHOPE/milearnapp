@@ -1,11 +1,13 @@
 import { type Note, type Folder, type ThemeMode, type ResolvedTheme, type TypographySettings, type Workspace, type Book, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
 import { validateVaultData } from './validation/schemas';
+import { flashcardService } from './flashcards';
+import { debugLogger } from './debugLogger';
 
 const DB_NAME = 'noteflow_db';
 const DB_VERSION = 2;
 
 // IndexedDB Helper
-function openDB(): Promise<IDBDatabase> {
+export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -300,13 +302,23 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
+    debugLogger.log('info', 'storage', `Note saved locally to IndexedDB: "${note.title}"`);
+
     // Opportunistically persist to PostgreSQL database
     try {
       fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ note })
-      }).catch(() => {});
+      }).then(res => {
+        if (!res.ok) {
+          debugLogger.log('warn', 'sync', `Note sync deferred: PostgreSQL returned HTTP ${res.status}`);
+        } else {
+          debugLogger.log('success', 'sync', `Note synced to PostgreSQL: "${note.title}"`);
+        }
+      }).catch(() => {
+        debugLogger.log('info', 'sync', `PostgreSQL offline, note safely retained in IndexedDB: "${note.title}"`);
+      });
     } catch {}
   },
 
@@ -386,30 +398,37 @@ export const storage = {
         this.getFolders(),
         this.getNotes()
       ]);
+      const flashcards = flashcardService.getFlashcards();
 
       const res = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fullSync: { workspaces, books, folders, notes }
+          fullSync: { workspaces, books, folders, notes, flashcards }
         })
       });
 
       if (!res.ok) {
-        throw new Error(`Sync HTTP error ${res.status}`);
+        const errText = await res.text();
+        debugLogger.log('error', 'sync', `Sync failed with HTTP ${res.status}: ${errText}`);
+        throw new Error(`Sync HTTP error ${res.status}: ${errText}`);
       }
 
       const healthRes = await fetch('/api/health');
       const healthData = healthRes.ok ? await healthRes.json() : null;
+
+      debugLogger.log('success', 'sync', `Bi-directional sync succeeded. Notes in PostgreSQL: ${healthData?.count?.notes ?? notes.length}`);
 
       return {
         success: true,
         count: healthData?.count
       };
     } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      debugLogger.log('warn', 'sync', `PostgreSQL sync error: ${msg}`);
       return {
         success: false,
-        error: err instanceof Error ? err.message : String(err)
+        error: msg
       };
     }
   },
@@ -569,6 +588,7 @@ export const storage = {
       this.getWorkspaces(),
       this.getBooks()
     ]);
+    const flashcards = flashcardService.getFlashcards();
     const payload = {
       app: 'Noteflow',
       version: 2,
@@ -576,8 +596,10 @@ export const storage = {
       workspaces,
       books,
       folders,
-      notes
+      notes,
+      flashcards
     };
+    debugLogger.log('info', 'storage', `Exported full vault: ${notes.length} notes, ${folders.length} folders, ${flashcards.length} cards`);
     return JSON.stringify(payload, null, 2);
   },
 
@@ -627,6 +649,21 @@ export const storage = {
     await new Promise<void>((resolve) => {
       tx.oncomplete = () => resolve();
     });
+
+    // Restore flashcards if present in backup
+    if (validatedData.flashcards && Array.isArray(validatedData.flashcards)) {
+      flashcardService.saveFlashcards(validatedData.flashcards);
+    }
+
+    debugLogger.log('success', 'storage', `Imported vault locally to IndexedDB (${validatedData.notes.length} notes). Initiating PostgreSQL sync...`);
+
+    // Synchronize newly imported dataset directly with PostgreSQL
+    try {
+      await this.syncToPostgres();
+      debugLogger.log('success', 'sync', 'Imported vault synchronized successfully with PostgreSQL container.');
+    } catch {
+      debugLogger.log('warn', 'sync', 'PostgreSQL offline; imported vault safely active in IndexedDB.');
+    }
 
     return { 
       notes: validatedData.notes, 

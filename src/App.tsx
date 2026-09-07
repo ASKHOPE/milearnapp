@@ -391,9 +391,14 @@ export const App: React.FC = () => {
 
   const handleDeleteBook = async (bookId: string) => {
     setBooks((prev) => prev.filter((b) => b.id !== bookId));
-    // Clear bookId from notes
+    // Clear bookId from affected notes, update state, and persist to storage
+    const affectedNotes = notes.filter((n) => n.bookId === bookId);
     setNotes((prev) => prev.map((n) => (n.bookId === bookId ? { ...n, bookId: null } : n)));
+    for (const note of affectedNotes) {
+      await storage.saveNote({ ...note, bookId: null });
+    }
     await storage.deleteBook(bookId);
+    storage.syncToPostgres().catch(() => {});
   };
 
   const handleAddPageToBook = async (bookId: string) => {
@@ -771,15 +776,19 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteFolder = async (folderId: string) => {
-    if (!confirm('Delete this folder? Notes inside will become unfiled.')) return;
-
+    // Clear folderId from affected notes, update state, and persist to storage
+    const affectedNotes = notes.filter((n) => n.folderId === folderId);
     setNotes((prev) =>
       prev.map((n) => (n.folderId === folderId ? { ...n, folderId: null } : n))
     );
+    for (const note of affectedNotes) {
+      await storage.saveNote({ ...note, folderId: null });
+    }
 
     setFolders((prev) => prev.filter((f) => f.id !== folderId && f.parentId !== folderId));
     if (currentFolderId === folderId) setCurrentFolderId(null);
     await storage.deleteFolder(folderId);
+    storage.syncToPostgres().catch(() => {});
   };
 
   // Export / Backup & Import (.noteflow)

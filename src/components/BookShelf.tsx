@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Book, Note } from '../types';
 import { BookOpen, Plus, ChevronRight, ChevronDown, FileText, Trash2 } from 'lucide-react';
+import { ConfirmModal } from './common/ConfirmModal';
 
 interface BookShelfProps {
   books: Book[];
@@ -30,6 +31,7 @@ export const BookShelf: React.FC<BookShelfProps> = ({
   const [newBookTitle, setNewBookTitle] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('📖');
   const [selectedColor, setSelectedColor] = useState('#4f46e5');
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
 
   const toggleExpand = (bookId: string) => {
     setExpandedBookIds((prev) => {
@@ -153,11 +155,7 @@ export const BookShelf: React.FC<BookShelfProps> = ({
                   <button
                     className="book-icon-btn danger"
                     title="Delete Book"
-                    onClick={() => {
-                      if (confirm(`Delete book "${book.title}"? Notes inside will be kept.`)) {
-                        onDeleteBook(book.id);
-                      }
-                    }}
+                    onClick={() => setBookToDelete(book)}
                   >
                     <Trash2 size={11} />
                   </button>
@@ -201,6 +199,25 @@ export const BookShelf: React.FC<BookShelfProps> = ({
       </div>
     </>
   )}
+
+  <ConfirmModal
+    isOpen={!!bookToDelete}
+    onClose={() => setBookToDelete(null)}
+    onConfirm={() => {
+      if (bookToDelete) {
+        onDeleteBook(bookToDelete.id);
+        setBookToDelete(null);
+      }
+    }}
+    title="Delete Book"
+    itemName={bookToDelete?.title}
+    message={
+      <span>
+        Are you sure you want to delete <strong>"{bookToDelete?.title}"</strong>? Notes inside will be preserved.
+      </span>
+    }
+    confirmText="Delete Book"
+  />
 </div>
 );
 };

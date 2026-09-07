@@ -953,10 +953,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     e.stopPropagation();
                     setIsThemeCustomMenuOpen((prev) => !prev);
                   }}
-                  title="More Luxury Custom Themes (OLED, Tokyo, Nordic, Editorial)"
+                  title="More Luxury Themes (OLED, Tokyo, Nordic, Editorial)"
                 >
                   <Sparkles size={12} color="#ec4899" />
-                  <span>Custom</span>
+                  <span>More</span>
                   <ChevronDown size={10} />
                 </button>
 

@@ -1,38 +1,5 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
-import helmet from 'helmet'
-import hpp from 'hpp'
-import rateLimit from 'express-rate-limit'
-
-// ==============================================================================
-// Server Security Middleware & API Protection Layer
-// ==============================================================================
-const helmetGuard = helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
-});
-const hppGuard = hpp();
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'API rate limit exceeded, please retry shortly.' }
-});
-const scrapeLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Scraping rate limit exceeded, please wait a few minutes.' }
-});
-const seedLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Database reseeding rate limit exceeded.' }
-});
 
 function postgresApiPlugin(): Plugin {
   return {
@@ -43,15 +10,11 @@ function postgresApiPlugin(): Plugin {
           return next();
         }
 
-        // 1. HTTP Security Headers (helmet) & Parameter Pollution Guard (hpp) & API Rate Limiter
-        helmetGuard(req, res, () => {
-          hppGuard(req as any, res as any, () => {
-            apiLimiter(req as any, res as any, async () => {
-              res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Type', 'application/json');
 
-              try {
-                const { serverDb } = await import('./src/services/db/serverDb.js');
-                const { validateSyncPayload, validateScrapeRequest } = await import('./src/services/validation/schemas.js');
+        try {
+          const { serverDb } = await import('./src/services/db/serverDb.js');
+          const { validateSyncPayload, validateScrapeRequest } = await import('./src/services/validation/schemas.js');
 
               // Health Check
               if (req.url === '/api/health') {
@@ -88,49 +51,45 @@ function postgresApiPlugin(): Plugin {
                 return;
               }
 
-              // Database Reseed (Guarded with rate limiter)
+              // Database Reseed
               if (req.url === '/api/seed' && req.method === 'POST') {
-                seedLimiter(req as any, res as any, async () => {
-                  const { exec } = await import('node:child_process');
-                  exec('bun run scripts/seed.ts', (err, stdout) => {
-                    if (err) {
-                      res.statusCode = 500;
-                      res.end(JSON.stringify({ success: false, error: err.message }));
-                    } else {
-                      res.end(JSON.stringify({ success: true, message: 'Database reseeded successfully.', output: stdout }));
-                    }
-                  });
+                const { exec } = await import('node:child_process');
+                exec('bun run scripts/seed.ts', (err, stdout) => {
+                  if (err) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ success: false, error: err.message }));
+                  } else {
+                    res.end(JSON.stringify({ success: true, message: 'Database reseeded successfully.', output: stdout }));
+                  }
                 });
                 return;
               }
 
-              // Web Content Scraper (Guarded with rate limiter & Zod validation)
+              // Web Content Scraper (Guarded with Zod validation)
               if (req.url?.startsWith('/api/scrape')) {
-                scrapeLimiter(req as any, res as any, async () => {
-                  const parsedUrl = new URL(req.url!, 'http://localhost');
-                  const target = parsedUrl.searchParams.get('url');
-                  
-                  const validation = validateScrapeRequest({ url: target });
-                  if (!validation.success) {
-                    res.statusCode = 400;
-                    res.end(JSON.stringify({ error: validation.error }));
-                    return;
-                  }
+                const parsedUrl = new URL(req.url!, 'http://localhost');
+                const target = parsedUrl.searchParams.get('url');
+                
+                const validation = validateScrapeRequest({ url: target });
+                if (!validation.success) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ error: validation.error }));
+                  return;
+                }
 
-                  try {
-                    const fetchRes = await fetch(validation.data!.url, {
-                      headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-                      }
-                    });
-                    const html = await fetchRes.text();
-                    res.end(JSON.stringify({ html, url: validation.data!.url, status: fetchRes.status }));
-                  } catch (err: unknown) {
-                    res.statusCode = 502;
-                    res.end(JSON.stringify({ error: 'Failed to scrape target URL', details: err instanceof Error ? err.message : String(err) }));
-                  }
-                });
+                try {
+                  const fetchRes = await fetch(validation.data!.url, {
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                    }
+                  });
+                  const html = await fetchRes.text();
+                  res.end(JSON.stringify({ html, url: validation.data!.url, status: fetchRes.status }));
+                } catch (err: unknown) {
+                  res.statusCode = 502;
+                  res.end(JSON.stringify({ error: 'Failed to scrape target URL', details: err instanceof Error ? err.message : String(err) }));
+                }
                 return;
               }
 
@@ -232,16 +191,18 @@ function postgresApiPlugin(): Plugin {
               res.end(JSON.stringify({ status: 'error', message: err instanceof Error ? err.message : String(err) }));
             }
           });
-        });
-      });
-    });
-  }
-};
-}
+        }
+      };
+    }
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), postgresApiPlugin()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+  },
   build: {
     chunkSizeWarningLimit: 3500,
     rollupOptions: {

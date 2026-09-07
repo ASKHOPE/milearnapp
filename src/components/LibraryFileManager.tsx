@@ -20,6 +20,7 @@ import {
   Paperclip
 } from 'lucide-react';
 import type { Book, Folder as FolderType, Note, Workspace } from '../types';
+import { ConfirmModal } from './common/ConfirmModal';
 
 interface LibraryFileManagerProps {
   isOpen: boolean;
@@ -80,6 +81,10 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
   const [movingNote, setMovingNote] = useState<Note | null>(null);
   const [targetFolderChoice, setTargetFolderChoice] = useState<string>('');
   const [targetBookChoice, setTargetBookChoice] = useState<string>('');
+
+  // Delete Confirmation States
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<FolderType | null>(null);
 
   if (!isOpen) return null;
 
@@ -354,7 +359,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
                           <button
                             type="button"
                             className="btn-book-icon-btn danger"
-                            onClick={() => onDeleteBook(book.id)}
+                            onClick={() => setBookToDelete(book)}
                             title="Delete Book"
                           >
                             <Trash2 size={13} />
@@ -449,7 +454,7 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
                           <button
                             type="button"
                             className="folder-del-mini"
-                            onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); }}
+                            onClick={(e) => { e.stopPropagation(); setFolderToDelete(folder); }}
                             title="Delete Folder"
                           >
                             <Trash2 size={11} />
@@ -807,6 +812,46 @@ export const LibraryFileManager: React.FC<LibraryFileManagerProps> = ({
             </div>
           </div>
         )}
+
+        {/* Delete Book Confirmation */}
+        <ConfirmModal
+          isOpen={!!bookToDelete}
+          onClose={() => setBookToDelete(null)}
+          onConfirm={() => {
+            if (bookToDelete) {
+              onDeleteBook(bookToDelete.id);
+              setBookToDelete(null);
+            }
+          }}
+          title="Delete Book"
+          itemName={bookToDelete?.title}
+          message={
+            <span>
+              Are you sure you want to delete <strong>"{bookToDelete?.title}"</strong>? Notes and chapters inside will be kept safely in your root collection.
+            </span>
+          }
+          confirmText="Delete Book"
+        />
+
+        {/* Delete Folder Confirmation */}
+        <ConfirmModal
+          isOpen={!!folderToDelete}
+          onClose={() => setFolderToDelete(null)}
+          onConfirm={() => {
+            if (folderToDelete) {
+              onDeleteFolder(folderToDelete.id);
+              setFolderToDelete(null);
+            }
+          }}
+          title="Delete Folder"
+          itemName={folderToDelete?.name}
+          message={
+            <span>
+              Are you sure you want to delete folder <strong>"{folderToDelete?.name}"</strong>? Any notes inside will become unfiled notes in your root collection.
+            </span>
+          }
+          confirmText="Delete Folder"
+        />
 
       </div>
     </div>

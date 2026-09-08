@@ -14,7 +14,7 @@ function postgresApiPlugin(): Plugin {
 
         try {
           const { serverDb } = await import('./src/services/db/serverDb.js');
-          const { validateSyncPayload, validateScrapeRequest } = await import('./src/services/validation/schemas.js');
+          const { validateSyncPayload, validateDeltaSyncPayload, validateScrapeRequest } = await import('./src/services/validation/schemas.js');
 
               // Health Check
               if (req.url === '/api/health') {
@@ -146,6 +146,38 @@ function postgresApiPlugin(): Plugin {
                       await serverDb.deleteWorkspace(payload.deleteWorkspaceId);
                     }
                     res.end(JSON.stringify({ success: true }));
+                  } catch (err: unknown) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }));
+                  }
+                });
+                return;
+              }
+
+              // Differential Delta Sync
+              if (req.url === '/api/sync/delta' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => { body += chunk; });
+                req.on('end', async () => {
+                  try {
+                    const payload = JSON.parse(body);
+                    const validation = validateDeltaSyncPayload(payload);
+                    if (!validation.success) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({
+                        success: false,
+                        error: 'Delta sync schema validation failed',
+                        details: validation.error,
+                        fieldErrors: validation.fieldErrors
+                      }));
+                      return;
+                    }
+
+                    const result = await serverDb.syncDelta(validation.data!);
+                    res.end(JSON.stringify({
+                      success: true,
+                      ...result
+                    }));
                   } catch (err: unknown) {
                     res.statusCode = 500;
                     res.end(JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }));

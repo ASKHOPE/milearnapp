@@ -232,3 +232,34 @@ export function validateScrapeRequest(data: unknown): ValidationResult<{ url: st
     error: res.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ')
   };
 }
+
+export const SyncMutationSchema = z.object({
+  id: z.string().min(1),
+  entityType: z.enum(['note', 'folder', 'workspace', 'book', 'flashcard']),
+  entityId: z.string().min(1),
+  action: z.enum(['upsert', 'delete']),
+  payload: z.record(z.string(), z.unknown()).optional(),
+  timestamp: z.number().int().positive(),
+  deviceId: z.string().min(1),
+  synced: z.boolean().default(false)
+});
+
+export const DeltaSyncPayloadSchema = z.object({
+  sinceTimestamp: z.number().int().nonnegative(),
+  clientMutations: z.array(SyncMutationSchema).default([]),
+  deviceId: z.string().min(1)
+});
+
+export type DeltaSyncPayload = z.infer<typeof DeltaSyncPayloadSchema>;
+
+export function validateDeltaSyncPayload(data: unknown): ValidationResult<DeltaSyncPayload> {
+  const res = DeltaSyncPayloadSchema.safeParse(data);
+  if (res.success) {
+    return { success: true, data: res.data };
+  }
+  return {
+    success: false,
+    error: res.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', '),
+    fieldErrors: res.error.flatten().fieldErrors
+  };
+}

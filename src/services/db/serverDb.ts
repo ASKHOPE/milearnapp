@@ -515,7 +515,117 @@ export const serverDb = {
     } finally {
       client.release();
     }
+  },
+
+  /**
+   * Process a differential delta sync batch:
+   * 1. Applies client mutations using Last-Write-Wins (LWW)
+   * 2. Pulls remote notes modified since sinceTimestamp
+   */
+  async syncDelta(params: {
+    sinceTimestamp: number;
+    clientMutations: import('../syncQueue.js').SyncMutation[];
+    deviceId: string;
+  }): Promise<{
+    appliedMutationIds: string[];
+    serverMutations: import('../syncQueue.js').SyncMutation[];
+    latestServerTimestamp: number;
+  }> {
+    const appliedMutationIds: string[] = [];
+    const serverMutations: import('../syncQueue.js').SyncMutation[] = [];
+    const now = Date.now();
+
+    for (const m of params.clientMutations) {
+      try {
+        if (m.entityType === 'note') {
+          if (m.action === 'delete') {
+            await this.deleteNote(m.entityId);
+          } else if (m.action === 'upsert' && m.payload) {
+            await this.syncNote(m.payload as unknown as Note);
+          }
+        } else if (m.entityType === 'folder') {
+          if (m.action === 'delete') {
+            await this.deleteFolder(m.entityId);
+          } else if (m.action === 'upsert' && m.payload) {
+            await this.syncFolder(m.payload as unknown as Folder);
+          }
+        } else if (m.entityType === 'workspace') {
+          if (m.action === 'delete') {
+            await this.deleteWorkspace(m.entityId);
+          } else if (m.action === 'upsert' && m.payload) {
+            await this.syncWorkspace(m.payload as unknown as Workspace);
+          }
+        } else if (m.entityType === 'book') {
+          if (m.action === 'delete') {
+            await this.deleteBook(m.entityId);
+          } else if (m.action === 'upsert' && m.payload) {
+            await this.syncBook(m.payload as unknown as Book);
+          }
+        }
+        appliedMutationIds.push(m.id);
+      } catch {
+        // Individual mutation failures are skipped to avoid halting the batch
+      }
+    }
+
+    // Query notes updated since sinceTimestamp
+    try {
+      const client = await pool.connect();
+      try {
+        const sinceIso = new Date(params.sinceTimestamp).toISOString();
+        const res = await client.query(`
+          SELECT n.*, array_remove(array_agg(t.name), NULL) AS tags
+          FROM notes n
+          LEFT JOIN note_tags nt ON n.id = nt.note_id
+          LEFT JOIN tags t ON nt.tag_id = t.id
+          WHERE n.updated_at > $1
+          GROUP BY n.id
+        `, [sinceIso]);
+
+        for (const row of res.rows) {
+          const note: Note = {
+            id: row.id,
+            title: row.title,
+            content: row.content || '',
+            folderId: row.folder_id || null,
+            workspaceId: row.workspace_id || 'ws-personal',
+            bookId: row.book_id || null,
+            tags: row.tags || [],
+            attachments: [],
+            isPinned: Boolean(row.is_pinned),
+            isFavorite: Boolean(row.is_favorite),
+            isArchived: Boolean(row.is_archived),
+            isTrashed: Boolean(row.is_trashed),
+            isLocked: Boolean(row.is_locked),
+            createdAt: new Date(row.created_at).toISOString(),
+            updatedAt: new Date(row.updated_at).toISOString()
+          };
+
+          serverMutations.push({
+            id: `srv-${row.id}-${Date.now()}`,
+            entityType: 'note',
+            entityId: row.id,
+            action: 'upsert',
+            payload: note as unknown as Record<string, unknown>,
+            timestamp: new Date(note.updatedAt).getTime(),
+            deviceId: 'server',
+            synced: true
+          });
+        }
+      } finally {
+        client.release();
+      }
+    } catch {
+      // Offline or mock database fallback
+    }
+
+    return {
+      appliedMutationIds,
+      serverMutations,
+      latestServerTimestamp: now
+    };
   }
 };
+
 
 

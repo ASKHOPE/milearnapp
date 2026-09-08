@@ -60,6 +60,7 @@ import { scanTextToDiagram } from '../services/textToDiagram';
 import { FloatingBubbleToolbar, type FloatingBubblePosition } from './editor/FloatingBubbleToolbar';
 import { BlockActionsMenu } from './editor/BlockActionsMenu';
 import { flashcardService } from '../services/flashcards';
+import { ConflictBanner } from './editor/ConflictBanner';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -2216,6 +2217,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           onClose={() => setSuggestionState((prev) => ({ ...prev, isOpen: false }))}
         />
       )}
+
+      {/* Cloud Sync Conflict Resolution Banner */}
+      <ConflictBanner
+        currentNote={note}
+        allNotes={allNotes}
+        onOpenSplit={onOpenSplit}
+        onUpdateNote={onUpdateNote}
+        onDeleteNote={onDeleteNote}
+      />
 
       {/* Main Canvas Area: Locked State OR Single View OR Side-by-Side Split View */}
       {note.isLocked ? (

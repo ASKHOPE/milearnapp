@@ -8,6 +8,8 @@ import { inactivityLockManager } from '../services/inactivityLock';
 import { AVATAR_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
 import { storage } from '../services/storage';
 import { storageShield, formatBytes, type StorageEstimateResult } from '../services/storageShield';
+import { syncQueue } from '../services/syncQueue';
+import { syncEngine } from '../services/syncEngine';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { 
@@ -139,6 +141,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [pgSyncNotice, setPgSyncNotice] = useState<string | null>(null);
   const [isPgReseeding, setIsPgReseeding] = useState(false);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [syncDeviceId, setSyncDeviceId] = useState('');
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState(0);
+  const [pendingMutationsCount, setPendingMutationsCount] = useState(0);
 
   // Reset / Reseed Confirmation State
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -161,6 +166,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const loadSyncTelemetry = async () => {
+    setSyncDeviceId(syncQueue.getDeviceId());
+    setLastSyncTimestamp(syncEngine.getLastSyncTimestamp());
+    try {
+      const pending = await syncQueue.getPendingMutations();
+      setPendingMutationsCount(pending.length);
+    } catch {
+      setPendingMutationsCount(0);
+    }
+  };
+
   const loadPgHealth = async () => {
     const data = await storage.fetchPostgresHealth();
     setPgHealth(data);
@@ -175,6 +191,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setMouseSettings(shortcutManager.getMouseSettings());
       setSecuritySettings(inactivityLockManager.getSettings());
       loadPgHealth();
+      loadSyncTelemetry();
     }
   }, [isOpen]);
 
@@ -297,18 +314,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setIsPgSyncing(true);
     setPgSyncNotice(null);
     try {
-      const res = await storage.syncToPostgres();
-      if (res.success) {
-        setPgSyncNotice('✓ Bi-directional sync complete. All local records persisted to PostgreSQL.');
+      const deltaRes = await syncEngine.syncDelta();
+      if (deltaRes.success) {
+        if (deltaRes.offline) {
+          setPgSyncNotice('✓ Offline Mode: Local changes safely queued in IndexedDB.');
+        } else {
+          setPgSyncNotice(`✓ Differential sync complete: pushed ${deltaRes.pushedCount} mutations, pulled ${deltaRes.pulledCount} updates (${deltaRes.conflictsResolved} conflicts resolved).`);
+        }
         await loadPgHealth();
+        await loadSyncTelemetry();
       } else {
-        setPgSyncNotice(`Sync warning: ${res.error}`);
+        setPgSyncNotice(`Sync warning: ${deltaRes.error || 'Unknown error'}`);
       }
     } catch (err: unknown) {
       setPgSyncNotice(`Sync error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsPgSyncing(false);
-      setTimeout(() => setPgSyncNotice(null), 5000);
+      setTimeout(() => setPgSyncNotice(null), 6000);
     }
   };
 
@@ -1356,8 +1378,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="settings-symmetrical-grid">
           {/* Left Column: Server Connection & Sync Actions */}
           <div className="settings-card-panel">
-            <h4 className="panel-section-title">PostgreSQL 16 Connection</h4>
+            <h4 className="panel-section-title">PostgreSQL 16 Differential Sync</h4>
 
+            {/* Connection & Live Cloud Status Card */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1366,7 +1389,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               borderRadius: '10px',
               border: pgHealth?.status === 'healthy' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
               background: pgHealth?.status === 'healthy' ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.06)',
-              marginBottom: '16px'
+              marginBottom: '14px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
@@ -1378,21 +1401,79 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }} />
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
-                    {pgHealth?.status === 'healthy' ? 'PostgreSQL 16 Container Online' : 'Local IndexedDB Fallback Mode'}
+                    {pgHealth?.status === 'healthy' ? 'PostgreSQL 16 Connected & Active' : 'Local IndexedDB Fallback Mode'}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {pgHealth?.status === 'healthy' ? 'Docker Compose: localhost:5432 (milearnapp_postgres)' : 'Backend API offline, changes cached in browser'}
+                    {pgHealth?.status === 'healthy' ? 'Docker Compose: localhost:5432 (milearnapp_postgres)' : 'Backend API offline, changes queued in browser'}
                   </div>
                 </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadPgHealth}
-                title="Refresh Health"
+                onClick={async () => {
+                  await loadPgHealth();
+                  await loadSyncTelemetry();
+                }}
+                title="Refresh Status"
               >
                 <RefreshCw size={12} />
               </Button>
+            </div>
+
+            {/* Telemetry Metrics Pill Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '8px',
+              marginBottom: '14px'
+            }}>
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                background: 'var(--bg-surface, rgba(255, 255, 255, 0.02))',
+                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))'
+              }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Client Device ID</span>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
+                  {syncDeviceId || 'Initializing...'}
+                </span>
+              </div>
+
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: '8px',
+                background: 'var(--bg-surface, rgba(255, 255, 255, 0.02))',
+                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))'
+              }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Unsynced Local Mutations</span>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: pendingMutationsCount > 0 ? '#ef4444' : '#10b981'
+                }}>
+                  {pendingMutationsCount > 0 ? `🔴 ${pendingMutationsCount} pending` : '🟢 0 pending (Clean)'}
+                </span>
+              </div>
+            </div>
+
+            {/* Last Synchronized Checkpoint Info */}
+            <div style={{
+              padding: '8px 12px',
+              borderRadius: '6px',
+              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.02))',
+              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.05))',
+              fontSize: '11px',
+              color: 'var(--text-secondary)',
+              marginBottom: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>Last Synchronized Checkpoint:</span>
+              <strong style={{ color: 'var(--text-primary)' }}>
+                {lastSyncTimestamp ? new Date(lastSyncTimestamp).toLocaleString() : 'Never (Pending Initial Sync)'}
+              </strong>
             </div>
 
             {/* Sync Notice Alert */}
@@ -1415,8 +1496,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '13px' }}>Force Bi-Directional Sync</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Flush all local edits to PostgreSQL tables</div>
+                  <div style={{ fontWeight: 600, fontSize: '13px' }}>Differential Delta Sync</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Push local mutation queue & pull remote delta with LWW conflict resolution</div>
                 </div>
                 <Button
                   variant="primary"

@@ -32,6 +32,7 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { TagSelectorPopover } from './TagSelectorPopover';
 import { FolderSelectorModal } from './FolderSelectorModal';
 import { BookSelectorModal } from './BookSelectorModal';
+import { SyncStatusIndicator } from './common/SyncStatusIndicator';
 
 interface SidebarProps {
   workspaces: Workspace[];
@@ -70,6 +71,7 @@ interface SidebarProps {
   theme?: ThemeMode;
   onToggleTheme?: () => void;
   onChangeTheme?: (theme: ThemeMode) => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -108,7 +110,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  onCloseMobile
+  onCloseMobile,
+  onOpenSettings
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [expandedBookIds, setExpandedBookIds] = useState<Set<string>>(new Set());
@@ -908,6 +911,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="bin-count-chip danger">{trashedNotesCount}</span>
             )}
           </button>
+        </div>
+
+        {/* Live Cloud Differential Sync Status Indicator */}
+        <div style={{ padding: isCollapsed ? '4px 0' : '0 10px 8px 10px', display: 'flex', justifyContent: 'center' }}>
+          <SyncStatusIndicator
+            variant={isCollapsed ? 'compact' : 'sidebar'}
+            onOpenSettings={onOpenSettings}
+          />
         </div>
 
         {/* Theme Switcher beneath Archive and Bin: Quick Day, Night, System selector & Custom dropdown */}

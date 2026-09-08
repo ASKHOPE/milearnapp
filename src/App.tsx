@@ -965,6 +965,10 @@ export const App: React.FC = () => {
           theme={theme}
           onToggleTheme={handleToggleTheme}
           onChangeTheme={handleChangeTheme}
+          onOpenSettings={(tab) => {
+            setSettingsInitialTab(tab || 'database');
+            setIsSettingsOpen(true);
+          }}
         />
 
         {/* Pane 2: Notes List with Search, Sorting & Compact Hover Preview Cards */}

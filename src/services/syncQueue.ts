@@ -25,6 +25,12 @@ async function getDb(): Promise<IDBDatabase | null> {
   });
 }
 
+function notifyQueueChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('milearn:sync-queue-updated'));
+  }
+}
+
 export const syncQueue = {
   /**
    * Retrieves or creates a stable client device identifier.
@@ -69,6 +75,7 @@ export const syncQueue = {
     const db = await getDb();
     if (!db || !db.objectStoreNames.contains('sync_queue')) {
       inMemoryQueue.push(mutation);
+      notifyQueueChange();
       return mutation;
     }
 
@@ -77,11 +84,15 @@ export const syncQueue = {
         const tx = db.transaction('sync_queue', 'readwrite');
         const store = tx.objectStore('sync_queue');
         const req = store.put(mutation);
-        req.onsuccess = () => resolve(mutation);
+        req.onsuccess = () => {
+          notifyQueueChange();
+          resolve(mutation);
+        };
         req.onerror = () => reject(req.error);
       } catch {
         // Fallback to memory
         inMemoryQueue.push(mutation);
+        notifyQueueChange();
         resolve(mutation);
       }
     });
@@ -126,7 +137,10 @@ export const syncQueue = {
     }
 
     const db = await getDb();
-    if (!db || !db.objectStoreNames.contains('sync_queue')) return;
+    if (!db || !db.objectStoreNames.contains('sync_queue')) {
+      notifyQueueChange();
+      return;
+    }
 
     return new Promise((resolve, reject) => {
       try {
@@ -135,9 +149,13 @@ export const syncQueue = {
         for (const id of mutationIds) {
           store.delete(id);
         }
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          notifyQueueChange();
+          resolve();
+        };
         tx.onerror = () => reject(tx.error);
       } catch {
+        notifyQueueChange();
         resolve();
       }
     });
@@ -149,16 +167,23 @@ export const syncQueue = {
   async clearQueue(): Promise<void> {
     inMemoryQueue.length = 0;
     const db = await getDb();
-    if (!db || !db.objectStoreNames.contains('sync_queue')) return;
+    if (!db || !db.objectStoreNames.contains('sync_queue')) {
+      notifyQueueChange();
+      return;
+    }
 
     return new Promise((resolve, reject) => {
       try {
         const tx = db.transaction('sync_queue', 'readwrite');
         const store = tx.objectStore('sync_queue');
         const req = store.clear();
-        req.onsuccess = () => resolve();
+        req.onsuccess = () => {
+          notifyQueueChange();
+          resolve();
+        };
         req.onerror = () => reject(req.error);
       } catch {
+        notifyQueueChange();
         resolve();
       }
     });

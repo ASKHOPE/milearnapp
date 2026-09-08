@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
 import { typingMetrics, type TypingSessionStats } from '../services/typingMetrics';
+import { SyncStatusIndicator } from './common/SyncStatusIndicator';
 
 interface HeaderProps {
   theme?: ThemeMode;
@@ -591,6 +592,9 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </div>
+
+        {/* Live Cloud Differential Sync Status Indicator */}
+        <SyncStatusIndicator onOpenSettings={onOpenSettings} />
 
         {/* Combined Profile & Settings Tablet (Profile Avatar + Name + Settings Gear Icon with Live Postgres Indicator) */}
         <div

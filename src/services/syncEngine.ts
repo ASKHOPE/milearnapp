@@ -24,6 +24,12 @@ export interface SyncDeltaResult {
 
 let inMemoryLastSync = 0;
 
+function notifySyncState(isSyncing: boolean) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('milearn:sync-state-changed', { detail: { isSyncing } }));
+  }
+}
+
 export const syncEngine = {
   /**
    * Retrieve the last successful synchronization checkpoint timestamp.
@@ -50,10 +56,12 @@ export const syncEngine = {
    * Execute a differential delta synchronization run.
    */
   async syncDelta(endpoint = '/api/sync/delta'): Promise<SyncDeltaResult> {
+    notifySyncState(true);
     try {
       const isReachable = await checkBackendHealth();
       if (!isReachable) {
         debugLogger.log('info', 'sync', 'Differential sync paused: backend offline. Local mutations safely queued in IndexedDB.');
+        notifySyncState(false);
         return {
           success: true,
           offline: true,
@@ -123,6 +131,7 @@ export const syncEngine = {
       }
 
       debugLogger.log('success', 'sync', `Differential sync complete: pushed ${appliedMutationIds.length} mutations, pulled ${serverMutations.length} updates.`);
+      notifySyncState(false);
 
       return {
         success: true,
@@ -131,6 +140,7 @@ export const syncEngine = {
         conflictsResolved
       };
     } catch (err: unknown) {
+      notifySyncState(false);
       const msg = err instanceof Error ? err.message : String(err);
       debugLogger.log('warn', 'sync', `Differential sync warning: ${msg}`);
       return {

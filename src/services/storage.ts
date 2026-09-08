@@ -2,9 +2,10 @@ import { type Note, type Folder, type ThemeMode, type ResolvedTheme, type Typogr
 import { validateVaultData } from './validation/schemas';
 import { flashcardService } from './flashcards';
 import { debugLogger } from './debugLogger';
+import { syncQueue } from './syncQueue';
 
 const DB_NAME = 'noteflow_db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // IndexedDB Helper
 export function openDB(): Promise<IDBDatabase> {
@@ -30,6 +31,9 @@ export function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains('citations')) {
         db.createObjectStore('citations', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('sync_queue')) {
+        db.createObjectStore('sync_queue', { keyPath: 'id' });
       }
     };
 
@@ -296,6 +300,13 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'workspace',
+      entityId: ws.id,
+      action: 'upsert',
+      payload: ws as unknown as Record<string, unknown>
+    })).catch(() => {});
+
     triggerSync({ workspace: ws }, `Workspace "${ws.name}"`);
   },
 
@@ -308,6 +319,12 @@ export const storage = {
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'workspace',
+      entityId: id,
+      action: 'delete'
+    })).catch(() => {});
 
     triggerSync({ deleteWorkspaceId: id });
   },
@@ -334,6 +351,13 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'book',
+      entityId: book.id,
+      action: 'upsert',
+      payload: book as unknown as Record<string, unknown>
+    })).catch(() => {});
+
     triggerSync({ book }, `Book "${book.title}"`);
   },
 
@@ -346,6 +370,12 @@ export const storage = {
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'book',
+      entityId: id,
+      action: 'delete'
+    })).catch(() => {});
 
     triggerSync({ deleteBookId: id });
   },
@@ -372,6 +402,13 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'note',
+      entityId: note.id,
+      action: 'upsert',
+      payload: note as unknown as Record<string, unknown>
+    })).catch(() => {});
+
     debugLogger.log('info', 'storage', `Note saved locally to IndexedDB: "${note.title}"`);
     triggerSync({ note }, `Note "${note.title}"`);
   },
@@ -385,6 +422,12 @@ export const storage = {
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'note',
+      entityId: id,
+      action: 'delete'
+    })).catch(() => {});
 
     triggerSync({ deleteNoteId: id });
   },
@@ -427,6 +470,13 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'folder',
+      entityId: folder.id,
+      action: 'upsert',
+      payload: folder as unknown as Record<string, unknown>
+    })).catch(() => {});
+
     triggerSync({ folder }, `Folder "${folder.name}"`);
   },
 
@@ -439,6 +489,12 @@ export const storage = {
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    syncQueue.enqueueMutation(syncQueue.createMutation({
+      entityType: 'folder',
+      entityId: id,
+      action: 'delete'
+    })).catch(() => {});
 
     triggerSync({ deleteFolderId: id });
   },

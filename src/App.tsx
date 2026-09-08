@@ -3,6 +3,7 @@ import { type Note, type Folder, type ViewFilter, type ThemeMode, type Workspace
 import { storage } from './services/storage';
 import { storageShield } from './services/storageShield';
 import { inactivityLockManager } from './services/inactivityLock';
+import { freezeServices, assertCriticalIntegrity } from './services/integrity';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -13,6 +14,10 @@ import { NOTE_TEMPLATES } from './services/templates';
 import { AppModals } from './components/AppModals';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './styles/main.css';
+
+// Freeze critical singletons at module load time — before any user code runs.
+// This prevents injected scripts from replacing service methods.
+freezeServices();
 
 const generateNoteId = (): string => 'n-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
 
@@ -77,6 +82,9 @@ export const App: React.FC = () => {
 
   // Initialize DB & Seed Data
   useEffect(() => {
+    // Verify service integrity on every app boot
+    assertCriticalIntegrity();
+
     async function loadData() {
       try {
         storageShield.requestPersistence().catch(() => {});
@@ -118,7 +126,7 @@ export const App: React.FC = () => {
           }, 450);
         }
       } catch (err) {
-        console.error('Failed to initialize Noteflow database:', err);
+        console.error('Failed to initialize MiLearn database:', err);
       } finally {
         setIsLoading(false);
       }
@@ -810,14 +818,14 @@ export const App: React.FC = () => {
     storage.syncToPostgres().catch(() => {});
   };
 
-  // Export / Backup & Import (.noteflow)
+  // Export / Backup & Import (.milearn)
   const handleExportData = async () => {
     const dataStr = await storage.exportAllData();
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `noteflow-vault-${new Date().toISOString().slice(0, 10)}.noteflow`;
+    link.download = `milearn-vault-${new Date().toISOString().slice(0, 10)}.milearn`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

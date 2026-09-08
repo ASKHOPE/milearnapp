@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import type { PomodoroMode } from '../types';
 import { ambientAudio } from '../services/ambientAudio';
 import { Modal } from './ui/Modal';
@@ -32,7 +32,7 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [completedSessions, setCompletedSessions] = useState(() => {
-    return parseInt(localStorage.getItem('noteflow_pomo_sessions') || '0', 10);
+    return parseInt(localStorage.getItem('milearn_pomo_sessions') || '0', 10);
   });
   const [isChimeTesting, setIsChimeTesting] = useState(false);
 
@@ -59,7 +59,7 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
           if (mode === 'work') {
             const nextCount = completedSessions + 1;
             setCompletedSessions(nextCount);
-            localStorage.setItem('noteflow_pomo_sessions', nextCount.toString());
+            localStorage.setItem('milearn_pomo_sessions', nextCount.toString());
 
             // Check for long break
             if (nextCount % 4 === 0) {

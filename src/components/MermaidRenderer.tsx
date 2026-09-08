@@ -3,6 +3,7 @@ import mermaid from 'mermaid';
 import { Copy, Check, Maximize2, AlertCircle, Edit2 } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { MermaidEditorModal } from './editor/MermaidEditorModal';
+import { sanitizer } from '../services/sanitizer';
 
 interface MermaidRendererProps {
   chart: string;
@@ -120,7 +121,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id, onE
           ) : (
             <div 
               className="mermaid-svg-wrapper"
-              dangerouslySetInnerHTML={{ __html: svgContent }} 
+              dangerouslySetInnerHTML={{ __html: sanitizer.sanitize(svgContent) }} 
             />
           )}
         </div>
@@ -136,7 +137,7 @@ export const MermaidRenderer: React.FC<MermaidRendererProps> = ({ chart, id, onE
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '80vh', overflow: 'auto' }}>
             <div 
               style={{ display: 'flex', justifyContent: 'center', padding: '20px', background: 'var(--bg-editor)', borderRadius: 'var(--radius-md)' }}
-              dangerouslySetInnerHTML={{ __html: svgContent }} 
+              dangerouslySetInnerHTML={{ __html: sanitizer.sanitize(svgContent) }} 
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               {onEditChart && (

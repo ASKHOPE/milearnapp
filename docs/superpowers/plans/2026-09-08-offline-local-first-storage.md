@@ -1,10 +1,10 @@
-# Offline Local-First Storage & Desktop Readiness Implementation Plan
+﻿# Offline Local-First Storage & Desktop Readiness Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a robust, 100% standalone offline local-first storage architecture with persistent browser quota shielding, migration of flashcards/citations into IndexedDB, silent offline operation without backend errors, and Tauri desktop configuration.
 
-**Architecture:** Expand IndexedDB (`noteflow_db` v3) to store notes, folders, workspaces, books, flashcards, and citations in binary-safe stores. Wrap browser storage with `navigator.storage.persist()` and `navigator.storage.estimate()`. Gate remote sync behind active heartbeat checks so offline/Vercel environments operate silently and seamlessly. Scaffold `src-tauri/` configuration for desktop distribution.
+**Architecture:** Expand IndexedDB (`milearn_db` v3) to store notes, folders, workspaces, books, flashcards, and citations in binary-safe stores. Wrap browser storage with `navigator.storage.persist()` and `navigator.storage.estimate()`. Gate remote sync behind active heartbeat checks so offline/Vercel environments operate silently and seamlessly. Scaffold `src-tauri/` configuration for desktop distribution.
 
 **Tech Stack:** TypeScript, React 19, IndexedDB API, Web Storage API (`navigator.storage`), Vite, Bun, Tauri 2.
 

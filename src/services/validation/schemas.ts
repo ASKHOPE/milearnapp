@@ -24,10 +24,14 @@ export const AttachmentSchema = z.object({
   createdAt: z.string()
 });
 
+const MAX_NOTE_CONTENT_BYTES = 10 * 1024 * 1024; // 10 MB hard limit
+const MAX_TITLE_LENGTH = 500;
+
 export const NoteSchema = z.object({
   id: z.string().min(1),
-  title: z.string(),
-  content: z.string(),
+  title: z.string().max(MAX_TITLE_LENGTH, `Title must be ${MAX_TITLE_LENGTH} characters or fewer`),
+  content: z.string().max(MAX_NOTE_CONTENT_BYTES, `Note content exceeds the 10 MB limit`),
+  // note: .max() on a string checks character count, which is a safe proxy for byte size
   folderId: z.string().nullable().optional(),
   workspaceId: z.string().nullable().optional(),
   bookId: z.string().nullable().optional(),
@@ -128,6 +132,21 @@ export const VaultDataSchema = z.object({
   books: z.array(BookSchema).default([]),
   flashcards: z.array(FlashcardSchema).optional(),
   exportedAt: z.string().optional()
+}).superRefine((data, ctx) => {
+  // Reject duplicate IDs within each entity type to prevent silent data overwrites
+  const checkDuplicates = (ids: string[], label: string) => {
+    const seen = new Set<string>();
+    for (const id of ids) {
+      if (seen.has(id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Duplicate ${label} id: "${id}" — import would silently overwrite existing data` });
+      }
+      seen.add(id);
+    }
+  };
+  checkDuplicates(data.notes.map(n => n.id), 'note');
+  checkDuplicates(data.folders.map(f => f.id), 'folder');
+  checkDuplicates(data.workspaces.map(w => w.id), 'workspace');
+  checkDuplicates(data.books.map(b => b.id), 'book');
 });
 
 export const ScrapeRequestSchema = z.object({

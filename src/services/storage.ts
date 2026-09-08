@@ -4,7 +4,7 @@ import { flashcardService } from './flashcards';
 import { debugLogger } from './debugLogger';
 import { syncQueue } from './syncQueue';
 
-const DB_NAME = 'noteflow_db';
+const DB_NAME = 'milearn_db';
 const DB_VERSION = 4;
 
 // IndexedDB Helper
@@ -347,7 +347,7 @@ export const storage = {
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('milearn_vault_initialized', 'true');
-      localStorage.setItem('noteflow_active_workspace', 'ws-personal');
+      localStorage.setItem('milearn_active_workspace', 'ws-personal');
     }
 
     try {
@@ -661,7 +661,7 @@ export const storage = {
   // --- Theme ---
   getTheme(): ThemeMode {
     try {
-      const saved = localStorage.getItem('noteflow_theme') as ThemeMode;
+      const saved = localStorage.getItem('milearn_theme') as ThemeMode;
       const validThemes: ThemeMode[] = ['system', 'light', 'dark', 'oled', 'tokyo', 'nordic', 'editorial'];
       if (saved && validThemes.includes(saved)) return saved;
       return 'system';
@@ -680,7 +680,7 @@ export const storage = {
 
   setTheme(theme: ThemeMode) {
     try {
-      localStorage.setItem('noteflow_theme', theme);
+      localStorage.setItem('milearn_theme', theme);
       const resolved = this.resolveTheme(theme);
       document.documentElement.setAttribute('data-theme', resolved);
       const meta = document.querySelector('meta[name="color-scheme"]');
@@ -694,15 +694,12 @@ export const storage = {
 
   // --- UI Layout & Interaction Settings ---
   getUiLayoutSettings(): { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean } {
+    const defaults = { showSidebarCalendar: true, sidebarCollapsed: false, noteListCollapsed: false };
     try {
       const saved = localStorage.getItem('milearnapp_ui_layout');
-      if (saved) return JSON.parse(saved);
+      if (saved) return { ...defaults, ...JSON.parse(saved) };
     } catch {}
-    return {
-      showSidebarCalendar: true,
-      sidebarCollapsed: false,
-      noteListCollapsed: false
-    };
+    return defaults;
   },
 
   setUiLayoutSettings(settings: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }) {
@@ -715,17 +712,12 @@ export const storage = {
 
   // --- Typography Settings ---
   getTypographySettings(): TypographySettings {
+    const defaults: TypographySettings = { fontFamily: 'sans', fontScale: 'base', lineHeight: 'normal' };
     try {
       const saved = localStorage.getItem('milearnapp_typography');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // fallback
-    }
-    return {
-      fontFamily: 'sans',
-      fontScale: 'base',
-      lineHeight: 'normal'
-    };
+      if (saved) return { ...defaults, ...JSON.parse(saved) };
+    } catch {}
+    return defaults;
   },
 
   setTypographySettings(settings: TypographySettings) {
@@ -742,7 +734,7 @@ export const storage = {
   // --- User Profile ---
   getUserProfile(): UserProfile {
     try {
-      const raw = localStorage.getItem('noteflow_user_profile');
+      const raw = localStorage.getItem('milearn_user_profile');
       if (!raw) return { ...DEFAULT_USER_PROFILE };
       return { ...DEFAULT_USER_PROFILE, ...JSON.parse(raw) };
     } catch {
@@ -752,7 +744,7 @@ export const storage = {
 
   setUserProfile(profile: UserProfile): void {
     try {
-      localStorage.setItem('noteflow_user_profile', JSON.stringify(profile));
+      localStorage.setItem('milearn_user_profile', JSON.stringify(profile));
     } catch (e) {
       console.error('Failed to save user profile', e);
     }
@@ -761,7 +753,7 @@ export const storage = {
   // --- Microphone Privacy Toggle ---
   isMicEnabled(): boolean {
     try {
-      const val = localStorage.getItem('noteflow_mic_enabled');
+      const val = localStorage.getItem('milearn_mic_enabled');
       return val === null ? true : val === 'true';
     } catch {
       return true;
@@ -770,7 +762,7 @@ export const storage = {
 
   setMicEnabled(enabled: boolean) {
     try {
-      localStorage.setItem('noteflow_mic_enabled', enabled ? 'true' : 'false');
+      localStorage.setItem('milearn_mic_enabled', enabled ? 'true' : 'false');
     } catch (e) {
       console.error('Failed to save mic setting', e);
     }
@@ -779,7 +771,7 @@ export const storage = {
   // --- Active Workspace Persistence ---
   getActiveWorkspaceId(): string {
     try {
-      return localStorage.getItem('noteflow_active_workspace') || 'ws-personal';
+      return localStorage.getItem('milearn_active_workspace') || 'ws-personal';
     } catch {
       return 'ws-personal';
     }
@@ -787,13 +779,13 @@ export const storage = {
 
   setActiveWorkspaceId(id: string) {
     try {
-      localStorage.setItem('noteflow_active_workspace', id);
+      localStorage.setItem('milearn_active_workspace', id);
     } catch (e) {
       console.error('Failed to save active workspace', e);
     }
   },
 
-  // --- Backup & Restore (.noteflow bundle) ---
+  // --- Backup & Restore (.milearn bundle) ---
   async exportAllData(): Promise<string> {
     const [notes, folders, workspaces, books] = await Promise.all([
       this.getNotes(),
@@ -803,7 +795,7 @@ export const storage = {
     ]);
     const flashcards = flashcardService.getFlashcards();
     const payload = {
-      app: 'Noteflow',
+      app: 'MiLearnApp',
       version: 2,
       exportDate: new Date().toISOString(),
       workspaces,
@@ -817,51 +809,45 @@ export const storage = {
   },
 
   async importAllData(jsonStr: string): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
-    const parsed = JSON.parse(jsonStr);
+    // Parse & validate BEFORE touching the database — if this throws, nothing is wiped
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      throw new Error(`Corrupt backup file: not valid JSON — ${e instanceof Error ? e.message : String(e)}`);
+    }
     const validation = validateVaultData(parsed);
     if (!validation.success || !validation.data) {
-      throw new Error(`Invalid Noteflow backup format: ${validation.error || 'Schema validation failed'}`);
+      throw new Error(`Invalid MiLearn backup format: ${validation.error || 'Schema validation failed'}`);
     }
     const validatedData = validation.data;
 
-    const db = await openDB();
-    const tx = db.transaction(['notes', 'folders', 'workspaces', 'books'], 'readwrite');
-    const noteStore = tx.objectStore('notes');
-    const folderStore = tx.objectStore('folders');
-    const wsStore = tx.objectStore('workspaces');
-    const bookStore = tx.objectStore('books');
+    if (typeof indexedDB !== 'undefined') {
+      const db = await openDB();
+      // Use a SINGLE transaction for clear + write so a mid-import tab close
+      // cannot leave the vault in an empty/partial state.
+      const tx = db.transaction(['notes', 'folders', 'workspaces', 'books'], 'readwrite');
+      const noteStore = tx.objectStore('notes');
+      const folderStore = tx.objectStore('folders');
+      const wsStore = tx.objectStore('workspaces');
+      const bookStore = tx.objectStore('books');
 
-    await new Promise<void>((resolve, reject) => {
-      const c1 = noteStore.clear();
-      const c2 = folderStore.clear();
-      const c3 = wsStore.clear();
-      const c4 = bookStore.clear();
-      c1.onsuccess = () => {
-        c2.onsuccess = () => {
-          c3.onsuccess = () => {
-            c4.onsuccess = () => resolve();
-          };
-        };
-      };
-      c1.onerror = () => reject(c1.error);
-    });
+      noteStore.clear();
+      folderStore.clear();
+      wsStore.clear();
+      bookStore.clear();
 
-    for (const ws of validatedData.workspaces) {
-      wsStore.put(ws);
-    }
-    for (const b of validatedData.books) {
-      bookStore.put(b);
-    }
-    for (const folder of validatedData.folders) {
-      folderStore.put(folder);
-    }
-    for (const note of validatedData.notes) {
-      noteStore.put(note);
-    }
+      for (const ws of validatedData.workspaces) wsStore.put(ws);
+      for (const b of validatedData.books) bookStore.put(b);
+      for (const folder of validatedData.folders) folderStore.put(folder);
+      for (const note of validatedData.notes) noteStore.put(note);
 
-    await new Promise<void>((resolve) => {
-      tx.oncomplete = () => resolve();
-    });
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(new Error('Import transaction aborted — vault is unchanged'));
+      });
+    }
 
     // Restore flashcards if present in backup
     if (validatedData.flashcards && Array.isArray(validatedData.flashcards)) {

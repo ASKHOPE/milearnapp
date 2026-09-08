@@ -10,6 +10,12 @@ function postgresApiPlugin(): Plugin {
           return next();
         }
 
+        // ── Body size limit (CVE-H1: prevent memory exhaustion) ──────────────
+        const MAX_REQUEST_BODY = 5 * 1024 * 1024; // 5 MB
+
+        // ── SSRF blocklist (CVE-C2: prevent cloud metadata / LAN access) ────
+        const SSRF_BLOCKED = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[::1\]|0\.0\.0\.0)/i;
+
         res.setHeader('Content-Type', 'application/json');
 
         try {
@@ -65,7 +71,6 @@ function postgresApiPlugin(): Plugin {
                 return;
               }
 
-              // Web Content Scraper (Guarded with Zod validation)
               if (req.url?.startsWith('/api/scrape')) {
                 const parsedUrl = new URL(req.url!, 'http://localhost');
                 const target = parsedUrl.searchParams.get('url');
@@ -77,18 +82,33 @@ function postgresApiPlugin(): Plugin {
                   return;
                 }
 
+                // SSRF protection: block private/internal IP ranges
+                try {
+                  const targetParsed = new URL(validation.data!.url);
+                  if (SSRF_BLOCKED.test(targetParsed.hostname)) {
+                    res.statusCode = 403;
+                    res.end(JSON.stringify({ error: 'Access to private/internal network addresses is not permitted' }));
+                    return;
+                  }
+                } catch {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ error: 'Invalid URL format' }));
+                  return;
+                }
+
                 try {
                   const fetchRes = await fetch(validation.data!.url, {
                     headers: {
                       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-                    }
+                    },
+                    signal: AbortSignal.timeout(8000)
                   });
                   const html = await fetchRes.text();
                   res.end(JSON.stringify({ html, url: validation.data!.url, status: fetchRes.status }));
                 } catch (err: unknown) {
                   res.statusCode = 502;
-                  res.end(JSON.stringify({ error: 'Failed to scrape target URL', details: err instanceof Error ? err.message : String(err) }));
+                  res.end(JSON.stringify({ error: 'Failed to scrape target URL' }));
                 }
                 return;
               }
@@ -96,7 +116,14 @@ function postgresApiPlugin(): Plugin {
               // Bi-Directional Sync (Zod runtime validation)
               if (req.url === '/api/sync' && req.method === 'POST') {
                 let body = '';
-                req.on('data', chunk => { body += chunk; });
+                req.on('data', chunk => {
+                  body += chunk;
+                  if (body.length > MAX_REQUEST_BODY) {
+                    res.statusCode = 413;
+                    res.end(JSON.stringify({ error: 'Payload too large (max 5MB)' }));
+                    req.destroy();
+                  }
+                });
                 req.on('end', async () => {
                   try {
                     const payload = JSON.parse(body);
@@ -157,7 +184,14 @@ function postgresApiPlugin(): Plugin {
               // Differential Delta Sync
               if (req.url === '/api/sync/delta' && req.method === 'POST') {
                 let body = '';
-                req.on('data', chunk => { body += chunk; });
+                req.on('data', chunk => {
+                  body += chunk;
+                  if (body.length > MAX_REQUEST_BODY) {
+                    res.statusCode = 413;
+                    res.end(JSON.stringify({ error: 'Payload too large (max 5MB)' }));
+                    req.destroy();
+                  }
+                });
                 req.on('end', async () => {
                   try {
                     const payload = JSON.parse(body);

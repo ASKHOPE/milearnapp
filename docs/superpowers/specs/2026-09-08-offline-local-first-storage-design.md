@@ -1,4 +1,4 @@
-# Offline Local-First Storage & Desktop Readiness Specification
+﻿# Offline Local-First Storage & Desktop Readiness Specification
 
 **Date:** 2026-09-08  
 **Status:** Approved by User  
@@ -19,14 +19,14 @@ MiLEARNAPP is evolving into a true local-first workstation across Web (Vercel/Br
 ### 2.1 The Local-First Guarantee
 1. **Zero External Dependency to Boot:** The application boots up in < 200ms directly from local assets and local storage. No server, no Docker, and no internet connection required.
 2. **Persistence Guarantee:** Automatically request persistent storage via `navigator.storage.persist()`, preventing browser cache evictions even under low disk space.
-3. **Infinite Capacity (Beyond 5MB localStorage):** Migrate heavy entities (flashcards, citations, attachments) from limited `localStorage` into **IndexedDB** (`noteflow_db`), allowing gigabytes of notes, media, and learning records.
+3. **Infinite Capacity (Beyond 5MB localStorage):** Migrate heavy entities (flashcards, citations, attachments) from limited `localStorage` into **IndexedDB** (`milearn_db`), allowing gigabytes of notes, media, and learning records.
 4. **Desktop Autonomy:** Provide native desktop scaffolding via **Tauri** (`src-tauri/`) sharing the exact same frontend and local-first storage adapter.
 
 ---
 
 ## 3. Storage Layer Design
 
-### 3.1 IndexedDB Schema Expansion (`noteflow_db` v3)
+### 3.1 IndexedDB Schema Expansion (`milearn_db` v3)
 Expand `openDB()` to support 6 dedicated object stores:
 * `notes` (key: `id`)
 * `folders` (key: `id`)

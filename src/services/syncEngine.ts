@@ -39,7 +39,15 @@ export const syncEngine = {
       return inMemoryLastSync;
     }
     const saved = localStorage.getItem(LAST_SYNC_KEY);
-    return saved ? parseInt(saved, 10) || 0 : inMemoryLastSync;
+    if (!saved) return inMemoryLastSync;
+    const parsed = parseInt(saved, 10);
+    // Clamp: NaN, negative, or future timestamps (clock skew) are treated as 0.
+    // A value of 0 is safe — it just means "sync everything since epoch" once.
+    // Returning a negative would send sinceTimestamp<0, violating the API contract.
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return 0;
+    }
+    return parsed;
   },
 
   /**

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Anti-Brute-Force Rate Limiting & Lockout Service
  * Protects encrypted notes against dictionary attacks and automated brute force.
  * 
@@ -48,7 +48,7 @@ function safeRemoveItem(key: string): void {
 
 export class CryptoLockoutManager {
   private getStorageKey(noteId: string): string {
-    return `noteflow_lockout_${noteId}`;
+    return `milearn_lockout_${noteId}`;
   }
 
   private getStored(noteId: string): StoredLockout {
@@ -145,7 +145,7 @@ export class CryptoLockoutManager {
       if (typeof localStorage !== 'undefined') {
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (k && k.startsWith('noteflow_lockout_')) {
+          if (k && k.startsWith('milearn_lockout_')) {
             const raw = localStorage.getItem(k);
             if (raw) {
               const data = JSON.parse(raw);
@@ -167,7 +167,7 @@ export class CryptoLockoutManager {
         const toRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (k && k.startsWith('noteflow_lockout_')) toRemove.push(k);
+          if (k && k.startsWith('milearn_lockout_')) toRemove.push(k);
         }
         toRemove.forEach((k) => localStorage.removeItem(k));
       }

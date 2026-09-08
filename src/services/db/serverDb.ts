@@ -491,6 +491,12 @@ export const serverDb = {
    * Synchronizes notes and state from client back to PostgreSQL
    */
   async syncNote(note: Note, userId = 'user-default'): Promise<void> {
+    // Integrity guard: a locked note MUST have encryptedData.
+    // Syncing a locked note without ciphertext would store it as permanently
+    // inaccessible in PostgreSQL (locked=true, content=plaintext or null).
+    if (note.isLocked && !note.encryptedData) {
+      throw new Error(`Refused to sync note "${note.id}": isLocked=true but encryptedData is missing. Encrypt the note before syncing.`);
+    }
     const client = await pool.connect();
     try {
       await client.query(

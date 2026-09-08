@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import mermaid from 'mermaid';
+import { sanitizer } from '../../services/sanitizer';
 import { 
   X, 
   Sparkles, 
@@ -283,7 +284,7 @@ export const MermaidEditorModal: React.FC<MermaidEditorModalProps> = ({
               {svgPreview ? (
                 <div 
                   className="studio-svg-rendered" 
-                  dangerouslySetInnerHTML={{ __html: svgPreview }} 
+                  dangerouslySetInnerHTML={{ __html: sanitizer.sanitize(svgPreview) }} 
                 />
               ) : (
                 <div className="studio-empty-preview">

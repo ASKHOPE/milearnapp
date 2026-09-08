@@ -1,6 +1,6 @@
-import type { Flashcard, Note } from '../types';
+﻿import type { Flashcard, Note } from '../types';
 
-const STORAGE_KEY = 'noteflow_flashcards_v1';
+const STORAGE_KEY = 'milearn_flashcards_v1';
 const memoryStore = new Map<string, string>();
 
 function safeGetItem(key: string): string | null {

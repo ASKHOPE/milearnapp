@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sync Mutation Queue
  * Records granular local operations (upsert / delete) for differential synchronization.
  * Operates offline-first using IndexedDB with in-memory fallback for test environments.
@@ -16,7 +16,7 @@ async function getDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return null;
   return new Promise((resolve) => {
     try {
-      const request = indexedDB.open('noteflow_db', 4);
+      const request = indexedDB.open('milearn_db', 4);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => resolve(null);
     } catch {

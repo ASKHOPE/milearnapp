@@ -71,6 +71,48 @@ describe('Zero-Knowledge Cryptographic Integrity & Anti-MITM Tests', () => {
     ).rejects.toThrow(/tampered with|Authentication failed/i);
   });
 
+  it('BACKWARDS COMPATIBILITY: Decrypts legacy payload encrypted with noteflow:bound-id prefix', async () => {
+    // Manually encrypt with legacy prefix
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(passphrase),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt,
+        iterations: 600000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+    const legacyAd = new TextEncoder().encode(`noteflow:bound-id:${noteId}`);
+    const cipherBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: legacyAd, tagLength: 128 },
+      key,
+      new TextEncoder().encode('Legacy secret note content')
+    );
+
+    const legacyPayload = {
+      salt: Buffer.from(salt).toString('base64'),
+      iv: Buffer.from(iv).toString('base64'),
+      ciphertext: Buffer.from(cipherBuffer).toString('base64'),
+      algorithm: 'AES-GCM-256' as const,
+      kdf: 'PBKDF2-SHA256-600K' as const
+    };
+
+    const decrypted = await cryptoService.decrypt(legacyPayload, passphrase, noteId);
+    expect(decrypted).toBe('Legacy secret note content');
+  });
+
   it('evaluates passphrase entropy strength scores properly', () => {
     const weak = cryptoService.evaluateStrength('123');
     expect(weak.label).toBe('Weak');

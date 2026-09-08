@@ -47,6 +47,17 @@ export const citationStorage = {
         list.unshift(item);
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch {}
+    } catch (e) {
+      // Surface storage-full errors so the UI can warn the user instead of
+      // silently losing their citation.
+      if (e instanceof DOMException && (
+        e.name === 'QuotaExceededError' ||
+        e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+      )) {
+        throw new Error('Storage full: unable to save citation. Free up space by exporting and clearing old data.');
+      }
+      // Other errors (e.g. private browsing disabled) are rethrown as-is
+      throw e;
+    }
   }
 };

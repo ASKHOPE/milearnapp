@@ -1,7 +1,7 @@
-import type { HotkeyBindings, MouseSettings } from '../types';
+﻿import type { HotkeyBindings, MouseSettings } from '../types';
 
-const HOTKEYS_STORAGE_KEY = 'noteflow_custom_hotkeys';
-const MOUSE_STORAGE_KEY = 'noteflow_mouse_settings';
+const HOTKEYS_STORAGE_KEY = 'milearn_custom_hotkeys';
+const MOUSE_STORAGE_KEY = 'milearn_mouse_settings';
 
 export const DEFAULT_HOTKEYS: HotkeyBindings = {
   search: 'Meta+k',

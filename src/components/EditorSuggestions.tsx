@@ -143,7 +143,7 @@ export const EditorSuggestions: React.FC<EditorSuggestionsProps> = ({
       label: 'Code Block',
       sublabel: 'Syntax formatted code snippet',
       icon: <Code size={15} color="#ec4899" />,
-      action: () => onSelectSlashCommand('```typescript\n// Code snippet\nconst noteflow = true;\n```\n')
+      action: () => onSelectSlashCommand('```typescript\n// Code snippet\nconst miLearnApp = true;\n```\n')
     },
     {
       id: 'quote',

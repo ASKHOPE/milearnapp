@@ -346,7 +346,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const updated: UserProfile = {
       name: profileName.trim() || 'Alex Mercer',
       bio: profileBio.trim(),
-      role: profileRole.trim() || 'Noteflow Member',
+      role: profileRole.trim() || 'MiLearn Member',
       avatarType,
       avatarValue,
       mood: selectedMood
@@ -355,7 +355,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onUpdateProfile(updated);
     }
     try {
-      localStorage.setItem('noteflow_user_profile', JSON.stringify(updated));
+      localStorage.setItem('milearn_user_profile', JSON.stringify(updated));
     } catch {}
     setProfileSaveNotice(true);
     setTimeout(() => setProfileSaveNotice(false), 2000);
@@ -1314,7 +1314,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <Button variant="outline" size="md" onClick={onExportVault}>
                 <Download size={14} />
-                <span>Export Entire Vault (.noteflow)</span>
+                <span>Export Entire Vault (.milearn)</span>
               </Button>
 
               <Button
@@ -1328,7 +1328,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".noteflow,.json"
+                accept=".milearn,.noteflow,.json"
                 style={{ display: 'none' }}
                 onChange={onImportVault}
               />

@@ -12,7 +12,7 @@ test.describe('MiLEARNAPP Enterprise Desktop App Tests', () => {
   });
 
   test('loads the app and renders navigation bar, brand, and sidebar', async ({ page }) => {
-    await expect(page).toHaveTitle(/MiLEARNAPP|NoteFlow/);
+    await expect(page).toHaveTitle(/MiLEARNAPP/i);
     const header = page.locator('.app-header');
     await expect(header).toBeVisible();
 

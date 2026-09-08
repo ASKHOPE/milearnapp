@@ -1,6 +1,6 @@
-import type { SecuritySettings } from '../types';
+﻿import type { SecuritySettings } from '../types';
 
-const SECURITY_STORAGE_KEY = 'noteflow_security_settings';
+const SECURITY_STORAGE_KEY = 'milearn_security_settings';
 
 export const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   autoLockMinutes: 0, // 0 = disabled

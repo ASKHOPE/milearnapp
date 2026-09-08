@@ -101,7 +101,7 @@ export class NoteCryptoService {
 
     // 3. Prepare Associated Data (bind noteId into authentication tag)
     const encoder = new TextEncoder();
-    const additionalData = encoder.encode(`noteflow:bound-id:${noteId}`);
+    const additionalData = encoder.encode(`milearn:bound-id:${noteId}`);
     const plaintextBytes = encoder.encode(plaintext);
 
     // 4. Perform authenticated encryption
@@ -148,22 +148,42 @@ export class NoteCryptoService {
       // Derive key
       const key = await this.deriveKey(passphrase, salt, ['decrypt']);
 
-      // Associated data verification
+      // Associated data verification (MiLearn bound-id with fallback for legacy notes)
       const encoder = new TextEncoder();
-      const additionalData = encoder.encode(`noteflow:bound-id:${noteId}`);
+      const additionalData = encoder.encode(`milearn:bound-id:${noteId}`);
       const crypto = getCrypto();
 
       // Perform authenticated decryption
-      const decryptedBuffer = await crypto.subtle.decrypt(
-        {
-          name: 'AES-GCM',
-          iv: iv as unknown as ArrayBuffer,
-          additionalData: additionalData as unknown as ArrayBuffer,
-          tagLength: 128
-        },
-        key,
-        ciphertextBytes as unknown as ArrayBuffer
-      );
+      let decryptedBuffer: ArrayBuffer;
+      try {
+        decryptedBuffer = await crypto.subtle.decrypt(
+          {
+            name: 'AES-GCM',
+            iv: iv as unknown as ArrayBuffer,
+            additionalData: additionalData as unknown as ArrayBuffer,
+            tagLength: 128
+          },
+          key,
+          ciphertextBytes as unknown as ArrayBuffer
+        );
+      } catch (err) {
+        // Fallback for notes encrypted under legacy 'noteflow:bound-id' prefix
+        const legacyAdditionalData = encoder.encode(`noteflow:bound-id:${noteId}`);
+        try {
+          decryptedBuffer = await crypto.subtle.decrypt(
+            {
+              name: 'AES-GCM',
+              iv: iv as unknown as ArrayBuffer,
+              additionalData: legacyAdditionalData as unknown as ArrayBuffer,
+              tagLength: 128
+            },
+            key,
+            ciphertextBytes as unknown as ArrayBuffer
+          );
+        } catch {
+          throw err;
+        }
+      }
 
       const decoder = new TextDecoder();
       return decoder.decode(decryptedBuffer);

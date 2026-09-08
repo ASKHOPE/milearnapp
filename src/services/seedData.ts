@@ -137,7 +137,7 @@ export const SAMPLE_FOLDERS: Folder[] = [
 ];
 
 // Sample Drawing SVG Vector Data
-export const SAMPLE_DRAWING_DATA = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="320" viewBox="0 0 600 320"><defs><linearGradient id="bgG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%230f172a"/><stop offset="100%" style="stop-color:%231e1b4b"/></linearGradient><linearGradient id="glowG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%234f46e5"/><stop offset="100%" style="stop-color:%238b5cf6"/></linearGradient></defs><rect width="600" height="320" rx="16" fill="url(%23bgG)"/><circle cx="140" cy="160" r="55" fill="url(%23glowG)" filter="drop-shadow(0 8px 16px rgba(79,70,229,0.4))"/><text x="140" y="165" fill="%23ffffff" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" font-weight="700" text-anchor="middle">Noteflow Core</text><circle cx="440" cy="90" r="42" fill="%230ea5e9" opacity="0.85"/><text x="440" y="95" fill="%23ffffff" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" font-weight="600" text-anchor="middle">AES-256 Vault</text><circle cx="440" cy="230" r="42" fill="%2310b981" opacity="0.85"/><text x="440" y="235" fill="%23ffffff" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" font-weight="600" text-anchor="middle">SM-2 Spaced Deck</text><path d="M 195 160 C 280 160, 320 90, 398 90" fill="none" stroke="%2338bdf8" stroke-width="3" stroke-dasharray="6,6"/><path d="M 195 160 C 280 160, 320 230, 398 230" fill="none" stroke="%2334d399" stroke-width="3"/><rect x="220" y="275" width="160" height="28" rx="14" fill="rgba(255,255,255,0.08)"/><text x="300" y="293" fill="%2394a3b8" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" text-anchor="middle">Canvas Sketch Vector</text></svg>`;
+export const SAMPLE_DRAWING_DATA = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="320" viewBox="0 0 600 320"><defs><linearGradient id="bgG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%230f172a"/><stop offset="100%" style="stop-color:%231e1b4b"/></linearGradient><linearGradient id="glowG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%234f46e5"/><stop offset="100%" style="stop-color:%238b5cf6"/></linearGradient></defs><rect width="600" height="320" rx="16" fill="url(%23bgG)"/><circle cx="140" cy="160" r="55" fill="url(%23glowG)" filter="drop-shadow(0 8px 16px rgba(79,70,229,0.4))"/><text x="140" y="165" fill="%23ffffff" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" font-weight="700" text-anchor="middle">MiLearn Core</text><circle cx="440" cy="90" r="42" fill="%230ea5e9" opacity="0.85"/><text x="440" y="95" fill="%23ffffff" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" font-weight="600" text-anchor="middle">AES-256 Vault</text><circle cx="440" cy="230" r="42" fill="%2310b981" opacity="0.85"/><text x="440" y="235" fill="%23ffffff" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="12" font-weight="600" text-anchor="middle">SM-2 Spaced Deck</text><path d="M 195 160 C 280 160, 320 90, 398 90" fill="none" stroke="%2338bdf8" stroke-width="3" stroke-dasharray="6,6"/><path d="M 195 160 C 280 160, 320 230, 398 230" fill="none" stroke="%2334d399" stroke-width="3"/><rect x="220" y="275" width="160" height="28" rx="14" fill="rgba(255,255,255,0.08)"/><text x="300" y="293" fill="%2394a3b8" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="11" text-anchor="middle">Canvas Sketch Vector</text></svg>`;
 
 const TODAY_DATE = new Date().toISOString().split('T')[0];
 
@@ -146,7 +146,7 @@ export const SAMPLE_NOTES: Note[] = [
   {
     id: 'n-welcome',
     workspaceId: 'ws-personal',
-    title: '👋 Welcome to Noteflow (Interactive Tutorial & Guide)',
+    title: '👋 Welcome to MiLearn (Interactive Tutorial & Guide)',
     folderId: 'f-start',
     bookId: null,
     parentPageId: null,
@@ -155,9 +155,9 @@ export const SAMPLE_NOTES: Note[] = [
     isPinned: true,
     isArchived: false,
     isTrashed: false,
-    content: `# 👋 Welcome to Noteflow
+    content: `# 👋 Welcome to MiLearn
 
-Noteflow is a local-first, privacy-respecting power workspace engineered with zero-knowledge cryptography, LaTeX math, dynamic diagramming, and spaced repetition.
+MiLearn is a local-first, privacy-respecting power workspace engineered with zero-knowledge cryptography, LaTeX math, dynamic diagramming, and spaced repetition.
 
 ---
 
@@ -211,7 +211,7 @@ Try these core features directly within this note:
     isTrashed: false,
     content: `# 🧠 Active Recall & Spaced Repetition
 
-Noteflow automatically extracts flashcards from your notes using natural syntax. Click **🧠 Study Cards** in the header to review this deck!
+MiLearn automatically extracts flashcards from your notes using natural syntax. Click **🧠 Study Cards** in the header to review this deck!
 
 ---
 
@@ -263,7 +263,7 @@ In quantum mechanics, Heisenberg's uncertainty relation is ==$\\Delta x \\Delta 
     isTrashed: false,
     content: `# 📐 LaTeX Mathematics & Scientific Computing
 
-Noteflow incorporates high-performance KaTeX rendering for both inline and multi-line display equations.
+MiLearn incorporates high-performance KaTeX rendering for both inline and multi-line display equations.
 
 ---
 
@@ -311,14 +311,14 @@ $$f(x \\mid \\mu, \\sigma^2) = \\frac{1}{\\sqrt{2\\pi\\sigma^2}} \\exp\\left( -\
     isTrashed: false,
     content: `# 📊 System Architecture & Mermaid Diagrams
 
-Noteflow renders beautiful SVG flowcharts, sequence diagrams, and mindmaps from markdown code blocks.
+MiLearn renders beautiful SVG flowcharts, sequence diagrams, and mindmaps from markdown code blocks.
 
 ---
 
 ### 1. High-Level Subsystem Flowchart
 \`\`\`mermaid
 graph TD
-  User["👤 User Interaction"] --> UI["💻 Noteflow Interface"]
+  User["👤 User Interaction"] --> UI["💻 MiLearn Interface"]
   UI --> Router["⚡ State & Tab Controller"]
   Router --> Crypto["🔒 Zero-Knowledge AES-GCM Engine"]
   Router --> Audio["🎧 Web Audio Synthesizer"]
@@ -334,7 +334,7 @@ graph TD
 sequenceDiagram
   autonumber
   actor User as User
-  participant UI as Noteflow UI
+  participant UI as MiLearn UI
   participant Worker as WebCrypto Subtle
   participant DB as IndexedDB Vault
 
@@ -420,7 +420,7 @@ Below is a sample architecture sketch attached directly to this note:
     isTrashed: false,
     content: `# 🔒 Zero-Knowledge Cryptographic Architecture
 
-Noteflow's note-locking system provides bank-grade, on-device encryption designed to be mathematically tamper-proof and resilient against MITM (Man-in-the-Middle) and automated brute-force attacks.
+MiLearn's note-locking system provides bank-grade, on-device encryption designed to be mathematically tamper-proof and resilient against MITM (Man-in-the-Middle) and automated brute-force attacks.
 
 ---
 
@@ -431,7 +431,7 @@ Noteflow's note-locking system provides bank-grade, on-device encryption designe
    - Generates a 128-bit authentication tag. If an attacker modifies even a single bit of ciphertext, decryption fails immediately without leaking plaintext.
 
 2. **Associated Data (AD) Note-ID Binding**:
-   - The unique \`noteId\` is bound into the authentication tag (\`noteflow:bound-id:\${noteId}\`).
+   - The unique \`noteId\` is bound into the authentication tag (\`milearn:bound-id:\${noteId}\`).
    - Attackers cannot transplant ciphertext from one note into another.
 
 3. **PBKDF2 with 600,000 Iterations**:
@@ -515,7 +515,7 @@ Noteflow's note-locking system provides bank-grade, on-device encryption designe
     isTrashed: false,
     content: `# 🍅 Deep Work & Focus Pomodoro Protocol
 
-Maximize mental flow and eliminate cognitive fatigue with Noteflow's built-in Pomodoro timer and procedural audio synthesizers.
+Maximize mental flow and eliminate cognitive fatigue with MiLearn's built-in Pomodoro timer and procedural audio synthesizers.
 
 ---
 
@@ -587,7 +587,7 @@ Access via the **Sound Mixer** tab in the Pomodoro modal:
 **Book**: [[Modern Software Architecture]] • **Page 2 of 2**
 
 ### 📦 In-Browser Canvas WebP Compression
-When users attach images, drawings, or sketches, Noteflow compresses them on a dedicated offscreen canvas:
+When users attach images, drawings, or sketches, MiLearn compresses them on a dedicated offscreen canvas:
 
 \`\`\`typescript
 const webpUrl = canvas.toDataURL('image/webp', 0.82);

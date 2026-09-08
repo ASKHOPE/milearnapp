@@ -7,6 +7,7 @@ import { shortcutManager } from '../services/shortcutManager';
 import { inactivityLockManager } from '../services/inactivityLock';
 import { AVATAR_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
 import { storage } from '../services/storage';
+import { storageShield, formatBytes, type StorageEstimateResult } from '../services/storageShield';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { 
@@ -129,6 +130,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [health, setHealth] = useState<StorageHealth | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleanSuccess, setCleanSuccess] = useState(false);
+  const [storageEstimate, setStorageEstimate] = useState<StorageEstimateResult | null>(null);
+  const [isPersisting, setIsPersisting] = useState(false);
 
   // PostgreSQL Database State
   const [pgHealth, setPgHealth] = useState<{ status: string; count?: Record<string, number> } | null>(null);
@@ -143,6 +146,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const loadStorageEstimate = async () => {
+    const est = await storageShield.getStorageEstimate();
+    setStorageEstimate(est);
+  };
+
+  const handleRequestPersistence = async () => {
+    setIsPersisting(true);
+    try {
+      await storageShield.requestPersistence();
+      await loadStorageEstimate();
+    } finally {
+      setIsPersisting(false);
+    }
+  };
+
   const loadPgHealth = async () => {
     const data = await storage.fetchPostgresHealth();
     setPgHealth(data);
@@ -152,6 +170,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (isOpen) {
       setLockoutCount(lockoutManager.getAllActiveLockouts().length);
       optimizer.getHealthReport().then(setHealth);
+      loadStorageEstimate();
       setHotkeys(shortcutManager.getHotkeys());
       setMouseSettings(shortcutManager.getMouseSettings());
       setSecuritySettings(inactivityLockManager.getSettings());
@@ -1221,35 +1240,97 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Storage Diagnostics */}
           <div className="settings-card-panel">
             <h4 className="panel-section-title">Storage Quota Diagnostics</h4>
-            {health && (
-              <>
-                <div className="storage-meter-track" style={{ margin: '14px 0 8px 0' }}>
-                  <div
-                    className="storage-meter-fill"
-                    style={{ width: `${Math.min(Math.round(health.usagePercent), 100)}%` }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
-                  <span>{optimizer.formatBytes(health.usageBytes)} used</span>
-                  <span>{Math.round(health.usagePercent)}% of browser capacity</span>
-                </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Real-time browser IndexedDB storage capacity and persistent quota protection.
+            </p>
 
-                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontWeight: 600, fontSize: '13px', display: 'block' }}>Cache Optimizer</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Prune orphaned preview blobs</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    isLoading={isCleaning}
-                    onClick={handleCleanStorage}
-                  >
-                    {cleanSuccess ? '✓ Cleaned!' : 'Clean Cache'}
-                  </Button>
+            {/* Storage Progress Meter */}
+            <div className="storage-meter-track" style={{ margin: '14px 0 8px 0' }}>
+              <div
+                className="storage-meter-fill"
+                style={{ width: `${Math.min(Math.max(storageEstimate?.percentage ?? (health ? Math.round(health.usagePercent) : 0), 1), 100)}%` }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <span>
+                {storageEstimate && storageEstimate.quotaBytes > 0
+                  ? `${formatBytes(storageEstimate.usedBytes)} of ${formatBytes(storageEstimate.quotaBytes)} available`
+                  : health
+                  ? `${optimizer.formatBytes(health.usageBytes)} used`
+                  : 'Calculating usage...'}
+              </span>
+              <span>
+                {storageEstimate && storageEstimate.quotaBytes > 0
+                  ? `${storageEstimate.percentage}% capacity`
+                  : health
+                  ? `${Math.round(health.usagePercent)}% capacity`
+                  : ''}
+              </span>
+            </div>
+
+            {/* Persistent Eviction Shield Status Card */}
+            <div style={{
+              marginTop: '16px',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              background: storageEstimate?.isPersisted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(99, 102, 241, 0.08)',
+              border: storageEstimate?.isPersisted ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(99, 102, 241, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
+                  background: storageEstimate?.isPersisted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                  color: storageEstimate?.isPersisted ? '#10b981' : 'var(--accent-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <ShieldCheck size={16} />
                 </div>
-              </>
-            )}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {storageEstimate?.isPersisted ? 'Browser Eviction Shield Active' : 'Standard Eviction Retention'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {storageEstimate?.isPersisted
+                      ? 'Protected by navigator.storage.persist. Browser will not purge data during low disk conditions.'
+                      : 'Storage may be evicted if device disk is critically low.'}
+                  </div>
+                </div>
+              </div>
+              {!storageEstimate?.isPersisted && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  isLoading={isPersisting}
+                  onClick={handleRequestPersistence}
+                >
+                  Shield Storage
+                </Button>
+              )}
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontWeight: 600, fontSize: '13px', display: 'block' }}>Cache Optimizer</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Prune orphaned preview blobs</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                isLoading={isCleaning}
+                onClick={handleCleanStorage}
+              >
+                {cleanSuccess ? '✓ Cleaned!' : 'Clean Cache'}
+              </Button>
+            </div>
           </div>
 
           {/* Offline QR Beam */}

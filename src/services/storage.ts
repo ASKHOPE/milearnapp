@@ -4,7 +4,7 @@ import { flashcardService } from './flashcards';
 import { debugLogger } from './debugLogger';
 
 const DB_NAME = 'noteflow_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // IndexedDB Helper
 export function openDB(): Promise<IDBDatabase> {
@@ -24,6 +24,12 @@ export function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains('books')) {
         db.createObjectStore('books', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('flashcards')) {
+        db.createObjectStore('flashcards', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('citations')) {
+        db.createObjectStore('citations', { keyPath: 'id' });
       }
     };
 

@@ -4,29 +4,25 @@
  * Operates offline-first using IndexedDB with in-memory fallback for test environments.
  */
 
-export interface SyncMutation {
-  id: string;
-  entityType: 'note' | 'folder' | 'workspace' | 'book' | 'flashcard';
-  entityId: string;
-  action: 'upsert' | 'delete';
-  payload?: Record<string, unknown>;
-  timestamp: number;
-  deviceId: string;
-  synced: boolean;
-}
+import type { SyncMutation } from '../types';
+
+export type { SyncMutation };
 
 const DEVICE_ID_KEY = 'milearn_device_id';
 const inMemoryQueue: SyncMutation[] = [];
 
-// Helper to access IndexedDB openDB dynamically if available
+// Helper to access IndexedDB without circular dependencies
 async function getDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return null;
-  try {
-    const { openDB } = await import('./storage');
-    return await openDB();
-  } catch {
-    return null;
-  }
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open('noteflow_db', 4);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
 }
 
 export const syncQueue = {
@@ -83,7 +79,7 @@ export const syncQueue = {
         const req = store.put(mutation);
         req.onsuccess = () => resolve(mutation);
         req.onerror = () => reject(req.error);
-      } catch (err) {
+      } catch {
         // Fallback to memory
         inMemoryQueue.push(mutation);
         resolve(mutation);

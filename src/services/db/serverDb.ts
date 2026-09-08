@@ -6,7 +6,7 @@
  */
 
 import pg from 'pg';
-import type { Note, Workspace, Book, Folder, Flashcard, UserProfile } from '../../types/index.js';
+import type { Note, Workspace, Book, Folder, Flashcard, UserProfile, SyncMutation } from '../../types/index.js';
 
 const { Pool } = pg;
 
@@ -524,15 +524,15 @@ export const serverDb = {
    */
   async syncDelta(params: {
     sinceTimestamp: number;
-    clientMutations: import('../syncQueue.js').SyncMutation[];
+    clientMutations: SyncMutation[];
     deviceId: string;
   }): Promise<{
     appliedMutationIds: string[];
-    serverMutations: import('../syncQueue.js').SyncMutation[];
+    serverMutations: SyncMutation[];
     latestServerTimestamp: number;
   }> {
     const appliedMutationIds: string[] = [];
-    const serverMutations: import('../syncQueue.js').SyncMutation[] = [];
+    const serverMutations: SyncMutation[] = [];
     const now = Date.now();
 
     for (const m of params.clientMutations) {

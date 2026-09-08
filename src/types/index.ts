@@ -199,3 +199,14 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   mood: 'Deep Focus'
 };
 
+export interface SyncMutation {
+  id: string;
+  entityType: 'note' | 'folder' | 'workspace' | 'book' | 'flashcard';
+  entityId: string;
+  action: 'upsert' | 'delete';
+  payload?: Record<string, unknown>;
+  timestamp: number;
+  deviceId: string;
+  synced: boolean;
+}
+

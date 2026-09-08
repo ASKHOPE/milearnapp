@@ -41,6 +41,23 @@ const FAQ_ITEMS: FaqItem[] = [
     )
   },
   {
+    id: 'offline-local-first',
+    category: 'basics',
+    question: 'Can I use MiLEARNAPP 100% offline without Docker or servers running?',
+    answer: (
+      <>
+        <p>
+          <strong>Yes, absolutely!</strong> MiLEARNAPP is built offline-first. It operates completely standalone in your browser or desktop app with zero server dependencies:
+        </p>
+        <ul>
+          <li><strong>IndexedDB v3:</strong> All your notes, workspaces, books, flashcards, citations, and drawings are saved locally with binary persistence.</li>
+          <li><strong>Eviction Shield:</strong> The app automatically requests persistent storage protection (<code>navigator.storage.persist()</code>) so modern browsers will not purge your notes under low disk pressure.</li>
+          <li><strong>Silent Operation:</strong> When deployed on static hosts like Vercel or when running offline on a laptop during travel, remote database synchronization seamlessly pauses without throwing console errors or interrupting your flow.</li>
+        </ul>
+      </>
+    )
+  },
+  {
     id: 'passwords-login',
     category: 'basics',
     question: 'Do I need a password or login account to use the app?',

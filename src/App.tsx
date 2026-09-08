@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { type Note, type Folder, type ViewFilter, type ThemeMode, type Workspace, type Book, type PomodoroMode, type UserProfile, DEFAULT_USER_PROFILE } from './types';
 import { storage } from './services/storage';
+import { storageShield } from './services/storageShield';
 import { inactivityLockManager } from './services/inactivityLock';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -78,6 +79,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     async function loadData() {
       try {
+        storageShield.requestPersistence().catch(() => {});
+
         const savedTheme = storage.getTheme();
         setTheme(savedTheme);
         storage.setTheme(savedTheme);

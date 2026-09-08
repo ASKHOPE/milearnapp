@@ -4,7 +4,7 @@ import { flashcardService } from './flashcards';
 import { debugLogger } from './debugLogger';
 
 const DB_NAME = 'noteflow_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // IndexedDB Helper
 export function openDB(): Promise<IDBDatabase> {
@@ -25,11 +25,69 @@ export function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('books')) {
         db.createObjectStore('books', { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains('flashcards')) {
+        db.createObjectStore('flashcards', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('citations')) {
+        db.createObjectStore('citations', { keyPath: 'id' });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+let isBackendReachable: boolean | null = null;
+let lastHealthCheck = 0;
+const HEALTH_CHECK_TTL = 30000; // 30 seconds
+
+/**
+ * Intelligent healthcheck cache to prevent network error spam when operating offline or on Vercel
+ */
+export async function checkBackendHealth(): Promise<boolean> {
+  const now = Date.now();
+  if (isBackendReachable !== null && now - lastHealthCheck < HEALTH_CHECK_TTL) {
+    return isBackendReachable;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch('/api/health', { method: 'GET', signal: controller.signal });
+    clearTimeout(timeoutId);
+    isBackendReachable = res.ok;
+  } catch {
+    isBackendReachable = false;
+  }
+  lastHealthCheck = now;
+  return isBackendReachable;
+}
+
+/**
+ * Opportunistically dispatch synchronization payload to backend if reachable
+ */
+export function triggerSync(payload: Record<string, unknown>, label?: string): void {
+  if (isBackendReachable === false) return;
+
+  checkBackendHealth().then((reachable) => {
+    if (reachable) {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then((res) => {
+          if (!res.ok) {
+            debugLogger.log('warn', 'sync', `${label || 'Item'} sync deferred: Server returned HTTP ${res.status}`);
+          } else if (label) {
+            debugLogger.log('success', 'sync', `${label} synced to backend`);
+          }
+        })
+        .catch(() => {
+          isBackendReachable = false;
+        });
+    }
+  }).catch(() => {});
 }
 
 // Import Rich Seed Dataset
@@ -48,15 +106,17 @@ export const storage = {
     const VAULT_INITIALIZED_KEY = 'milearn_vault_initialized';
     const isAlreadyInitialized = typeof localStorage !== 'undefined' && localStorage.getItem(VAULT_INITIALIZED_KEY) === 'true';
 
-    // 1. Dynamic PostgreSQL Synchronization: Fetch live seeded data from PostgreSQL
+    // 1. Dynamic PostgreSQL Synchronization: Fetch live seeded data from PostgreSQL if backend is connected
     try {
-      const apiRes = await fetch('/api/vault');
-      if (apiRes.ok) {
-        const vault = await apiRes.json();
-        if (vault) {
-          // If PostgreSQL has an initialized vault (at least one workspace exists), sync from PostgreSQL
-          const hasPostgresVault = Array.isArray(vault.workspaces) && vault.workspaces.length > 0;
-          if (hasPostgresVault) {
+      const isReachable = await checkBackendHealth();
+      if (isReachable) {
+        const apiRes = await fetch('/api/vault');
+        if (apiRes.ok) {
+          const vault = await apiRes.json();
+          if (vault) {
+            // If PostgreSQL has an initialized vault (at least one workspace exists), sync from PostgreSQL
+            const hasPostgresVault = Array.isArray(vault.workspaces) && vault.workspaces.length > 0;
+            if (hasPostgresVault) {
             const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
             const wsStore = tx.objectStore('workspaces');
             const bStore = tx.objectStore('books');
@@ -95,9 +155,10 @@ export const storage = {
           }
         }
       }
-    } catch {
-      // Offline fallback
     }
+  } catch {
+    // Offline fallback
+  }
 
     const [workspaces, books, folders, notes] = await Promise.all([
       this.getWorkspaces(),
@@ -235,13 +296,7 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspace: ws })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ workspace: ws }, `Workspace "${ws.name}"`);
   },
 
   async deleteWorkspace(id: string): Promise<void> {
@@ -254,13 +309,7 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteWorkspaceId: id })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ deleteWorkspaceId: id });
   },
 
   // --- Books ---
@@ -285,13 +334,7 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ book }, `Book "${book.title}"`);
   },
 
   async deleteBook(id: string): Promise<void> {
@@ -304,13 +347,7 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteBookId: id })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ deleteBookId: id });
   },
 
   // --- Notes ---
@@ -336,23 +373,7 @@ export const storage = {
     });
 
     debugLogger.log('info', 'storage', `Note saved locally to IndexedDB: "${note.title}"`);
-
-    // Opportunistically persist to PostgreSQL database
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note })
-      }).then(res => {
-        if (!res.ok) {
-          debugLogger.log('warn', 'sync', `Note sync deferred: PostgreSQL returned HTTP ${res.status}`);
-        } else {
-          debugLogger.log('success', 'sync', `Note synced to PostgreSQL: "${note.title}"`);
-        }
-      }).catch(() => {
-        debugLogger.log('info', 'sync', `PostgreSQL offline, note safely retained in IndexedDB: "${note.title}"`);
-      });
-    } catch {}
+    triggerSync({ note }, `Note "${note.title}"`);
   },
 
   async deleteNote(id: string): Promise<void> {
@@ -365,13 +386,7 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteNoteId: id })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ deleteNoteId: id });
   },
 
   async emptyTrash(): Promise<void> {
@@ -387,13 +402,7 @@ export const storage = {
       tx.onerror = () => reject(tx.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emptyTrash: true })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ emptyTrash: true });
   },
 
   // --- Folders ---
@@ -418,13 +427,7 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ folder }, `Folder "${folder.name}"`);
   },
 
   async deleteFolder(id: string): Promise<void> {
@@ -437,18 +440,21 @@ export const storage = {
       req.onerror = () => reject(req.error);
     });
 
-    try {
-      fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteFolderId: id })
-      }).catch(() => {});
-    } catch {}
+    triggerSync({ deleteFolderId: id });
   },
 
-  // --- PostgreSQL Synchronization & Diagnostics ---
+  // --- PostgreSQL / Server Synchronization & Diagnostics ---
   async syncToPostgres(): Promise<{ success: boolean; count?: Record<string, number>; error?: string }> {
     try {
+      const reachable = await checkBackendHealth();
+      if (!reachable) {
+        debugLogger.log('info', 'sync', 'Standalone offline mode active. All data safely retained locally in IndexedDB.');
+        return {
+          success: true,
+          count: { offline: 1 }
+        };
+      }
+
       const [workspaces, books, folders, notes] = await Promise.all([
         this.getWorkspaces(),
         this.getBooks(),
@@ -490,8 +496,16 @@ export const storage = {
     }
   },
 
+  async syncWithServer(): Promise<{ success: boolean; count?: Record<string, number>; error?: string }> {
+    return this.syncToPostgres();
+  },
+
   async fetchPostgresHealth(): Promise<{ status: string; count?: Record<string, number> }> {
     try {
+      const reachable = await checkBackendHealth();
+      if (!reachable) {
+        return { status: 'offline' };
+      }
       const res = await fetch('/api/health');
       if (res.ok) {
         return await res.json();

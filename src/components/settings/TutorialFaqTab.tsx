@@ -171,7 +171,11 @@ const FAQ_ITEMS: FaqItem[] = [
   }
 ];
 
-export const TutorialFaqTab: React.FC = () => {
+export interface TutorialFaqTabProps {
+  onLaunchTour?: () => void;
+}
+
+export const TutorialFaqTab: React.FC<TutorialFaqTabProps> = ({ onLaunchTour }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [openFaqIds, setOpenFaqIds] = useState<Set<string>>(new Set(['data-privacy', 'flashcard-extraction']));
@@ -236,10 +240,38 @@ export const TutorialFaqTab: React.FC = () => {
 
       {/* Quick-Start Walkthrough Cards */}
       <div>
-        <h4 className="panel-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={14} color="var(--accent-primary)" />
-          Quick-Start Feature Walkthrough
-        </h4>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h4 className="panel-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <Sparkles size={14} color="var(--accent-primary)" />
+            Quick-Start Feature Walkthrough
+          </h4>
+          <button
+            type="button"
+            onClick={() => {
+              if (onLaunchTour) {
+                onLaunchTour();
+              } else {
+                window.dispatchEvent(new CustomEvent('milearn:open-tour'));
+              }
+            }}
+            style={{
+              fontSize: '12px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              background: 'var(--accent-primary, #6366f1)',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)'
+            }}
+          >
+            <Sparkles size={13} /> Launch Interactive Tour
+          </button>
+        </div>
 
         <div className="tutorial-cards-grid">
           {/* Card 1 */}

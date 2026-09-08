@@ -130,6 +130,21 @@ function postgresApiPlugin(): Plugin {
                     if (payload.fullSync) {
                       await serverDb.fullSync(payload.fullSync);
                     }
+                    if (payload.deleteNoteId) {
+                      await serverDb.deleteNote(payload.deleteNoteId);
+                    }
+                    if (payload.emptyTrash) {
+                      await serverDb.emptyTrash();
+                    }
+                    if (payload.deleteFolderId) {
+                      await serverDb.deleteFolder(payload.deleteFolderId);
+                    }
+                    if (payload.deleteBookId) {
+                      await serverDb.deleteBook(payload.deleteBookId);
+                    }
+                    if (payload.deleteWorkspaceId) {
+                      await serverDb.deleteWorkspace(payload.deleteWorkspaceId);
+                    }
                     res.end(JSON.stringify({ success: true }));
                   } catch (err: unknown) {
                     res.statusCode = 500;

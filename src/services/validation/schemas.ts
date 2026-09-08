@@ -106,11 +106,19 @@ export const SyncPayloadSchema = z.object({
   workspace: WorkspaceSchema.optional(),
   book: BookSchema.optional(),
   flashcard: FlashcardSchema.optional(),
-  fullSync: FullSyncSchema.optional()
+  fullSync: FullSyncSchema.optional(),
+  deleteNoteId: z.string().optional(),
+  emptyTrash: z.boolean().optional(),
+  deleteFolderId: z.string().optional(),
+  deleteBookId: z.string().optional(),
+  deleteWorkspaceId: z.string().optional()
 }).refine((data) => {
-  return Boolean(data.note || data.folder || data.workspace || data.book || data.flashcard || data.fullSync);
+  return Boolean(
+    data.note || data.folder || data.workspace || data.book || data.flashcard || data.fullSync ||
+    data.deleteNoteId || data.emptyTrash || data.deleteFolderId || data.deleteBookId || data.deleteWorkspaceId
+  );
 }, {
-  message: 'Sync payload must contain at least one entity (note, folder, workspace, book, flashcard, or fullSync)'
+  message: 'Sync payload must contain at least one entity or deletion instruction'
 });
 
 export const VaultDataSchema = z.object({

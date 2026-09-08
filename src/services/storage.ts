@@ -45,44 +45,54 @@ export { SAMPLE_WORKSPACES, SAMPLE_BOOKS, SAMPLE_FOLDERS, SAMPLE_NOTES };
 export const storage = {
   async init(): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
     const db = await openDB();
+    const VAULT_INITIALIZED_KEY = 'milearn_vault_initialized';
+    const isAlreadyInitialized = typeof localStorage !== 'undefined' && localStorage.getItem(VAULT_INITIALIZED_KEY) === 'true';
 
     // 1. Dynamic PostgreSQL Synchronization: Fetch live seeded data from PostgreSQL
     try {
       const apiRes = await fetch('/api/vault');
       if (apiRes.ok) {
         const vault = await apiRes.json();
-        if (vault && Array.isArray(vault.notes) && vault.notes.length > 0) {
-          const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
-          const wsStore = tx.objectStore('workspaces');
-          const bStore = tx.objectStore('books');
-          const fStore = tx.objectStore('folders');
-          const nStore = tx.objectStore('notes');
+        if (vault) {
+          // If PostgreSQL has an initialized vault (at least one workspace exists), sync from PostgreSQL
+          const hasPostgresVault = Array.isArray(vault.workspaces) && vault.workspaces.length > 0;
+          if (hasPostgresVault) {
+            const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
+            const wsStore = tx.objectStore('workspaces');
+            const bStore = tx.objectStore('books');
+            const fStore = tx.objectStore('folders');
+            const nStore = tx.objectStore('notes');
 
-          wsStore.clear();
-          bStore.clear();
-          fStore.clear();
-          nStore.clear();
+            wsStore.clear();
+            bStore.clear();
+            fStore.clear();
+            nStore.clear();
 
-          for (const ws of vault.workspaces) wsStore.put(ws);
-          for (const b of vault.books) bStore.put(b);
-          for (const f of vault.folders) fStore.put(f);
-          for (const n of vault.notes) nStore.put(n);
+            if (Array.isArray(vault.workspaces)) for (const ws of vault.workspaces) wsStore.put(ws);
+            if (Array.isArray(vault.books)) for (const b of vault.books) bStore.put(b);
+            if (Array.isArray(vault.folders)) for (const f of vault.folders) fStore.put(f);
+            if (Array.isArray(vault.notes)) for (const n of vault.notes) nStore.put(n);
 
-          await new Promise<void>((resolve, reject) => {
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-          });
+            await new Promise<void>((resolve, reject) => {
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => reject(tx.error);
+            });
 
-          if (vault.user) {
-            this.setUserProfile(vault.user);
+            if (vault.user) {
+              this.setUserProfile(vault.user);
+            }
+
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(VAULT_INITIALIZED_KEY, 'true');
+            }
+
+            return {
+              notes: vault.notes || [],
+              folders: vault.folders || [],
+              workspaces: vault.workspaces || [],
+              books: vault.books || []
+            };
           }
-
-          return {
-            notes: vault.notes,
-            folders: vault.folders,
-            workspaces: vault.workspaces,
-            books: vault.books
-          };
         }
       }
     } catch {
@@ -96,44 +106,47 @@ export const storage = {
       this.getNotes()
     ]);
 
-    // Seed default workspaces if empty
-    if (workspaces.length === 0) {
-      const tx = db.transaction('workspaces', 'readwrite');
-      const store = tx.objectStore('workspaces');
-      for (const ws of SAMPLE_WORKSPACES) {
-        store.put(ws);
+    // Only seed sample default data on first launch if the vault has never been initialized
+    if (!isAlreadyInitialized) {
+      if (workspaces.length === 0) {
+        const tx = db.transaction('workspaces', 'readwrite');
+        const store = tx.objectStore('workspaces');
+        for (const ws of SAMPLE_WORKSPACES) {
+          store.put(ws);
+        }
+        workspaces.push(...SAMPLE_WORKSPACES);
       }
-      workspaces.push(...SAMPLE_WORKSPACES);
-    }
 
-    // Seed default books if empty
-    if (books.length === 0) {
-      const tx = db.transaction('books', 'readwrite');
-      const store = tx.objectStore('books');
-      for (const b of SAMPLE_BOOKS) {
-        store.put(b);
+      if (books.length === 0) {
+        const tx = db.transaction('books', 'readwrite');
+        const store = tx.objectStore('books');
+        for (const b of SAMPLE_BOOKS) {
+          store.put(b);
+        }
+        books.push(...SAMPLE_BOOKS);
       }
-      books.push(...SAMPLE_BOOKS);
-    }
 
-    // Seed default folders if empty
-    if (folders.length === 0) {
-      const tx = db.transaction('folders', 'readwrite');
-      const store = tx.objectStore('folders');
-      for (const folder of SAMPLE_FOLDERS) {
-        store.put(folder);
+      if (folders.length === 0) {
+        const tx = db.transaction('folders', 'readwrite');
+        const store = tx.objectStore('folders');
+        for (const folder of SAMPLE_FOLDERS) {
+          store.put(folder);
+        }
+        folders.push(...SAMPLE_FOLDERS);
       }
-      folders.push(...SAMPLE_FOLDERS);
-    }
 
-    // Seed default notes if empty
-    if (notes.length === 0) {
-      const tx = db.transaction('notes', 'readwrite');
-      const store = tx.objectStore('notes');
-      for (const note of SAMPLE_NOTES) {
-        store.put(note);
+      if (notes.length === 0) {
+        const tx = db.transaction('notes', 'readwrite');
+        const store = tx.objectStore('notes');
+        for (const note of SAMPLE_NOTES) {
+          store.put(note);
+        }
+        notes.push(...SAMPLE_NOTES);
       }
-      notes.push(...SAMPLE_NOTES);
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(VAULT_INITIALIZED_KEY, 'true');
+      }
     } else {
       // Migration: Ensure all existing notes have workspaceId and flags
       const tx = db.transaction('notes', 'readwrite');
@@ -188,6 +201,10 @@ export const storage = {
       tx.onerror = () => reject(tx.error);
     });
 
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('milearn_vault_initialized', 'true');
+    }
+
     return {
       workspaces: [...SAMPLE_WORKSPACES],
       books: [...SAMPLE_BOOKS],
@@ -229,13 +246,21 @@ export const storage = {
 
   async deleteWorkspace(id: string): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('workspaces', 'readwrite');
       const store = tx.objectStore('workspaces');
       const req = store.delete(id);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteWorkspaceId: id })
+      }).catch(() => {});
+    } catch {}
   },
 
   // --- Books ---
@@ -271,13 +296,21 @@ export const storage = {
 
   async deleteBook(id: string): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('books', 'readwrite');
       const store = tx.objectStore('books');
       const req = store.delete(id);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteBookId: id })
+      }).catch(() => {});
+    } catch {}
   },
 
   // --- Notes ---
@@ -324,13 +357,21 @@ export const storage = {
 
   async deleteNote(id: string): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('notes', 'readwrite');
       const store = tx.objectStore('notes');
       const req = store.delete(id);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteNoteId: id })
+      }).catch(() => {});
+    } catch {}
   },
 
   async emptyTrash(): Promise<void> {
@@ -338,13 +379,21 @@ export const storage = {
     const notes = await this.getNotes();
     const trashed = notes.filter((n) => n.isTrashed);
 
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('notes', 'readwrite');
       const store = tx.objectStore('notes');
       trashed.forEach((n) => store.delete(n.id));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emptyTrash: true })
+      }).catch(() => {});
+    } catch {}
   },
 
   // --- Folders ---
@@ -380,13 +429,21 @@ export const storage = {
 
   async deleteFolder(id: string): Promise<void> {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction('folders', 'readwrite');
       const store = tx.objectStore('folders');
       const req = store.delete(id);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+
+    try {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteFolderId: id })
+      }).catch(() => {});
+    } catch {}
   },
 
   // --- PostgreSQL Synchronization & Diagnostics ---

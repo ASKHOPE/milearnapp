@@ -455,6 +455,67 @@ export const serverDb = {
     if (payload.flashcards) {
       for (const fc of payload.flashcards) await this.syncFlashcard(fc);
     }
+  },
+
+  /**
+   * Delete a note from PostgreSQL
+   */
+  async deleteNote(id: string): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('DELETE FROM notes WHERE id = $1', [id]);
+    } finally {
+      client.release();
+    }
+  },
+
+  /**
+   * Empty all trashed notes from PostgreSQL
+   */
+  async emptyTrash(userId = 'user-default'): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('DELETE FROM notes WHERE is_trashed = true AND (user_id = $1 OR user_id IS NULL)', [userId]);
+    } finally {
+      client.release();
+    }
+  },
+
+  /**
+   * Delete a folder from PostgreSQL
+   */
+  async deleteFolder(id: string): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('DELETE FROM folders WHERE id = $1', [id]);
+    } finally {
+      client.release();
+    }
+  },
+
+  /**
+   * Delete a book from PostgreSQL
+   */
+  async deleteBook(id: string): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('DELETE FROM books WHERE id = $1', [id]);
+    } finally {
+      client.release();
+    }
+  },
+
+  /**
+   * Delete a workspace from PostgreSQL
+   */
+  async deleteWorkspace(id: string): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query('DELETE FROM workspaces WHERE id = $1', [id]);
+    } finally {
+      client.release();
+    }
   }
 };
+
 

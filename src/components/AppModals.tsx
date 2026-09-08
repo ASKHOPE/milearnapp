@@ -13,6 +13,7 @@ const TypingMetricsModal = lazy(() => import('./TypingMetricsModal').then(m => (
 const DictionaryAbbreviationsModal = lazy(() => import('./DictionaryAbbreviationsModal').then(m => ({ default: m.DictionaryAbbreviationsModal })));
 const LibraryFileManager = lazy(() => import('./LibraryFileManager').then(m => ({ default: m.LibraryFileManager })));
 const WebClipperModal = lazy(() => import('./WebClipperModal').then(m => ({ default: m.WebClipperModal })));
+const OnboardingTourModal = lazy(() => import('./OnboardingTourModal').then(m => ({ default: m.OnboardingTourModal })));
 
 export interface AppModalsProps {
   // Settings
@@ -91,6 +92,11 @@ export interface AppModalsProps {
   isWebClipperOpen?: boolean;
   onCloseWebClipper?: () => void;
   onSaveClippedNote?: (note: Note) => void;
+
+  // Onboarding Feature Tour
+  isOnboardingOpen?: boolean;
+  onCloseOnboarding?: () => void;
+  onOpenSettingsGuide?: () => void;
 }
 
 export const AppModals: React.FC<AppModalsProps> = ({
@@ -158,7 +164,10 @@ export const AppModals: React.FC<AppModalsProps> = ({
   onCreateNote,
   isWebClipperOpen,
   onCloseWebClipper,
-  onSaveClippedNote
+  onSaveClippedNote,
+  isOnboardingOpen,
+  onCloseOnboarding,
+  onOpenSettingsGuide
 }) => {
   const filteredWorkspaceNotes = workspaceNotes.filter((n) => !n.isTrashed);
   const resolvedWorkspace: Workspace = activeWorkspace || {
@@ -338,6 +347,17 @@ export const AppModals: React.FC<AppModalsProps> = ({
                 onSaveClippedNote(note);
               }
             }}
+          />
+        </ErrorBoundary>
+      )}
+
+      {/* First-Launch Daemon: Interactive Feature Tour */}
+      {isOnboardingOpen && onCloseOnboarding && (
+        <ErrorBoundary name="Onboarding Tour Modal">
+          <OnboardingTourModal
+            isOpen={isOnboardingOpen}
+            onClose={onCloseOnboarding}
+            onOpenSettingsGuide={onOpenSettingsGuide}
           />
         </ErrorBoundary>
       )}

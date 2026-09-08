@@ -54,6 +54,7 @@ export const App: React.FC = () => {
   const [isTypingMetricsOpen, setIsTypingMetricsOpen] = useState(false);
   const [isDictionaryOpen, setIsDictionaryOpen] = useState(false);
   const [isWebClipperOpen, setIsWebClipperOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isVaultLockedDueToInactivity, setIsVaultLockedDueToInactivity] = useState(false);
   const [pomodoroSecondsLeft, setPomodoroSecondsLeft] = useState(25 * 60);
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
@@ -105,6 +106,14 @@ export const App: React.FC = () => {
           setSelectedNoteId(wsNotes[0].id);
           setOpenNoteIds([wsNotes[0].id]);
         }
+
+        // First Launch Daemon: Trigger guided feature tour on first launch
+        const tourCompleted = typeof localStorage !== 'undefined' && localStorage.getItem('milearn_tour_completed') === 'true';
+        if (!tourCompleted) {
+          setTimeout(() => {
+            setIsOnboardingOpen(true);
+          }, 450);
+        }
       } catch (err) {
         console.error('Failed to initialize Noteflow database:', err);
       } finally {
@@ -112,6 +121,13 @@ export const App: React.FC = () => {
       }
     }
     loadData();
+  }, []);
+
+  // First-Launch Tour Event Listener (allows triggering from settings or keyboard shortcuts)
+  useEffect(() => {
+    const handleOpenTour = () => setIsOnboardingOpen(true);
+    window.addEventListener('milearn:open-tour', handleOpenTour);
+    return () => window.removeEventListener('milearn:open-tour', handleOpenTour);
   }, []);
 
   // System Dark Theme Auto-Sync Listener
@@ -1163,6 +1179,12 @@ export const App: React.FC = () => {
         onSaveClippedNote={(clippedNote) => {
           setNotes((prev) => [clippedNote, ...prev]);
           handleOpenNote(clippedNote.id);
+        }}
+        isOnboardingOpen={isOnboardingOpen}
+        onCloseOnboarding={() => setIsOnboardingOpen(false)}
+        onOpenSettingsGuide={() => {
+          setSettingsInitialTab('tutorial');
+          setIsSettingsOpen(true);
         }}
       />
 

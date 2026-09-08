@@ -141,6 +141,19 @@ describe('Zod Runtime Schema Validation & Vault Resilience Tests', () => {
     };
     const resNote = validateSyncPayload(noteSync);
     expect(resNote.success).toBe(true);
+
+    // Valid sync with deletion operations
+    const deleteNoteSync = { deleteNoteId: 'n-sync-1' };
+    expect(validateSyncPayload(deleteNoteSync).success).toBe(true);
+
+    const emptyTrashSync = { emptyTrash: true };
+    expect(validateSyncPayload(emptyTrashSync).success).toBe(true);
+
+    const deleteFolderSync = { deleteFolderId: 'f-1' };
+    expect(validateSyncPayload(deleteFolderSync).success).toBe(true);
+
+    const deleteBookSync = { deleteBookId: 'b-1' };
+    expect(validateSyncPayload(deleteBookSync).success).toBe(true);
   });
 
   it('validates Web Scraper URLs and rejects invalid protocols or javascript injections', () => {

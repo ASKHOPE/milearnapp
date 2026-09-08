@@ -243,28 +243,30 @@ export const storage = {
    * Resets and re-seeds the entire database with the full interactive tutorial dataset
    */
   async reseedTutorialVault(): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
-    const db = await openDB();
-    const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
+    if (typeof indexedDB !== 'undefined') {
+      const db = await openDB();
+      const tx = db.transaction(['workspaces', 'books', 'folders', 'notes'], 'readwrite');
 
-    const wsStore = tx.objectStore('workspaces');
-    const bStore = tx.objectStore('books');
-    const fStore = tx.objectStore('folders');
-    const nStore = tx.objectStore('notes');
+      const wsStore = tx.objectStore('workspaces');
+      const bStore = tx.objectStore('books');
+      const fStore = tx.objectStore('folders');
+      const nStore = tx.objectStore('notes');
 
-    wsStore.clear();
-    bStore.clear();
-    fStore.clear();
-    nStore.clear();
+      wsStore.clear();
+      bStore.clear();
+      fStore.clear();
+      nStore.clear();
 
-    for (const ws of SAMPLE_WORKSPACES) wsStore.put(ws);
-    for (const b of SAMPLE_BOOKS) bStore.put(b);
-    for (const f of SAMPLE_FOLDERS) fStore.put(f);
-    for (const n of SAMPLE_NOTES) nStore.put(n);
+      for (const ws of SAMPLE_WORKSPACES) wsStore.put(ws);
+      for (const b of SAMPLE_BOOKS) bStore.put(b);
+      for (const f of SAMPLE_FOLDERS) fStore.put(f);
+      for (const n of SAMPLE_NOTES) nStore.put(n);
 
-    await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('milearn_vault_initialized', 'true');
@@ -275,6 +277,90 @@ export const storage = {
       books: [...SAMPLE_BOOKS],
       folders: [...SAMPLE_FOLDERS],
       notes: [...SAMPLE_NOTES]
+    };
+  },
+
+  /**
+   * Resets the vault to a completely clean slate (empty state with 1 personal workspace and 1 clean note)
+   */
+  async createCleanSlateVault(): Promise<{ notes: Note[]; folders: Folder[]; workspaces: Workspace[]; books: Book[] }> {
+    const cleanWorkspace: Workspace = {
+      id: 'ws-personal',
+      name: 'Personal',
+      icon: '👤',
+      color: '#6366f1',
+      description: 'Your private personal workspace',
+      createdAt: new Date().toISOString()
+    };
+
+    const cleanFolder: Folder = {
+      id: 'f-quick',
+      name: 'Quick Notes',
+      color: '#6366f1',
+      workspaceId: 'ws-personal',
+      parentId: null,
+      createdAt: new Date().toISOString()
+    };
+
+    const cleanNote: Note = {
+      id: 'n-welcome',
+      title: 'Welcome to your Workspace',
+      content: `# Welcome to MiLEARNAPP\n\nThis is your clean workspace. Start writing, brainstorming, or studying right away.\n\n### Quick Tips:\n- Press **Cmd+N** / **Ctrl+N** to create a new note\n- Press **Cmd+K** / **Ctrl+K** for Spotlight Search\n- Type **/** for commands and formatting\n- Use **$math$** for KaTeX formulas and \`\`\`mermaid for diagrams\n`,
+      folderId: 'f-quick',
+      workspaceId: 'ws-personal',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: ['getting-started'],
+      attachments: [],
+      isFavorite: true,
+      isPinned: true,
+      isArchived: false,
+      isTrashed: false,
+      isLocked: false
+    };
+
+    if (typeof indexedDB !== 'undefined') {
+      const db = await openDB();
+      const tx = db.transaction(['workspaces', 'books', 'folders', 'notes', 'flashcards'], 'readwrite');
+
+      const wsStore = tx.objectStore('workspaces');
+      const bStore = tx.objectStore('books');
+      const fStore = tx.objectStore('folders');
+      const nStore = tx.objectStore('notes');
+      const fcStore = tx.objectStore('flashcards');
+
+      wsStore.clear();
+      bStore.clear();
+      fStore.clear();
+      nStore.clear();
+      fcStore.clear();
+
+      wsStore.put(cleanWorkspace);
+      fStore.put(cleanFolder);
+      nStore.put(cleanNote);
+
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('milearn_vault_initialized', 'true');
+      localStorage.setItem('noteflow_active_workspace', 'ws-personal');
+    }
+
+    try {
+      await this.syncToPostgres();
+    } catch {
+      // offline safe
+    }
+
+    return {
+      workspaces: [cleanWorkspace],
+      books: [],
+      folders: [cleanFolder],
+      notes: [cleanNote]
     };
   },
 

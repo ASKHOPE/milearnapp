@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { type Workspace, type Note, type Folder, type Book, type ThemeMode, type TypographySettings, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
 export { DEFAULT_USER_PROFILE };
 import { optimizer, type StorageHealth } from '../services/optimizer';
@@ -44,7 +44,11 @@ import {
   HelpCircle,
   FileText,
   Lock,
-  Bug
+  Bug,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { TutorialFaqTab } from './settings/TutorialFaqTab';
 import { TermsOfServiceTab } from './settings/TermsOfServiceTab';
@@ -182,6 +186,119 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setPgHealth(data);
   };
 
+  // PostgreSQL DB Connector State
+  const [dbConnectionString, setDbConnectionString] = useState('');
+  const [maskedActiveDbUrl, setMaskedActiveDbUrl] = useState('');
+  const [showDbPassword, setShowDbPassword] = useState(false);
+  const [isTestingDbConnection, setIsTestingDbConnection] = useState(false);
+  const [isSavingDbConnection, setIsSavingDbConnection] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{
+    tested: boolean;
+    success: boolean;
+    version?: string;
+    database?: string;
+    user?: string;
+    error?: string;
+  } | null>(null);
+  const [dbSaveSuccessNotice, setDbSaveSuccessNotice] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<'docker' | 'supabase' | 'neon' | 'custom'>('docker');
+
+  const loadDbConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/db/config');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.maskedUrl) {
+          setMaskedActiveDbUrl(data.maskedUrl);
+        }
+        if (data.connectionString) {
+          setDbConnectionString((prev) => prev || data.connectionString);
+        }
+      }
+    } catch {
+      // Backend offline
+    }
+  }, []);
+
+  const handleApplyPreset = (preset: 'docker' | 'supabase' | 'neon' | 'custom') => {
+    setSelectedPreset(preset);
+    setDbTestResult(null);
+    setDbSaveSuccessNotice(null);
+    if (preset === 'docker') {
+      setDbConnectionString('postgresql://milearn:milearn_password@localhost:5432/milearndb');
+    } else if (preset === 'supabase') {
+      setDbConnectionString('postgresql://postgres.[YOUR-PROJECT]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres');
+    } else if (preset === 'neon') {
+      setDbConnectionString('postgresql://[USER]:[PASSWORD]@[ENDPOINT].neon.tech/neondb?sslmode=require');
+    }
+  };
+
+  const handleTestDbConnection = async () => {
+    if (!dbConnectionString.trim()) return;
+    setIsTestingDbConnection(true);
+    setDbTestResult(null);
+    setDbSaveSuccessNotice(null);
+    try {
+      const res = await fetch('/api/db/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionString: dbConnectionString.trim() })
+      });
+      const data = await res.json();
+      setDbTestResult({
+        tested: true,
+        success: Boolean(data.success),
+        version: data.version,
+        database: data.database,
+        user: data.user,
+        error: data.error
+      });
+    } catch (err: unknown) {
+      setDbTestResult({
+        tested: true,
+        success: false,
+        error: err instanceof Error ? err.message : 'Network error communicating with server API'
+      });
+    } finally {
+      setIsTestingDbConnection(false);
+    }
+  };
+
+  const handleSaveAndConnectDb = async () => {
+    if (!dbConnectionString.trim()) return;
+    setIsSavingDbConnection(true);
+    setDbSaveSuccessNotice(null);
+    try {
+      const res = await fetch('/api/db/configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionString: dbConnectionString.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDbSaveSuccessNotice(`Successfully connected to database "${data.database || 'default'}" as user "${data.user || 'postgres'}"!`);
+        await loadDbConfig();
+        await loadPgHealth();
+        await loadSyncTelemetry();
+        setTimeout(() => setDbSaveSuccessNotice(null), 5000);
+      } else {
+        setDbTestResult({
+          tested: true,
+          success: false,
+          error: data.error || 'Failed to reconfigure connection'
+        });
+      }
+    } catch (err: unknown) {
+      setDbTestResult({
+        tested: true,
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to connect'
+      });
+    } finally {
+      setIsSavingDbConnection(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       setLockoutCount(lockoutManager.getAllActiveLockouts().length);
@@ -192,8 +309,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setSecuritySettings(inactivityLockManager.getSettings());
       loadPgHealth();
       loadSyncTelemetry();
+      loadDbConfig();
     }
-  }, [isOpen]);
+  }, [isOpen, loadDbConfig]);
 
   // Handle Photo Upload (1:1 Square Crop on Canvas)
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1375,10 +1493,228 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       {/* TAB 7: POSTGRESQL DATABASE SYNC & TELEMETRY */}
       {activeTab === 'database' && (
-        <div className="settings-symmetrical-grid">
-          {/* Left Column: Server Connection & Sync Actions */}
-          <div className="settings-card-panel">
-            <h4 className="panel-section-title">PostgreSQL 16 Differential Sync</h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* PostgreSQL Live Database Connector Card */}
+          <div className="settings-card-panel" style={{ width: '100%', padding: '18px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Database size={18} color="var(--accent-primary)" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    PostgreSQL Database Connector
+                  </h4>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Connect to local Docker or hosted PostgreSQL (Supabase, Neon, AWS RDS, Railway)
+                  </span>
+                </div>
+              </div>
+
+              {maskedActiveDbUrl && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 10px',
+                  borderRadius: '20px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  fontSize: '11px',
+                  color: '#10b981',
+                  fontFamily: 'var(--font-mono, monospace)'
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+                  Active: {maskedActiveDbUrl.includes('@') ? maskedActiveDbUrl.split('@')[1] : maskedActiveDbUrl}
+                </div>
+              )}
+            </div>
+
+            {/* Provider Presets */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
+                Provider Presets:
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'docker', label: '🐳 Local Docker', desc: 'localhost:5432' },
+                  { id: 'supabase', label: '⚡ Supabase', desc: 'Session Pooler' },
+                  { id: 'neon', label: '🌐 Neon Serverless', desc: 'Direct / SSL' },
+                  { id: 'custom', label: '🛠️ Custom URL', desc: 'Self-hosted' }
+                ].map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleApplyPreset(preset.id as 'docker' | 'supabase' | 'neon' | 'custom')}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: selectedPreset === preset.id
+                        ? '1px solid var(--accent-primary)'
+                        : '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
+                      background: selectedPreset === preset.id
+                        ? 'rgba(99, 102, 241, 0.15)'
+                        : 'var(--bg-surface, rgba(255, 255, 255, 0.03))',
+                      color: selectedPreset === preset.id ? 'var(--accent-primary)' : 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span>{preset.label}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 400 }}>({preset.desc})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Connection String Input & Reveal Toggle */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Connection URI (PostgreSQL Format)
+              </label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <input
+                    type={showDbPassword ? 'text' : 'password'}
+                    value={dbConnectionString}
+                    onChange={(e) => {
+                      setDbConnectionString(e.target.value);
+                      setSelectedPreset('custom');
+                      setDbTestResult(null);
+                      setDbSaveSuccessNotice(null);
+                    }}
+                    placeholder="postgresql://user:password@host:5432/dbname"
+                    style={{
+                      width: '100%',
+                      padding: '10px 42px 10px 14px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-surface, rgba(0, 0, 0, 0.2))',
+                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
+                      color: 'var(--text-primary)',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      fontSize: '12px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDbPassword((prev) => !prev)}
+                    title={showDbPassword ? 'Hide password' : 'Show password'}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '4px'
+                    }}
+                  >
+                    {showDbPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  isLoading={isTestingDbConnection}
+                  disabled={!dbConnectionString.trim() || isTestingDbConnection}
+                  onClick={handleTestDbConnection}
+                  title="Ping and test PostgreSQL connectivity"
+                >
+                  <RefreshCw size={13} style={{ marginRight: '6px' }} />
+                  Test Connection
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  isLoading={isSavingDbConnection}
+                  disabled={!dbConnectionString.trim() || isSavingDbConnection}
+                  onClick={handleSaveAndConnectDb}
+                  title="Switch backend connection pool to this database"
+                >
+                  <Check size={13} style={{ marginRight: '6px' }} />
+                  Save &amp; Connect
+                </Button>
+              </div>
+            </div>
+
+            {/* Test Connection Results Badge */}
+            {dbTestResult?.tested && (
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: dbTestResult.success ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                background: dbTestResult.success ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                color: dbTestResult.success ? '#10b981' : '#ef4444',
+                fontSize: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                marginBottom: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                  {dbTestResult.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                  <span>{dbTestResult.success ? 'Connection Successful!' : 'Connection Failed'}</span>
+                </div>
+                {dbTestResult.success ? (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '11px', lineHeight: '1.5' }}>
+                    <div><strong>Database:</strong> {dbTestResult.database} &bull; <strong>User:</strong> {dbTestResult.user}</div>
+                    <div style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono, monospace)' }}>{dbTestResult.version}</div>
+                  </div>
+                ) : (
+                  <div style={{ color: '#ef4444', fontSize: '11px' }}>
+                    {dbTestResult.error || 'Check network connection, credentials, and firewall settings.'}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Save Success Notice */}
+            {dbSaveSuccessNotice && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid #10b981',
+                color: '#10b981',
+                fontSize: '12px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '10px'
+              }}>
+                <CheckCircle2 size={15} />
+                <span>{dbSaveSuccessNotice}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="settings-symmetrical-grid">
+            {/* Left Column: Server Connection & Sync Actions */}
+            <div className="settings-card-panel">
+              <h4 className="panel-section-title">PostgreSQL 16 Differential Sync</h4>
 
             {/* Connection & Live Cloud Status Card */}
             <div style={{
@@ -1602,6 +1938,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* TAB 8: DIAGNOSTICS & DEBUGGER */}

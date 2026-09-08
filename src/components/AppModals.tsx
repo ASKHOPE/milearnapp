@@ -97,6 +97,7 @@ export interface AppModalsProps {
   isOnboardingOpen?: boolean;
   onCloseOnboarding?: () => void;
   onOpenSettingsGuide?: () => void;
+  onStartWithCleanSlate?: () => Promise<void> | void;
 }
 
 export const AppModals: React.FC<AppModalsProps> = ({
@@ -167,7 +168,8 @@ export const AppModals: React.FC<AppModalsProps> = ({
   onSaveClippedNote,
   isOnboardingOpen,
   onCloseOnboarding,
-  onOpenSettingsGuide
+  onOpenSettingsGuide,
+  onStartWithCleanSlate
 }) => {
   const filteredWorkspaceNotes = workspaceNotes.filter((n) => !n.isTrashed);
   const resolvedWorkspace: Workspace = activeWorkspace || {
@@ -358,6 +360,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
             isOpen={isOnboardingOpen}
             onClose={onCloseOnboarding}
             onOpenSettingsGuide={onOpenSettingsGuide}
+            onStartWithCleanSlate={onStartWithCleanSlate}
           />
         </ErrorBoundary>
       )}

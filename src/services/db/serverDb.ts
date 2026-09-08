@@ -13,11 +13,33 @@ const { Pool } = pg;
 const rawUrl = process.env.DATABASE_URL || 'postgresql://milearn:milearn_password@localhost:5432/milearndb';
 const DATABASE_URL = rawUrl.replace(/\?.*$/, '');
 
-export const pool = new Pool({
+export function maskConnectionString(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.password) {
+      parsed.password = '••••••••';
+    }
+    return decodeURI(parsed.toString());
+  } catch {
+    return url.replace(/:([^:@]+)@/, ':••••••••@');
+  }
+}
+
+let activePool = new Pool({
   connectionString: DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 4000
+});
+
+export const pool = new Proxy({} as pg.Pool, {
+  get(_target, prop, receiver) {
+    const value = Reflect.get(activePool, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(activePool);
+    }
+    return value;
+  }
 });
 
 export interface TypingPassage {
@@ -70,6 +92,210 @@ export interface VaultPayload {
 }
 
 export const serverDb = {
+  /**
+   * Retrieves active database configuration and masked URL
+   */
+  getActiveConfig(): { connectionString: string; maskedUrl: string; isCustom: boolean } {
+    const currentUrl = process.env.DATABASE_URL || DATABASE_URL;
+    return {
+      connectionString: currentUrl,
+      maskedUrl: maskConnectionString(currentUrl),
+      isCustom: currentUrl !== 'postgresql://milearn:milearn_password@localhost:5432/milearndb'
+    };
+  },
+
+  /**
+   * Initializes or migrates required database tables on target pool
+   */
+  async init(targetPool?: pg.Pool): Promise<void> {
+    const current = targetPool || activePool;
+    const client = await current.connect();
+    try {
+      try {
+        const fs = await import('node:fs');
+        const path = await import('node:path');
+        const schemaPath = path.resolve(process.cwd(), 'src/services/db/schema.sql');
+        if (fs.existsSync(schemaPath)) {
+          const sql = fs.readFileSync(schemaPath, 'utf8');
+          await client.query(sql);
+          return;
+        }
+      } catch {
+        // Fall back to direct minimal table creation if schema.sql read fails
+      }
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id VARCHAR(64) PRIMARY KEY,
+          email VARCHAR(255) UNIQUE,
+          name VARCHAR(255),
+          bio TEXT,
+          role VARCHAR(100) DEFAULT 'Systems Architect',
+          avatar_type VARCHAR(20) DEFAULT 'emoji',
+          avatar_value TEXT DEFAULT '⚡',
+          mood VARCHAR(100) DEFAULT 'Deep Focus',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS workspaces (
+          id VARCHAR(64) PRIMARY KEY,
+          user_id VARCHAR(64),
+          name VARCHAR(255) NOT NULL,
+          icon VARCHAR(32) DEFAULT '💼',
+          color VARCHAR(32) DEFAULT '#6366f1',
+          description TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS books (
+          id VARCHAR(64) PRIMARY KEY,
+          user_id VARCHAR(64),
+          workspace_id VARCHAR(64),
+          title VARCHAR(255) NOT NULL,
+          icon VARCHAR(32) DEFAULT '📖',
+          color VARCHAR(32) DEFAULT '#10b981',
+          description TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS folders (
+          id VARCHAR(64) PRIMARY KEY,
+          user_id VARCHAR(64),
+          workspace_id VARCHAR(64),
+          name VARCHAR(255) NOT NULL,
+          parent_id VARCHAR(64),
+          color VARCHAR(32),
+          icon VARCHAR(32),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS notes (
+          id VARCHAR(64) PRIMARY KEY,
+          user_id VARCHAR(64),
+          workspace_id VARCHAR(64),
+          folder_id VARCHAR(64),
+          book_id VARCHAR(64),
+          parent_page_id VARCHAR(64),
+          page_order INTEGER DEFAULT 0,
+          title VARCHAR(255) NOT NULL,
+          content TEXT NOT NULL DEFAULT '',
+          tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+          is_favorite BOOLEAN DEFAULT FALSE,
+          is_pinned BOOLEAN DEFAULT FALSE,
+          is_archived BOOLEAN DEFAULT FALSE,
+          is_trashed BOOLEAN DEFAULT FALSE,
+          trashed_at TIMESTAMP WITH TIME ZONE,
+          is_locked BOOLEAN DEFAULT FALSE,
+          encrypted_data JSONB,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS flashcards (
+          id VARCHAR(64) PRIMARY KEY,
+          user_id VARCHAR(64),
+          note_id VARCHAR(64),
+          note_title VARCHAR(255) NOT NULL,
+          question TEXT NOT NULL,
+          answer TEXT NOT NULL,
+          type VARCHAR(32) DEFAULT 'qa',
+          repetition INTEGER DEFAULT 0,
+          interval INTEGER DEFAULT 1,
+          ease_factor NUMERIC(4, 2) DEFAULT 2.50,
+          next_review_date DATE NOT NULL DEFAULT CURRENT_DATE,
+          last_reviewed DATE,
+          grade_history JSONB DEFAULT '[]'::jsonb,
+          is_manual BOOLEAN DEFAULT FALSE,
+          tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+          deck_category VARCHAR(100),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    } finally {
+      client.release();
+    }
+  },
+
+  /**
+   * Tests connection to an arbitrary PostgreSQL URL without changing active pool
+   */
+  async testConnection(connectionString: string): Promise<{ success: boolean; version?: string; database?: string; user?: string; error?: string }> {
+    if (!connectionString || typeof connectionString !== 'string') {
+      return { success: false, error: 'Connection string is required' };
+    }
+    let testPool: pg.Pool | null = null;
+    try {
+      testPool = new Pool({
+        connectionString,
+        max: 1,
+        connectionTimeoutMillis: 5000,
+        idleTimeoutMillis: 1000
+      });
+      const client = await testPool.connect();
+      try {
+        const res = await client.query('SELECT version(), current_database() as database, current_user as "user"');
+        const row = res.rows[0] || {};
+        return {
+          success: true,
+          version: row.version,
+          database: row.database,
+          user: row.user
+        };
+      } finally {
+        client.release();
+      }
+    } catch (err: unknown) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      };
+    } finally {
+      if (testPool) {
+        await testPool.end().catch(() => {});
+      }
+    }
+  },
+
+  /**
+   * Reconfigures server pool to use a new PostgreSQL connection string,
+   * runs schema migrations, and drains the previous pool.
+   */
+  async reconfigureConnection(newConnectionString: string): Promise<{ success: boolean; database?: string; user?: string; error?: string }> {
+    const test = await this.testConnection(newConnectionString);
+    if (!test.success) {
+      return {
+        success: false,
+        error: test.error || 'Connection failed'
+      };
+    }
+
+    const oldPool = activePool;
+    const nextPool = new Pool({
+      connectionString: newConnectionString,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000
+    });
+
+    try {
+      await this.init(nextPool);
+      activePool = nextPool;
+      process.env.DATABASE_URL = newConnectionString;
+
+      if (oldPool) {
+        oldPool.end().catch(() => {});
+      }
+
+      return {
+        success: true,
+        database: test.database,
+        user: test.user
+      };
+    } catch (err: unknown) {
+      await nextPool.end().catch(() => {});
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : String(err)
+      };
+    }
+  },
+
   /**
    * Healthcheck to verify database connectivity
    */

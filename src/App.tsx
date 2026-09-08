@@ -857,6 +857,19 @@ export const App: React.FC = () => {
     setCurrentFilter('all');
   };
 
+  const handleStartCleanSlate = async () => {
+    const clean = await storage.createCleanSlateVault();
+    setNotes(clean.notes);
+    setFolders(clean.folders);
+    setWorkspaces(clean.workspaces);
+    setBooks(clean.books);
+    setActiveWorkspaceId('ws-personal');
+    setSelectedNoteId('n-welcome');
+    setOpenNoteIds(['n-welcome']);
+    setCurrentFolderId(null);
+    setCurrentFilter('all');
+  };
+
   // Active Workspace Filtering
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
   const workspaceNotes = notes.filter((n) => (n.workspaceId || 'ws-personal') === activeWorkspaceId);
@@ -1193,6 +1206,7 @@ export const App: React.FC = () => {
           setSettingsInitialTab('tutorial');
           setIsSettingsOpen(true);
         }}
+        onStartWithCleanSlate={handleStartCleanSlate}
       />
 
       {/* Inactivity Security Screen Lock */}

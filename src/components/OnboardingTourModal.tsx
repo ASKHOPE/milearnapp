@@ -22,6 +22,7 @@ export interface OnboardingTourModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenSettingsGuide?: () => void;
+  onStartWithCleanSlate?: () => Promise<void> | void;
 }
 
 interface TourSlide {
@@ -47,9 +48,12 @@ interface TourSlide {
 export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
   isOpen,
   onClose,
-  onOpenSettingsGuide
+  onOpenSettingsGuide,
+  onStartWithCleanSlate
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const [starterChoice, setStarterChoice] = useState<'sample' | 'clean'>('sample');
+  const [isApplyingChoice, setIsApplyingChoice] = useState(false);
 
   const slides: TourSlide[] = [
     {
@@ -312,6 +316,31 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
           </div>
         )
       }
+    },
+    {
+      id: 'starter-choice',
+      badge: 'Workstation Setup',
+      badgeColor: '#06b6d4',
+      title: 'Choose Your Starting Workspace',
+      subtitle: 'Customize your setup: explore rich samples or start with a clean slate',
+      icon: <Sparkles size={32} color="#06b6d4" />,
+      features: [
+        {
+          icon: <BookOpen size={18} color="#6366f1" />,
+          title: 'Tutorial & Sample Vault',
+          description: '4 Workspaces, 3 Books, LaTeX formulas, Mermaid charts, flashcards, and sketches ready to explore.'
+        },
+        {
+          icon: <Palette size={18} color="#06b6d4" />,
+          title: 'Clean Slate (Empty Workstation)',
+          description: 'Start fresh with 1 clean Personal workspace, 1 welcome note, and 0 clutter.'
+        },
+        {
+          icon: <CheckCircle2 size={18} color="#10b981" />,
+          title: 'Flexible & Reseedable Anytime',
+          description: 'You can always reseed the sample vault or export your workspace from Settings.'
+        }
+      ]
     }
   ];
 
@@ -321,6 +350,20 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
     }
     onClose();
   }, [onClose]);
+
+  const handleFinish = useCallback(async () => {
+    if (starterChoice === 'clean' && onStartWithCleanSlate) {
+      setIsApplyingChoice(true);
+      try {
+        await onStartWithCleanSlate();
+      } catch (err) {
+        console.error('Failed to initialize clean slate:', err);
+      } finally {
+        setIsApplyingChoice(false);
+      }
+    }
+    handleDismiss();
+  }, [starterChoice, onStartWithCleanSlate, handleDismiss]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -348,7 +391,7 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
     if (currentStep < slides.length - 1) {
       setCurrentStep((prev) => prev + 1);
     } else {
-      handleDismiss();
+      handleFinish();
     }
   };
 
@@ -529,117 +572,244 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
             </div>
           </div>
 
-          {/* Two-Column Body: Features List + Preview Box */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1.15fr 0.85fr',
-              gap: '20px',
-              alignItems: 'stretch',
-              marginTop: '4px'
-            }}
-          >
-            {/* Left: Features */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {currentSlide.features.map((feat, i) => (
+          {/* Slide Content: Starter Customization Choice vs Standard Two-Column Body */}
+          {currentSlide.id === 'starter-choice' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginTop: '4px' }}>
+              {/* Option 1: Sample & Tutorial Vault */}
+              <div
+                onClick={() => setStarterChoice('sample')}
+                style={{
+                  padding: '20px',
+                  borderRadius: '14px',
+                  cursor: 'pointer',
+                  border: starterChoice === 'sample' ? '2px solid #6366f1' : '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
+                  background: starterChoice === 'sample' ? 'rgba(99, 102, 241, 0.08)' : 'var(--bg-surface, rgba(255, 255, 255, 0.02))',
+                  boxShadow: starterChoice === 'sample' ? '0 0 24px rgba(99, 102, 241, 0.22)' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  position: 'relative',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <BookOpen size={22} color="#6366f1" />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>Tutorial &amp; Sample Vault</h3>
+                      <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>Recommended for Beginners</span>
+                    </div>
+                  </div>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: starterChoice === 'sample' ? '6px solid #6366f1' : '2px solid var(--text-muted)',
+                    background: starterChoice === 'sample' ? '#fff' : 'transparent',
+                    transition: 'all 0.15s ease'
+                  }} />
+                </div>
+
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Start with rich interactive tutorial notes, multi-chapter books, and study decks so you can immediately explore all workstation capabilities.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>💼</span> <span><strong>4 Preloaded Workspaces</strong> (Personal, Systems, Math, Research)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📖</span> <span><strong>3 Multi-chapter Books</strong> with nested pages</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📐</span> <span><strong>KaTeX Math &amp; Mermaid</strong> diagrams pre-configured</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🧠</span> <span><strong>Active Recall Cards</strong> with SuperMemo-2</span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  💡 Notes can be modified or deleted freely at any time.
+                </div>
+              </div>
+
+              {/* Option 2: Clean Slate */}
+              <div
+                onClick={() => setStarterChoice('clean')}
+                style={{
+                  padding: '20px',
+                  borderRadius: '14px',
+                  cursor: 'pointer',
+                  border: starterChoice === 'clean' ? '2px solid #06b6d4' : '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
+                  background: starterChoice === 'clean' ? 'rgba(6, 182, 212, 0.08)' : 'var(--bg-surface, rgba(255, 255, 255, 0.02))',
+                  boxShadow: starterChoice === 'clean' ? '0 0 24px rgba(6, 182, 212, 0.22)' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px',
+                  position: 'relative',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(6, 182, 212, 0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkles size={22} color="#06b6d4" />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>Clean Slate Workspace</h3>
+                      <span style={{ fontSize: '11px', color: '#06b6d4', fontWeight: 600 }}>Pure Empty Canvas</span>
+                    </div>
+                  </div>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    border: starterChoice === 'clean' ? '6px solid #06b6d4' : '2px solid var(--text-muted)',
+                    background: starterChoice === 'clean' ? '#fff' : 'transparent',
+                    transition: 'all 0.15s ease'
+                  }} />
+                </div>
+
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                  Start completely fresh with a minimal workspace and a single onboarding note. Perfect for organizing your own notes from day one.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', color: 'var(--text-primary)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>👤</span> <span><strong>1 Clean Workspace</strong> (Personal)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📝</span> <span><strong>1 Welcome Cheatsheet Note</strong> with key shortcuts</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📁</span> <span><strong>0 Clutter</strong> (empty folders and book lists)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚡</span> <span><strong>Instant, distraction-free</strong> blank slate</span>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  🔄 You can always reload sample data anytime from Settings.
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Two-Column Body: Features List + Preview Box */
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1.15fr 0.85fr',
+                gap: '20px',
+                alignItems: 'stretch',
+                marginTop: '4px'
+              }}
+            >
+              {/* Left: Features */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {currentSlide.features.map((feat, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      background: 'var(--bg-surface, rgba(255, 255, 255, 0.03))',
+                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
+                      transition: 'transform 0.15s ease'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-subtle, rgba(255, 255, 255, 0.06))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginTop: '2px'
+                      }}
+                    >
+                      {feat.icon}
+                    </div>
+                    <div>
+                      <h4
+                        style={{
+                          margin: '0 0 3px 0',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: 'var(--text-primary, #ffffff)'
+                        }}
+                      >
+                        {feat.title}
+                      </h4>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: '12px',
+                          color: 'var(--text-secondary, #9499b8)',
+                          lineHeight: '1.45'
+                        }}
+                      >
+                        {feat.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Right: Live Preview Snippet / Diagram Card */}
+              {currentSlide.previewBox && (
                 <div
-                  key={i}
                   style={{
                     display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    padding: '12px 14px',
-                    borderRadius: '10px',
-                    background: 'var(--bg-surface, rgba(255, 255, 255, 0.03))',
-                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
-                    transition: 'transform 0.15s ease'
+                    flexDirection: 'column',
+                    borderRadius: '12px',
+                    background: 'var(--bg-subtle, #0d101a)',
+                    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                    overflow: 'hidden'
                   }}
                 >
                   <div
                     style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-subtle, rgba(255, 255, 255, 0.06))',
+                      padding: '10px 14px',
+                      borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                      background: 'rgba(255, 255, 255, 0.02)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      marginTop: '2px'
+                      gap: '6px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: 'var(--text-muted, #717694)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
                     }}
                   >
-                    {feat.icon}
+                    <Sparkles size={12} color={currentSlide.badgeColor} />
+                    {currentSlide.previewBox.header}
                   </div>
-                  <div>
-                    <h4
-                      style={{
-                        margin: '0 0 3px 0',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary, #ffffff)'
-                      }}
-                    >
-                      {feat.title}
-                    </h4>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: '12px',
-                        color: 'var(--text-secondary, #9499b8)',
-                        lineHeight: '1.45'
-                      }}
-                    >
-                      {feat.description}
-                    </p>
+                  <div
+                    style={{
+                      padding: '16px',
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {currentSlide.previewBox.content}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
-
-            {/* Right: Live Preview Snippet / Diagram Card */}
-            {currentSlide.previewBox && (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRadius: '12px',
-                  background: 'var(--bg-subtle, #0d101a)',
-                  border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-                  overflow: 'hidden'
-                }}
-              >
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: 'var(--text-muted, #717694)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em'
-                  }}
-                >
-                  <Sparkles size={12} color={currentSlide.badgeColor} />
-                  {currentSlide.previewBox.header}
-                </div>
-                <div
-                  style={{
-                    padding: '16px',
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {currentSlide.previewBox.content}
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Footer Navigation Controls */}
@@ -702,6 +872,7 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
             <button
               type="button"
               onClick={handleNext}
+              disabled={isApplyingChoice}
               style={{
                 padding: '8px 20px',
                 borderRadius: '8px',
@@ -713,13 +884,14 @@ export const OnboardingTourModal: React.FC<OnboardingTourModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                cursor: 'pointer',
+                cursor: isApplyingChoice ? 'not-allowed' : 'pointer',
+                opacity: isApplyingChoice ? 0.7 : 1,
                 boxShadow: `0 4px 14px ${currentStep === slides.length - 1 ? 'rgba(16, 185, 129, 0.35)' : 'rgba(99, 102, 241, 0.35)'}`
               }}
             >
               {currentStep === slides.length - 1 ? (
                 <>
-                  <CheckCircle2 size={16} /> Get Started
+                  <CheckCircle2 size={16} /> {isApplyingChoice ? 'Setting up...' : 'Get Started'}
                 </>
               ) : (
                 <>

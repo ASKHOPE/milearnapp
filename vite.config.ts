@@ -232,6 +232,63 @@ function postgresApiPlugin(): Plugin {
                 return;
               }
 
+              // Database Configuration Info
+              if (req.url === '/api/db/config' && req.method === 'GET') {
+                const config = serverDb.getActiveConfig();
+                res.end(JSON.stringify({ success: true, ...config }));
+                return;
+              }
+
+              // Test Database Connection
+              if (req.url === '/api/db/test' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => { body += chunk; });
+                req.on('end', async () => {
+                  try {
+                    const { connectionString } = JSON.parse(body || '{}');
+                    if (!connectionString) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: 'connectionString is required' }));
+                      return;
+                    }
+                    const result = await serverDb.testConnection(connectionString);
+                    if (!result.success) {
+                      res.statusCode = 400;
+                    }
+                    res.end(JSON.stringify(result));
+                  } catch (err: unknown) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }));
+                  }
+                });
+                return;
+              }
+
+              // Reconfigure Active Database Connection
+              if (req.url === '/api/db/configure' && req.method === 'POST') {
+                let body = '';
+                req.on('data', chunk => { body += chunk; });
+                req.on('end', async () => {
+                  try {
+                    const { connectionString } = JSON.parse(body || '{}');
+                    if (!connectionString) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ success: false, error: 'connectionString is required' }));
+                      return;
+                    }
+                    const result = await serverDb.reconfigureConnection(connectionString);
+                    if (!result.success) {
+                      res.statusCode = 400;
+                    }
+                    res.end(JSON.stringify(result));
+                  } catch (err: unknown) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }));
+                  }
+                });
+                return;
+              }
+
               next();
             } catch (err: unknown) {
               res.statusCode = 500;

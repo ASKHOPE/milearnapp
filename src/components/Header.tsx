@@ -171,51 +171,51 @@ export const Header: React.FC<HeaderProps> = ({
     : '25:00';
 
   return (
-    <header className="app-header">
-      {/* Left: Mobile Toggle & MiLEARNAPP Brand Logo */}
-      <div className="header-left">
+    <header className="app-header app-header-stitch">
+      {/* Left: Mobile Toggle & MILEARNAPP Brand Logo */}
+      <div className="header-brand-stitch">
         <button
-          className="mobile-only-btn editor-icon-btn"
+          className="header-sidebar-toggle-btn mobile-only-btn"
           onClick={onToggleMobileSidebar}
           title="Toggle Sidebar Navigation"
           aria-label="Toggle Sidebar"
           style={{ display: 'none' }}
         >
-          <Menu size={18} />
+          <Menu size={16} />
         </button>
 
         <div className="app-brand-text">
-          <span className="brand-title-logo" title="MiLEARNAPP - Knowledge & Learning Hub">MiLEARNAPP</span>
+          <span className="header-brand-logo-text" title="MiLEARNAPP - Knowledge & Learning Hub">
+            MILEARNAPP
+          </span>
         </div>
       </div>
 
-      {/* Center: Global Search Trigger */}
-      <div className="header-center">
+      {/* Center: Centered Omnisearch Bar */}
+      <div className="header-omnisearch-container">
         <button
-          className="search-trigger-btn"
+          type="button"
+          className="header-omnisearch-bar"
           onClick={onOpenSearch}
-          title="Global Spotlight Search across all notes, tags, books & media (Cmd+K)"
+          title="Global Spotlight Search across all notes, tags, books & media (⌘K)"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Search size={14} />
-            <span>Search notes, tags, files...</span>
-          </div>
-          <span className="kbd-shortcut">⌘K</span>
+          <Search size={14} />
+          <span className="header-omnisearch-placeholder">Search notes, tags, files...</span>
+          <kbd className="header-omnisearch-kbd">⌘K</kbd>
         </button>
       </div>
 
-      {/* Right: Quick Note, Pinned Tools (Widget & Icon system), Tools Tray, Theme, Profile */}
-      <div className="header-right">
-
+      {/* Right: Quick Note, Pinned Tools, Tools Tray, Profile */}
+      <div className="header-controls-right">
         {/* ⚡ Quick Note Button */}
         {onQuickNote && (
           <button
             type="button"
-            className="header-quick-note-btn"
+            className="header-quick-note-amber-btn"
             onClick={onQuickNote}
             title="Instant Quick Scratchpad (Alt+Q or Option+Q)"
           >
-            <Zap size={13} color="#f59e0b" />
+            <Zap size={13} />
             <span>Quick Note</span>
           </button>
         )}
@@ -363,7 +363,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="tools-tray-container">
           <button
             type="button"
-            className={`tools-tray-trigger-btn ${isToolsTrayOpen ? 'active' : ''} ${isPomodoroRunning ? 'running' : ''}`}
+            className={`tools-tray-trigger-btn header-tools-dropdown-btn ${isToolsTrayOpen ? 'active' : ''} ${isPomodoroRunning ? 'running' : ''}`}
             onClick={() => setIsToolsTrayOpen(!isToolsTrayOpen)}
             title="Open Power Tools, Study Hub & Utilities"
           >

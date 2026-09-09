@@ -6,7 +6,6 @@ import { inactivityLockManager } from './services/inactivityLock';
 import { freezeServices, assertCriticalIntegrity } from './services/integrity';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
-import { NoteList } from './components/NoteList';
 import { NoteEditor } from './components/NoteEditor';
 import { InactivityOverlay } from './components/InactivityOverlay';
 import { SplitWindowManager } from './components/editor/SplitWindowManager';
@@ -41,7 +40,6 @@ export const App: React.FC = () => {
   
   // UI & Layout Preferences
   const [uiLayout, setUiLayout] = useState(() => storage.getUiLayoutSettings());
-  const [isNotesCollapsed, setIsNotesCollapsed] = useState(() => storage.getUiLayoutSettings().noteListCollapsed);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => storage.getUiLayoutSettings().sidebarCollapsed);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
@@ -891,9 +889,6 @@ export const App: React.FC = () => {
       if (partial.sidebarCollapsed !== undefined) {
         setIsSidebarCollapsed(partial.sidebarCollapsed);
       }
-      if (partial.noteListCollapsed !== undefined) {
-        setIsNotesCollapsed(partial.noteListCollapsed);
-      }
       return next;
     });
   };
@@ -935,8 +930,9 @@ export const App: React.FC = () => {
       />
 
       {/* 3-Pane Main Application Layout */}
+      {/* 2-Pane Main Application Layout: Consolidated M/N Sidebar + Reclaimed Editor Workspace */}
       <div className="app-main">
-        {/* Pane 1: Sidebar with Books, Folders, Quick Views, Calendar Accordion & Archive/Bin Footer */}
+        {/* Pane 1: Consolidated M & N Sidebar */}
         <Sidebar
           workspaces={workspaces}
           activeWorkspaceId={activeWorkspaceId}
@@ -944,7 +940,7 @@ export const App: React.FC = () => {
           books={workspaceBooks}
           folders={workspaceFolders}
           notes={workspaceNotes}
-          selectedNoteId={selectedNoteId}
+          selectedNoteId={secondaryNoteId && activeSplitSide === 'right' ? secondaryNoteId : selectedNoteId}
           currentFilter={currentFilter}
           currentFolderId={currentFolderId}
           selectedTag={selectedTag}
@@ -990,19 +986,6 @@ export const App: React.FC = () => {
             setSettingsInitialTab(tab || 'database');
             setIsSettingsOpen(true);
           }}
-        />
-
-        {/* Pane 2: Notes List with Search, Sorting & Compact Hover Preview Cards */}
-        <NoteList
-          notes={workspaceNotes}
-          folders={workspaceFolders}
-          selectedNoteId={secondaryNoteId && activeSplitSide === 'right' ? secondaryNoteId : selectedNoteId}
-          currentFilter={currentFilter}
-          currentFolderId={currentFolderId}
-          selectedTag={selectedTag}
-          isCollapsed={isNotesCollapsed}
-          onToggleCollapse={() => setIsNotesCollapsed(!isNotesCollapsed)}
-          onSelectNote={handleOpenNoteInActivePane}
           onSelectNoteSplit={handleOpenNoteSplit}
           onCreateNote={handleCreateNote}
           onToggleFavorite={handleToggleFavorite}
@@ -1011,6 +994,7 @@ export const App: React.FC = () => {
           onArchiveNote={handleToggleArchiveNote}
           onDeleteNote={handleSoftDeleteNote}
           onPermanentDeleteNote={handlePermanentDeleteNote}
+          onMoveNote={handleMoveNote}
         />
 
         {/* Pane 3: Rich Note Editor / Dual Side-by-Side Split View */}

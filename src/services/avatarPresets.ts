@@ -5,12 +5,16 @@ export interface AvatarMood {
   badgeColor: string;
 }
 
-export const AVATAR_MOODS: AvatarMood[] = [
+export const CORE_MOODS: AvatarMood[] = [
   { id: 'focus', label: 'Deep Focus', emoji: '🧠', badgeColor: '#8b5cf6' },
   { id: 'energy', label: 'High Energy', emoji: '⚡', badgeColor: '#f59e0b' },
-  { id: 'zen', label: 'Zen & Calm', emoji: '🧘', badgeColor: '#10b981' },
+  { id: 'zen', label: 'Zen Calm', emoji: '🧘', badgeColor: '#10b981' },
+  { id: 'creative', label: 'Creative Flow', emoji: '🎨', badgeColor: '#ec4899' }
+];
+
+export const AVATAR_MOODS: AvatarMood[] = [
+  ...CORE_MOODS,
   { id: 'engineer', label: 'Engineering', emoji: '💻', badgeColor: '#0ea5e9' },
-  { id: 'creative', label: 'Creative Flow', emoji: '🎨', badgeColor: '#ec4899' },
   { id: 'night', label: 'Night Owl', emoji: '🦉', badgeColor: '#6366f1' },
   { id: 'scholar', label: 'Scholar', emoji: '📚', badgeColor: '#14b8a6' },
   { id: 'shield', label: 'Privacy Guard', emoji: '🛡️', badgeColor: '#e11d48' },

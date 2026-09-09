@@ -24,7 +24,7 @@ The primary goals are:
 |                                                  |                                                 |
 |  +--------------------------------------------+  |                                                 |
 |  | [🌿 Personal Vault ▾]  [◧ Collapse Button] |  |                                                 |
-|  | [ Navigation (M) ]  [ Notes (N) • 7 ]      |  |                                                 |
+|  | [ Menu (M) ]  [ Notes (N) • 7 ]      |  |                                                 |
 |  +--------------------------------------------+  |                                                 |
 |  |                                            |  |                                                 |
 |  | IF Mode === 'M' (Directory & Tree):        |  |                                                 |
@@ -79,7 +79,7 @@ The primary goals are:
   - **Collapse Toggle Button:** Direct button on the right of the header to toggle between collapsed and expanded states.
   - **Segmented M / N Mode Switcher:**
     - Segmented pill container:
-      - `[ Navigation (M) ]`
+      - `[ Menu (M) ]`
       - `[ Notes (N) • {activeNotesCount} ]`
     - Active pill highlighted with deep surface background (`#182033`), indigo text (`#a5b4fc`), and subtle glow.
     - Keyboard shortcut listener: pressing `M` or `N` outside text fields switches the active sidebar tab.
@@ -166,7 +166,7 @@ The primary goals are:
    - `Tools ▾` dropdown triggers each modal tool.
    - Profile badge reflects user profile and sync state.
 3. Verify Consolidated Sidebar:
-   - Segmented `[ Navigation (M) ]` and `[ Notes (N) ]` switches between views smoothly.
+   - Segmented `[ Menu (M) ]` and `[ Notes (N) ]` switches between views smoothly.
    - Shortcut keys `M` and `N` switch tabs.
    - Mode M displays navigation, books, and folders.
    - Mode N displays note cards with hover actions (favorite, split, delete).

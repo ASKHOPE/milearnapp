@@ -5,7 +5,7 @@ import { optimizer, type StorageHealth } from '../services/optimizer';
 import { lockoutManager } from '../services/cryptoLockout';
 import { shortcutManager } from '../services/shortcutManager';
 import { inactivityLockManager } from '../services/inactivityLock';
-import { AVATAR_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
+import { AVATAR_MOODS, CORE_MOODS, ANIMATED_AVATARS } from '../services/avatarPresets';
 import { storage } from '../services/storage';
 import { storageShield, formatBytes, type StorageEstimateResult } from '../services/storageShield';
 import { syncQueue } from '../services/syncQueue';
@@ -48,7 +48,8 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Settings
 } from 'lucide-react';
 import { TutorialFaqTab } from './settings/TutorialFaqTab';
 import { TermsOfServiceTab } from './settings/TermsOfServiceTab';
@@ -109,6 +110,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [avatarType, setAvatarType] = useState<'emoji' | 'gif' | 'image'>(userProfile.avatarType);
   const [avatarValue, setAvatarValue] = useState(userProfile.avatarValue);
   const [selectedMood, setSelectedMood] = useState(userProfile.mood);
+  const [isCustomMood, setIsCustomMood] = useState<boolean>(() => !CORE_MOODS.some((m) => m.label === userProfile.mood));
+  const [customMoodEmoji, setCustomMoodEmoji] = useState<string>(() => {
+    if (!CORE_MOODS.some((m) => m.label === userProfile.mood)) {
+      const match = userProfile.mood?.match(/^(\p{Extended_Pictographic})/u);
+      return match ? match[1] : '✨';
+    }
+    return '✨';
+  });
+  const [customMoodText, setCustomMoodText] = useState<string>(() => {
+    if (!CORE_MOODS.some((m) => m.label === userProfile.mood)) {
+      return (userProfile.mood || '').replace(/^(\p{Extended_Pictographic}\s*)/u, '').trim();
+    }
+    return '';
+  });
+
+  const getMoodDisplay = useCallback((mood: string) => {
+    if (!mood) return '🧠 Deep Focus';
+    const coreMatch = CORE_MOODS.find((m) => m.label === mood);
+    if (coreMatch) return `${coreMatch.emoji} ${coreMatch.label}`;
+    const legacyMatch = AVATAR_MOODS.find((m) => m.label === mood);
+    if (legacyMatch) return `${legacyMatch.emoji} ${legacyMatch.label}`;
+    if (/^\p{Extended_Pictographic}/u.test(mood)) return mood;
+    return `✨ ${mood}`;
+  }, []);
+
   const [customGifUrl, setCustomGifUrl] = useState('');
   const [profileSaveNotice, setProfileSaveNotice] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -497,7 +523,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClose={onClose}
       title="Settings & System Preferences"
       subtitle="Identity, themes, custom hotkeys, zero-knowledge security, and local vault controls"
-      maxWidth="960px"
+      icon={<Settings size={20} color="#6366f1" />}
+      maxWidth="1100px"
       className="settings-modal-dialog"
     >
       <div className="settings-master-container">
@@ -586,29 +613,141 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </div>
 
-            {/* Categorized Moods */}
+            {/* Reduced Work Mode & Mindset + Custom Option */}
             <div className="form-field-row">
-              <label className="form-field-label">Current Mindset / Mood</label>
+              <label className="form-field-label">Work Mode & Mindset</label>
               <div className="mood-pills-row">
-                {AVATAR_MOODS.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`mood-pill-btn ${selectedMood === m.label ? 'active' : ''}`}
-                    onClick={() => setSelectedMood(m.label)}
-                  >
-                    <span>{m.emoji}</span>
-                    <span>{m.label}</span>
-                  </button>
-                ))}
+                {CORE_MOODS.map((m) => {
+                  const isActive = !isCustomMood && selectedMood === m.label;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`mood-pill-btn ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        setIsCustomMood(false);
+                        setSelectedMood(m.label);
+                      }}
+                    >
+                      <span>{m.emoji}</span>
+                      <span>{m.label}</span>
+                    </button>
+                  );
+                })}
+                {/* Custom Option Pill */}
+                <button
+                  type="button"
+                  className={`mood-pill-btn ${isCustomMood ? 'active' : ''}`}
+                  onClick={() => {
+                    setIsCustomMood(true);
+                    const text = customMoodText.trim();
+                    setSelectedMood(text ? `${customMoodEmoji} ${text}` : customMoodEmoji);
+                  }}
+                >
+                  <Sparkles size={12} color="#a855f7" />
+                  <span>Custom...</span>
+                </button>
               </div>
+
+              {/* Custom Mindset / Mode Input Box */}
+              {isCustomMood && (
+                <div className="custom-mood-box">
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      className="dialog-text-input"
+                      style={{ width: '48px', textAlign: 'center', fontSize: '18px', padding: '8px 4px', flexShrink: 0 }}
+                      value={customMoodEmoji}
+                      onChange={(e) => {
+                        const em = e.target.value;
+                        setCustomMoodEmoji(em);
+                        const text = customMoodText.trim();
+                        setSelectedMood(text ? `${em} ${text}` : em);
+                      }}
+                      placeholder="✨"
+                      title="Custom Emoji"
+                      maxLength={4}
+                    />
+                    <input
+                      type="text"
+                      className="dialog-text-input"
+                      value={customMoodText}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomMoodText(val);
+                        setSelectedMood(val.trim() ? `${customMoodEmoji} ${val.trim()}` : customMoodEmoji);
+                      }}
+                      placeholder="Type custom mindset / mode (e.g. Deep Research, Writing, Debugging...)"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+
+                  {/* Quick Pick Emoji Suggestion Chips */}
+                  <div className="custom-emoji-chips">
+                    <span style={{ fontSize: '11px', color: '#64748b', marginRight: '2px' }}>Quick picks:</span>
+                    {['🎯', '🚀', '🔬', '📚', '☕', '🦉', '🛡️', '💻', '🔥', '🌱'].map((em) => (
+                      <button
+                        key={em}
+                        type="button"
+                        className={`custom-emoji-btn ${customMoodEmoji === em ? 'active' : ''}`}
+                        onClick={() => {
+                          setCustomMoodEmoji(em);
+                          const text = customMoodText.trim();
+                          setSelectedMood(text ? `${em} ${text}` : em);
+                        }}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* 1:1 Animated GIFs & SVGs */}
+            {/* Avatar Selection: Quick Emojis & Animated Presets */}
             <div className="form-field-row">
-              <label className="form-field-label">1:1 Looping Animated Avatars</label>
-              <div className="animated-gif-grid">
-                {ANIMATED_AVATARS.map((gif) => (
+              <label className="form-field-label">Avatar Emoji & Animated Presets</label>
+              
+              {/* Quick Avatar Emojis */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+                {['⚡', '🚀', '🧠', '💻', '🦉', '🔮', '🌟', '🐱', '🔥', '🎯'].map((em) => (
+                  <button
+                    key={em}
+                    type="button"
+                    className={`custom-emoji-btn ${avatarType === 'emoji' && avatarValue === em ? 'active' : ''}`}
+                    onClick={() => {
+                      setAvatarType('emoji');
+                      setAvatarValue(em);
+                    }}
+                    style={{ fontSize: '16px', padding: '6px 10px' }}
+                    title={`Set ${em} as avatar`}
+                  >
+                    {em}
+                  </button>
+                ))}
+                
+                {/* Custom Avatar Emoji Input */}
+                <input
+                  type="text"
+                  className="dialog-text-input"
+                  style={{ width: '44px', textAlign: 'center', fontSize: '16px', padding: '6px 4px', height: '32px' }}
+                  placeholder="✨"
+                  value={avatarType === 'emoji' ? avatarValue : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setAvatarType('emoji');
+                      setAvatarValue(val);
+                    }
+                  }}
+                  title="Type custom avatar emoji"
+                  maxLength={4}
+                />
+              </div>
+
+              {/* 1:1 Animated GIFs (Reduced to Top 3 Presets) */}
+              <div className="animated-gif-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                {ANIMATED_AVATARS.slice(0, 3).map((gif) => (
                   <button
                     key={gif.id}
                     type="button"
@@ -619,7 +758,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }}
                     title={gif.name}
                   >
-                    <img src={gif.dataUrl} alt={gif.name} />
+                    <img src={gif.dataUrl} alt={gif.name} style={{ width: '44px', height: '44px' }} />
                   </button>
                 ))}
               </div>
@@ -692,7 +831,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <span className="hero-mood-tag">
-                {AVATAR_MOODS.find((m) => m.label === selectedMood)?.emoji || '🧠'} {selectedMood}
+                {getMoodDisplay(selectedMood)}
               </span>
 
               <h3 className="hero-user-name">{profileName || 'Alex Mercer'}</h3>
@@ -730,107 +869,113 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       {/* TAB 2: APPEARANCE, LUXURY THEMES & TYPOGRAPHY STUDIO */}
       {activeTab === 'appearance' && (
-        <div className="settings-card-panel" style={{ maxWidth: '680px', margin: '0 auto' }}>
-          <h4 className="panel-section-title">Curated Luxury Themes</h4>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            Choose from curated luxury visual palettes designed for deep focus, reading comfort, and high contrast.
-          </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Card 1: Curated Luxury Themes */}
+          <div className="settings-card-panel">
+            <h4 className="panel-section-title">
+              <Palette size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+              Curated Luxury Themes
+            </h4>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Choose from curated luxury visual palettes designed for deep focus, reading comfort, and high contrast.
+            </p>
 
-          <div className="luxury-theme-grid">
-            {/* 1. System */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'system' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('system')}
-            >
-              <Monitor size={22} />
-              <div className="theme-card-text">
-                <span className="theme-card-title">System Default</span>
-                <span className="theme-card-desc">Sync with OS appearance</span>
-              </div>
-            </button>
+            <div className="luxury-theme-grid">
+              {/* 1. System */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'system' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('system')}
+              >
+                <Monitor size={22} />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">System Default</span>
+                  <span className="theme-card-desc">Sync with OS appearance</span>
+                </div>
+              </button>
 
-            {/* 2. Day Theme */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'light' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('light')}
-            >
-              <Sun size={22} color="#f59e0b" />
-              <div className="theme-card-text">
-                <span className="theme-card-title">Day Theme</span>
-                <span className="theme-card-desc">Crisp white & gentle paper</span>
-              </div>
-            </button>
+              {/* 2. Day Theme */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'light' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('light')}
+              >
+                <Sun size={22} color="#f59e0b" />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">Day Theme</span>
+                  <span className="theme-card-desc">Crisp white & gentle paper</span>
+                </div>
+              </button>
 
-            {/* 3. Night Theme */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'dark' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('dark')}
-            >
-              <Moon size={22} color="#8b5cf6" />
-              <div className="theme-card-text">
-                <span className="theme-card-title">Night Theme</span>
-                <span className="theme-card-desc">Deep slate & luminescence</span>
-              </div>
-            </button>
+              {/* 3. Night Theme */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'dark' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('dark')}
+              >
+                <Moon size={22} color="#8b5cf6" />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">Night Theme</span>
+                  <span className="theme-card-desc">Deep slate & luminescence</span>
+                </div>
+              </button>
 
-            {/* 4. Obsidian Onyx (OLED) */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'oled' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('oled')}
-            >
-              <Sparkles size={22} color="#a855f7" />
-              <div className="theme-card-text">
-                <span className="theme-card-title">Obsidian Onyx</span>
-                <span className="theme-card-desc">Pitch black OLED & neon glass</span>
-              </div>
-            </button>
+              {/* 4. Obsidian Onyx (OLED) */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'oled' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('oled')}
+              >
+                <Sparkles size={22} color="#a855f7" />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">Obsidian Onyx</span>
+                  <span className="theme-card-desc">Pitch black OLED & neon glass</span>
+                </div>
+              </button>
 
-            {/* 5. Tokyo Midnight */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'tokyo' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('tokyo')}
-            >
-              <Zap size={22} color="#38bdf8" />
-              <div className="theme-card-text">
-                <span className="theme-card-title">Tokyo Midnight</span>
-                <span className="theme-card-desc">Cyber indigo & neon cyan</span>
-              </div>
-            </button>
+              {/* 5. Tokyo Midnight */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'tokyo' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('tokyo')}
+              >
+                <Zap size={22} color="#38bdf8" />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">Tokyo Midnight</span>
+                  <span className="theme-card-desc">Cyber indigo & neon cyan</span>
+                </div>
+              </button>
 
-            {/* 6. Nordic Frost */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'nordic' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('nordic')}
-            >
-              <Cloud size={22} color="#34d399" />
-              <div className="theme-card-text">
-                <span className="theme-card-title">Nordic Frost</span>
-                <span className="theme-card-desc">Cool zinc slate & soft mint</span>
-              </div>
-            </button>
+              {/* 6. Nordic Frost */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'nordic' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('nordic')}
+              >
+                <Cloud size={22} color="#34d399" />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">Nordic Frost</span>
+                  <span className="theme-card-desc">Cool zinc slate & soft mint</span>
+                </div>
+              </button>
 
-            {/* 7. Warm Editorial Paper */}
-            <button
-              type="button"
-              className={`theme-3way-card ${theme === 'editorial' ? 'active' : ''}`}
-              onClick={() => onChangeTheme('editorial')}
-            >
-              <BookOpen size={22} color="#c2410c" />
-              <div className="theme-card-text">
-                <span className="theme-card-title">Editorial Paper</span>
-                <span className="theme-card-desc">Warm ivory & serif terracotta</span>
-              </div>
-            </button>
+              {/* 7. Warm Editorial Paper */}
+              <button
+                type="button"
+                className={`theme-3way-card ${theme === 'editorial' ? 'active' : ''}`}
+                onClick={() => onChangeTheme('editorial')}
+              >
+                <BookOpen size={22} color="#c2410c" />
+                <div className="theme-card-text">
+                  <span className="theme-card-title">Editorial Paper</span>
+                  <span className="theme-card-desc">Warm ivory & serif terracotta</span>
+                </div>
+              </button>
+            </div>
           </div>
 
-          {/* Typography Studio */}
-          <div className="typography-studio-section">
+          {/* Card 2: Typography Studio */}
+          <div className="settings-card-panel">
             <h4 className="panel-section-title">
               <Type size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
               Typography Studio
@@ -955,147 +1100,138 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* UI Interaction & Layout Dashboard (Rails, Collapsed/Expanded, Sidebar Calendar) */}
-          <div style={{ marginTop: '28px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-            <h4 className="panel-section-title">
-              <Layout size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
-              UI Layout & Interaction Dashboard
-            </h4>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Customize sidebar rails, collapsed default states, calendar visibility, and theme behaviors.
-            </p>
+          {/* Card 3: Symmetrical Grid for Sidebar & Editor Preferences */}
+          <div className="settings-symmetrical-grid">
+            {/* Left: Consolidated Sidebar & Navigation */}
+            <div className="settings-card-panel">
+              <h4 className="panel-section-title">
+                <Layout size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                Sidebar & Layout Rails
+              </h4>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                Configure the unified M & N sidebar, rail collapse behavior, and calendar view.
+              </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Option 1: Calendar in Sidebar */}
-              <div className="settings-toggle-row">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'rgba(99, 102, 241, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--accent-primary)',
-                    flexShrink: 0,
-                    marginTop: '2px'
-                  }}>
-                    <Calendar size={16} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Option 1: Calendar in Sidebar */}
+                <div className="settings-toggle-row">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'rgba(99, 102, 241, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--accent-primary)',
+                      flexShrink: 0,
+                      marginTop: '2px'
+                    }}>
+                      <Calendar size={16} />
+                    </div>
+                    <div>
+                      <span className="settings-toggle-title">Show Calendar in Sidebar</span>
+                      <span className="settings-toggle-sub">
+                        Display interactive Calendar & Daily Log accordion inside the sidebar navigation.
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="settings-toggle-title">Show Calendar in Sidebar</span>
-                    <span className="settings-toggle-sub">
-                      Display the interactive Calendar & Daily Log accordion directly inside the primary navigation sidebar above the Archive and Bin buttons.
-                    </span>
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={uiLayout ? uiLayout.showSidebarCalendar : true}
+                    onChange={(e) => {
+                      if (onUpdateUiLayout) {
+                        onUpdateUiLayout({ showSidebarCalendar: e.target.checked });
+                      }
+                    }}
+                    className="settings-checkbox"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={uiLayout ? uiLayout.showSidebarCalendar : true}
-                  onChange={(e) => {
-                    if (onUpdateUiLayout) {
-                      onUpdateUiLayout({ showSidebarCalendar: e.target.checked });
-                    }
-                  }}
-                  className="settings-checkbox"
-                />
-              </div>
 
-              {/* Option 2: Primary Sidebar Default State (Expanded vs Collapsed Icon Rail) */}
-              <div className="settings-toggle-row">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'rgba(16, 185, 129, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#10b981',
-                    flexShrink: 0,
-                    marginTop: '2px'
-                  }}>
-                    <Columns3 size={16} />
+                {/* Option 2: Consolidated Sidebar Rail Mode */}
+                <div className="settings-toggle-row">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#10b981',
+                      flexShrink: 0,
+                      marginTop: '2px'
+                    }}>
+                      <Columns3 size={16} />
+                    </div>
+                    <div>
+                      <span className="settings-toggle-title">Consolidated Sidebar Rail Mode</span>
+                      <span className="settings-toggle-sub">
+                        Collapse sidebar into a slim 48px icon rail to maximize screen space for editing.
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="settings-toggle-title">Primary Sidebar Rail Mode</span>
-                    <span className="settings-toggle-sub">
-                      When enabled, the primary navigation sidebar collapses into a slim icon rail to maximize screen space for reading and editing.
-                    </span>
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={uiLayout ? uiLayout.sidebarCollapsed : false}
+                    onChange={(e) => {
+                      if (onUpdateUiLayout) {
+                        onUpdateUiLayout({ sidebarCollapsed: e.target.checked });
+                      }
+                    }}
+                    className="settings-checkbox"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={uiLayout ? uiLayout.sidebarCollapsed : false}
-                  onChange={(e) => {
-                    if (onUpdateUiLayout) {
-                      onUpdateUiLayout({ sidebarCollapsed: e.target.checked });
-                    }
-                  }}
-                  className="settings-checkbox"
-                />
-              </div>
-
-              {/* Option 3: Second Sidebar (Notes List Pane) Hover Bar / Collapsed Mode */}
-              <div className="settings-toggle-row">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'rgba(245, 158, 11, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#f59e0b',
-                    flexShrink: 0,
-                    marginTop: '2px'
-                  }}>
-                    <Layout size={16} />
-                  </div>
-                  <div>
-                    <span className="settings-toggle-title">Notes List Hover Strip Mode</span>
-                    <span className="settings-toggle-sub">
-                      Collapses the middle note list into a sleek vertical hover strip that smoothly expands on hover with comfortable persistence.
-                    </span>
-                  </div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={uiLayout ? uiLayout.noteListCollapsed : false}
-                  onChange={(e) => {
-                    if (onUpdateUiLayout) {
-                      onUpdateUiLayout({ noteListCollapsed: e.target.checked });
-                    }
-                  }}
-                  className="settings-checkbox"
-                />
               </div>
             </div>
-          </div>
 
-          <div style={{ marginTop: '28px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-            <h4 className="panel-section-title">Editor & Auto-Save Behavior</h4>
-            
-            <div className="settings-toggle-row">
-              <div>
-                <span className="settings-toggle-title">Continuous Auto-Save</span>
-                <span className="settings-toggle-sub">
-                  Automatically persist edits to your local vault on every keystroke. When disabled, you can manually save using the dedicated Save button or <kbd>Ctrl+S</kbd> / <kbd>Cmd+S</kbd>.
-                </span>
+            {/* Right: Editor & Auto-Save Behavior */}
+            <div className="settings-card-panel">
+              <h4 className="panel-section-title">
+                <HardDrive size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                Editor & Vault Persistence
+              </h4>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                Control auto-save frequency and real-time disk synchronizations.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="settings-toggle-row">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#3b82f6',
+                      flexShrink: 0,
+                      marginTop: '2px'
+                    }}>
+                      <Check size={16} />
+                    </div>
+                    <div>
+                      <span className="settings-toggle-title">Continuous Auto-Save</span>
+                      <span className="settings-toggle-sub">
+                        Persist edits to your local vault on every keystroke. When disabled, manually save with Ctrl+S / Cmd+S.
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={localStorage.getItem('milearnapp_autosave_enabled') !== 'false'}
+                    onChange={(e) => {
+                      localStorage.setItem('milearnapp_autosave_enabled', e.target.checked ? 'true' : 'false');
+                      window.dispatchEvent(new Event('storage'));
+                    }}
+                    className="settings-checkbox"
+                  />
+                </div>
               </div>
-              <input
-                type="checkbox"
-                checked={localStorage.getItem('milearnapp_autosave_enabled') !== 'false'}
-                onChange={(e) => {
-                  localStorage.setItem('milearnapp_autosave_enabled', e.target.checked ? 'true' : 'false');
-                  // Dispatch storage event so NoteEditor responds immediately
-                  window.dispatchEvent(new Event('storage'));
-                }}
-                className="settings-checkbox"
-              />
             </div>
           </div>
         </div>

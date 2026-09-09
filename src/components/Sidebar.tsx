@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Folder as FolderType, Note, ViewFilter, Workspace, Book, ThemeMode } from '../types';
 import { 
   FileText, 
@@ -22,9 +22,17 @@ import {
   Plus,
   Sun,
   Moon,
-  Monitor,
   Sparkles,
-  Cloud
+  Columns2,
+  RotateCcw,
+  Lock,
+  Image as ImageIcon,
+  Music,
+  Menu,
+  X,
+  Search,
+  Settings,
+  HelpCircle
 } from 'lucide-react';
 
 import { CalendarWidget } from './CalendarWidget';
@@ -32,7 +40,6 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { TagSelectorPopover } from './TagSelectorPopover';
 import { FolderSelectorModal } from './FolderSelectorModal';
 import { BookSelectorModal } from './BookSelectorModal';
-import { SyncStatusIndicator } from './common/SyncStatusIndicator';
 
 interface SidebarProps {
   workspaces: Workspace[];
@@ -70,9 +77,47 @@ interface SidebarProps {
   showCalendar?: boolean;
   theme?: ThemeMode;
   onToggleTheme?: () => void;
-  onChangeTheme?: (theme: ThemeMode) => void;
+  onChangeTheme?: (mode: ThemeMode) => void;
   onOpenSettings?: (tab?: string) => void;
+  // Note List Integration props
+  onSelectNoteSplit?: (noteId: string) => void;
+  onCreateNote?: () => void;
+  onToggleFavorite?: (noteId: string, e: React.MouseEvent) => void;
+  onEmptyTrash?: () => void;
+  onRestoreNote?: (noteId: string, e: React.MouseEvent) => void;
+  onArchiveNote?: (noteId: string, e: React.MouseEvent) => void;
+  onDeleteNote?: (noteId: string, e: React.MouseEvent) => void;
+  onPermanentDeleteNote?: (noteId: string, e?: React.MouseEvent) => void;
+  onMoveNote?: (noteId: string, targetFolderId: string | null, targetBookId: string | null) => void;
 }
+
+// Relative time formatting helper
+const formatRelativeTime = (dateStr: string) => {
+  try {
+    const d = new Date(dateStr);
+    const diffMs = Date.now() - d.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+};
+
+// Clean snippet preview helper
+const getSnippet = (content: string) => {
+  return content
+    .replace(/^#+\s+/gm, '')
+    .replace(/\[\[(.*?)\]\]/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/`{1,3}.*?`{1,3}/gs, '')
+    .replace(/-\s\[[ x]\]\s/g, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({
   workspaces,
@@ -88,10 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   isCollapsed = false,
   onToggleCollapse,
-  showCalendar = true,
-  theme = 'system',
-  onToggleTheme,
-  onChangeTheme,
+  showCalendar = false,
   onSelectWorkspace,
   onCreateWorkspace,
   onRenameWorkspace,
@@ -101,8 +143,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddPageToBook,
   onSelectNote,
   onSelectFilter,
-  onOpenLibrary,
-  isLibraryOpen = false,
   onSelectFolder,
   onSelectTag,
   onSelectDate,
@@ -111,26 +151,86 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRenameFolder,
   onDeleteFolder,
   onCloseMobile,
-  onOpenSettings
+  onOpenLibrary,
+  theme = 'dark',
+  onChangeTheme,
+  onOpenSettings,
+  onSelectNoteSplit,
+  onCreateNote,
+  onToggleFavorite,
+  onEmptyTrash,
+  onRestoreNote,
+  onArchiveNote,
+  onDeleteNote,
+  onPermanentDeleteNote,
+  onMoveNote
 }) => {
+  // Consolidated View Mode: 'M' = Menu/Directory, 'N' = Notes Feed
+  const [viewMode, setViewMode] = useState<'M' | 'N'>(() => {
+    try {
+      const saved = localStorage.getItem('milearnapp_sidebar_view_mode');
+      return saved === 'M' || saved === 'N' ? saved : 'M';
+    } catch {
+      return 'M';
+    }
+  });
+
+  const handleSetViewMode = (mode: 'M' | 'N') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('milearnapp_sidebar_view_mode', mode);
+    } catch {}
+  };
+
+  // Keyboard Shortcuts: M for Menu, N for Notes (when not typing in an input)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey
+      ) {
+        return;
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        handleSetViewMode('M');
+      } else if (e.key === 'n' || e.key === 'N') {
+        handleSetViewMode('N');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Section Accordion States in Mode M
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [expandedBookIds, setExpandedBookIds] = useState<Set<string>>(new Set());
   const [isFoldersExpanded, setIsFoldersExpanded] = useState(true);
   const [isBooksExpanded, setIsBooksExpanded] = useState(true);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
-  const [isThemeCustomMenuOpen, setIsThemeCustomMenuOpen] = useState(false);
+  const [isNavSectionCollapsed, setIsNavSectionCollapsed] = useState(false);
 
-  // Popup Modal States
+  // Modal / Popover States
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [noteToMoveId, setNoteToMoveId] = useState<string | null>(null);
+
+  // Notes Feed Filter & Search in Mode N
+  const [notesSearchQuery, setNotesSearchQuery] = useState('');
+  const [sortOption, setSortOption] = useState<'updated' | 'created' | 'title'>('updated');
 
   // Pinned Folders & Books persisted in localStorage
   const [pinnedFolderIds, setPinnedFolderIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('milearnapp_pinned_folders');
       if (saved) return JSON.parse(saved);
-      // Default: pin root folders
       return folders.slice(0, 4).map((f) => f.id);
     } catch {
       return [];
@@ -163,54 +263,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // Daily 1-Minute Calendar auto-open and auto-collapse rule
-  useEffect(() => {
-    const todayDateKey = new Date().toISOString().slice(0, 10);
-    const lastAutoOpenDate = localStorage.getItem('milearnapp_cal_daily_open_date');
-
-    if (lastAutoOpenDate !== todayDateKey) {
-      setIsCalendarExpanded(true);
-      localStorage.setItem('milearnapp_cal_daily_open_date', todayDateKey);
-
-      const timer = setTimeout(() => {
-        setIsCalendarExpanded(false);
-      }, 60000); // 1 minute auto-collapse
-
-      return () => clearTimeout(timer);
-    } else {
-      setIsCalendarExpanded(false);
-    }
-  }, []);
-
-  // Auto-collapse calendar when scrolling sidebar
-  const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (e.currentTarget.scrollTop > 25 && isCalendarExpanded) {
-      setIsCalendarExpanded(false);
-    }
-  };
-
-  const collapseCalendarOnBrowse = () => {
-    if (isCalendarExpanded) {
-      setIsCalendarExpanded(false);
-    }
-  };
-
-  // Counts
-  const activeNotes = notes.filter((n) => !n.isTrashed && !n.isArchived);
-  const totalNotes = activeNotes.length;
-  const quickNotesCount = activeNotes.filter(
+  // Note Counts
+  const activeNotes = useMemo(() => notes.filter((n) => !n.isTrashed && !n.isArchived), [notes]);
+  const quickNotesCount = useMemo(() => activeNotes.filter(
     (n) => n.tags?.includes('quick-note') || n.title.includes('Quick Scratchpad')
-  ).length;
-  const favoriteNotes = activeNotes.filter((n) => n.isFavorite).length;
-  const withAttachments = activeNotes.filter((n) => n.attachments && n.attachments.length > 0).length;
-  const archivedNotesCount = notes.filter((n) => n.isArchived && !n.isTrashed).length;
-  const trashedNotesCount = notes.filter((n) => n.isTrashed).length;
+  ).length, [activeNotes]);
+  const favoriteNotesCount = useMemo(() => activeNotes.filter((n) => n.isFavorite).length, [activeNotes]);
+  const withAttachmentsCount = useMemo(() => activeNotes.filter((n) => n.attachments && n.attachments.length > 0).length, [activeNotes]);
+  const archivedNotesCount = useMemo(() => notes.filter((n) => n.isArchived && !n.isTrashed).length, [notes]);
+  const trashedNotesCount = useMemo(() => notes.filter((n) => n.isTrashed).length, [notes]);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
 
-  const notesCountByWorkspace = propNotesCount || (() => {
+  const notesCountByWorkspace = propNotesCount || useMemo(() => {
     const map = new Map<string, number>();
     notes.forEach((n) => {
       if (!n.isTrashed) {
@@ -219,21 +284,85 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     });
     return map;
-  })();
+  }, [notes, propNotesCount]);
 
-  const allTags = Array.from(
+  const allTags = useMemo(() => Array.from(
     new Set(activeNotes.flatMap((n) => n.tags || []))
-  ).filter(Boolean);
+  ).filter(Boolean), [activeNotes]);
 
+  // Derive title for Notes Feed header
+  const notesFeedTitle = useMemo(() => {
+    if (currentFolderId) {
+      const currentFolder = folders.find((f) => f.id === currentFolderId);
+      return currentFolder ? currentFolder.name : 'Folder Notes';
+    }
+    if (selectedTag) return `#${selectedTag}`;
+    if (currentFilter === 'favorites') return 'Favorites';
+    if (currentFilter === 'recent') return 'Recent Notes';
+    if (currentFilter === 'quick') return 'Quick Notes';
+    if (currentFilter === 'attachments') return 'With Media';
+    if (currentFilter === 'archive') return 'Archive';
+    if (currentFilter === 'trash') return 'Trash Bin';
+    return 'All Notes';
+  }, [currentFolderId, selectedTag, currentFilter, folders]);
+
+  // Filtered Notes for Mode N
+  const filteredNotes = useMemo(() => {
+    let list: Note[] = [];
+
+    if (currentFilter === 'trash') {
+      list = notes.filter((n) => n.isTrashed);
+    } else {
+      list = notes.filter((n) => !n.isTrashed);
+
+      if (currentFilter === 'archive') {
+        list = list.filter((n) => n.isArchived);
+      } else {
+        list = list.filter((n) => !n.isArchived);
+
+        if (currentFilter === 'favorites') {
+          list = list.filter((n) => n.isFavorite);
+        } else if (currentFilter === 'quick') {
+          list = list.filter((n) => n.tags?.includes('quick-note') || n.title.includes('Quick Scratchpad'));
+        } else if (currentFilter === 'attachments') {
+          list = list.filter((n) => n.attachments && n.attachments.length > 0);
+        } else if (currentFolderId) {
+          list = list.filter((n) => n.folderId === currentFolderId);
+        } else if (selectedTag) {
+          list = list.filter((n) => n.tags && n.tags.includes(selectedTag));
+        }
+      }
+    }
+
+    if (notesSearchQuery.trim()) {
+      const q = notesSearchQuery.trim().toLowerCase();
+      list = list.filter((n) =>
+        (n.title || '').toLowerCase().includes(q) ||
+        (n.content || '').toLowerCase().includes(q) ||
+        (n.tags && n.tags.some((t) => t.toLowerCase().includes(q)))
+      );
+    }
+
+    return [...list].sort((a, b) => {
+      if (sortOption === 'updated') {
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      } else if (sortOption === 'created') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else if (sortOption === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      return 0;
+    });
+  }, [notes, currentFilter, currentFolderId, selectedTag, notesSearchQuery, sortOption]);
+
+  // Tree Toggle Helpers
   const toggleFolder = (folderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    collapseCalendarOnBrowse();
     setExpandedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
   };
 
   const toggleBook = (bookId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    collapseCalendarOnBrowse();
     setExpandedBookIds((prev) => {
       const next = new Set(prev);
       if (next.has(bookId)) next.delete(bookId);
@@ -242,7 +371,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
-  // Render Pinned Folder Row
+  // Render Folders Tree Row
   const renderFolderItem = (folder: FolderType, depth = 0) => {
     const isExpanded = expandedFolders[folder.id];
     const isSelected = currentFolderId === folder.id;
@@ -256,8 +385,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={`folder-item-row ${isSelected ? 'active' : ''}`}
           style={{ paddingLeft: `${10 + depth * 12}px` }}
           onClick={() => {
-            collapseCalendarOnBrowse();
             onSelectFolder(folder.id);
+            handleSetViewMode('N'); // Fluidly show folder notes feed
             onCloseMobile();
           }}
         >
@@ -278,19 +407,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="folder-actions-hover" onClick={(e) => e.stopPropagation()}>
-            <span className="badge-count">{folderNoteCount}</span>
+            <span className="folder-item-count">{folderNoteCount}</span>
             <button
-              className="folder-icon-btn"
-              title="Unpin folder from sidebar"
-              onClick={() => togglePinFolder(folder.id)}
+              type="button"
+              className="folder-quick-add-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFolder(folder.id);
+                if (onCreateNote) onCreateNote();
+                handleSetViewMode('N');
+              }}
+              title={`Create note inside ${folder.name}`}
             >
-              <Pin size={11} fill="var(--accent-primary)" color="var(--accent-primary)" />
+              <Plus size={12} />
             </button>
           </div>
         </div>
 
         {hasSubfolders && isExpanded && (
-          <ul className="folder-nested-list">
+          <ul className="subfolder-list">
             {subfolders.map((sub) => renderFolderItem(sub, depth + 1))}
           </ul>
         )}
@@ -298,188 +433,1031 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // Filter pinned folders & books for sidebar display
-  const displayedFolders = folders.filter((f) => pinnedFolderIds.includes(f.id));
-  const displayedBooks = books.filter((b) => pinnedBookIds.includes(b.id));
-
-  // If collapsed on desktop, render sleek icon rail
+  // COLLAPSED STATE (48px Rail)
   if (isCollapsed) {
     return (
-      <aside className="app-sidebar collapsed">
+      <aside className={`app-sidebar collapsed ${isOpenMobile ? 'mobile-open' : ''}`}>
         <div className="sidebar-collapsed-rail">
-          {/* Top Rail Expand Button */}
-          {onToggleCollapse && (
-            <button 
+          {/* Active Workspace Icon */}
+          <div
+            className="sidebar-rail-btn"
+            title={`Workspace: ${activeWorkspace?.name || 'Personal'}`}
+            style={{ cursor: 'default', fontSize: '14px' }}
+          >
+            <span>{activeWorkspace?.icon || '🌿'}</span>
+          </div>
+
+          {/* Expand Button */}
+          <button
+            type="button"
+            className="sidebar-rail-btn"
+            onClick={onToggleCollapse}
+            title="Expand Sidebar (◧)"
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+
+          {/* M - Menu Toggle */}
+          <button
+            type="button"
+            className={`sidebar-rail-btn ${viewMode === 'M' ? 'active' : ''}`}
+            onClick={() => handleSetViewMode('M')}
+            title="Menu / Navigation Directory (M)"
+          >
+            <Menu size={16} />
+          </button>
+
+          {/* N - Notes Feed Toggle */}
+          <button
+            type="button"
+            className={`sidebar-rail-btn ${viewMode === 'N' ? 'active' : ''}`}
+            onClick={() => handleSetViewMode('N')}
+            title="Notes Feed (N)"
+          >
+            <FileText size={16} />
+            <span
+              style={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: '#6366f1'
+              }}
+            />
+          </button>
+
+          {/* Quick New Note */}
+          {onCreateNote && (
+            <button
               type="button"
-              className="rail-nav-btn rail-toggle-btn"
-              onClick={onToggleCollapse}
-              title="Expand Sidebar (Cmd+\)"
-              aria-label="Expand Sidebar"
+              className="sidebar-rail-btn"
+              onClick={() => {
+                onCreateNote();
+                handleSetViewMode('N');
+              }}
+              title="Create New Note (+)"
             >
-              <PanelLeftOpen size={16} />
+              <Plus size={16} />
             </button>
           )}
 
-          <div 
-            className="rail-ws-badge" 
-            onClick={onToggleCollapse}
-            title={`Workspace: ${activeWorkspace?.name || 'Personal'} (Click to expand)`}
+          <div style={{ flex: 1 }} />
+
+          {/* Theme Quick Toggle */}
+          <button
+            type="button"
+            className="sidebar-rail-btn"
+            onClick={() => onChangeTheme && onChangeTheme(theme === 'dark' ? 'light' : 'dark')}
+            title={`Switch theme (current: ${theme})`}
           >
-            <span>{activeWorkspace?.icon || '🏠'}</span>
-          </div>
+            {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
+          </button>
 
-          <div className="rail-nav-group">
-            <button 
-              type="button"
-              className={`rail-nav-btn ${currentFilter === 'all' && !currentFolderId && !selectedTag ? 'active' : ''}`}
-              onClick={() => onSelectFilter('all')}
-              title={`All Notes (${totalNotes})`}
-            >
-              <FileText size={16} />
-              <span className="rail-pill-badge">{totalNotes}</span>
-            </button>
-
-            <button 
-              type="button"
-              className={`rail-nav-btn ${currentFilter === 'quick' ? 'active' : ''}`}
-              onClick={() => onSelectFilter('quick')}
-              title={`Quick Notes (${quickNotesCount})`}
-            >
-              <Zap size={16} color="#eab308" />
-            </button>
-
-            <button 
-              type="button"
-              className={`rail-nav-btn ${currentFilter === 'favorites' ? 'active' : ''}`}
-              onClick={() => onSelectFilter('favorites')}
-              title={`Favorites (${favoriteNotes})`}
-            >
-              <Star size={16} color="#f59e0b" />
-            </button>
-
-            <button 
-              type="button"
-              className={`rail-nav-btn ${currentFilter === 'recent' ? 'active' : ''}`}
-              onClick={() => onSelectFilter('recent')}
-              title="Recent Notes"
-            >
-              <Clock size={16} color="#0ea5e9" />
-            </button>
-
-            <button 
-              type="button"
-              className={`rail-nav-btn ${currentFilter === 'attachments' ? 'active' : ''}`}
-              onClick={() => onSelectFilter('attachments')}
-              title={`Files & Media (${withAttachments})`}
-            >
-              <Paperclip size={16} color="#10b981" />
-            </button>
-
-            {onOpenLibrary && (
-              <button
-                type="button"
-                className={`rail-nav-btn ${isLibraryOpen ? 'active' : ''}`}
-                onClick={onOpenLibrary}
-                title={`Open Library & File Manager (${books.length} Books, ${folders.length} Folders)`}
-              >
-                <BookOpen size={16} color="var(--accent-primary)" />
-              </button>
-            )}
-
+          {/* Settings Trigger */}
+          {onOpenSettings && (
             <button
               type="button"
-              className="rail-nav-btn"
-              onClick={() => setIsFolderModalOpen(true)}
-              title={`Browse Folders (${folders.length})`}
+              className="sidebar-rail-btn"
+              onClick={() => onOpenSettings('database')}
+              title="Vault Settings"
             >
-              <Folder size={16} color="var(--text-secondary)" />
+              <Settings size={15} />
             </button>
-          </div>
-
-          <div className="rail-bottom-group">
-            {/* Calendar Button placed above Archive & Bin in Rail */}
-            <button
-              type="button"
-              className={`rail-nav-btn ${isCalendarExpanded ? 'active' : ''}`}
-              onClick={() => {
-                if (onToggleCollapse) onToggleCollapse();
-                setIsCalendarExpanded(true);
-              }}
-              title={`Today: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} (Click to expand Calendar)`}
-            >
-              <CalendarIcon size={16} color="var(--accent-primary)" />
-              <span className="rail-pill-badge" style={{ background: 'var(--accent-primary)' }}>
-                {new Date().getDate()}
-              </span>
-            </button>
-
-            <button 
-              type="button"
-              className={`rail-nav-btn ${currentFilter === 'archive' ? 'active' : ''}`}
-              onClick={() => onSelectFilter('archive')}
-              title={`Archived Notes (${archivedNotesCount})`}
-            >
-              <Archive size={16} color="#8b5cf6" />
-              {archivedNotesCount > 0 && <span className="rail-pill-badge">{archivedNotesCount}</span>}
-            </button>
-
-            <button 
-              type="button"
-              className={`rail-nav-btn danger ${currentFilter === 'trash' ? 'active' : ''}`}
-              onClick={() => onSelectFilter('trash')}
-              title={`Trash Bin (${trashedNotesCount})`}
-            >
-              <Trash2 size={16} color="#ef4444" />
-              {trashedNotesCount > 0 && <span className="rail-pill-badge danger">{trashedNotesCount}</span>}
-            </button>
-
-            {onToggleTheme && (
-              <button 
-                type="button"
-                className="rail-nav-btn rail-theme-btn"
-                onClick={onToggleTheme}
-                title={`Theme: ${
-                  theme === 'system' ? 'System Default' :
-                  theme === 'light' ? 'Day Theme' :
-                  theme === 'dark' ? 'Night Theme' :
-                  theme === 'oled' ? 'Obsidian Onyx' :
-                  theme === 'tokyo' ? 'Tokyo Midnight' :
-                  theme === 'nordic' ? 'Nordic Frost' : 'Editorial'
-                } (Click to Cycle Themes)`}
-              >
-                {theme === 'system' ? <Monitor size={16} /> :
-                 theme === 'light' ? <Sun size={16} color="#f59e0b" /> :
-                 theme === 'dark' ? <Moon size={16} color="#8b5cf6" /> :
-                 theme === 'oled' ? <Sparkles size={16} color="#a855f7" /> :
-                 theme === 'tokyo' ? <Zap size={16} color="#38bdf8" /> :
-                 theme === 'nordic' ? <Cloud size={16} color="#34d399" /> :
-                 <BookOpen size={16} color="#c2410c" />}
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </aside>
     );
   }
 
+  // EXPANDED STATE (320px Consolidated Sidebar)
   return (
-    <>
-      {isOpenMobile && (
-        <div className="sidebar-backdrop mobile-only" onClick={onCloseMobile} />
+    <aside className={`app-sidebar ${isOpenMobile ? 'mobile-open' : ''}`}>
+      {/* Top Workspace Selector & M / N View Segmented Switcher */}
+      <div className="sidebar-mode-switcher-container">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          {/* Workspace Switcher */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+              notesCountByWorkspace={notesCountByWorkspace}
+              onSelectWorkspace={onSelectWorkspace}
+              onCreateWorkspace={onCreateWorkspace}
+              onRenameWorkspace={onRenameWorkspace}
+              onDeleteWorkspace={onDeleteWorkspace}
+            />
+          </div>
+
+          {/* Collapse Sidebar Button */}
+          {onToggleCollapse && (
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              onClick={onToggleCollapse}
+              title="Collapse Sidebar"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          )}
+        </div>
+
+        {/* Segmented Mode Switcher: Menu (M) vs Notes (N) */}
+        <div className="sidebar-mode-pill-grid">
+          <button
+            type="button"
+            id="tab-nav-btn"
+            className={`sidebar-mode-pill-btn ${viewMode === 'M' ? 'active' : ''}`}
+            onClick={() => handleSetViewMode('M')}
+            title="Menu & Directory Tree View (Press M)"
+          >
+            <Menu size={13} />
+            <span>Menu (M)</span>
+          </button>
+
+          <button
+            type="button"
+            id="tab-notes-btn"
+            className={`sidebar-mode-pill-btn ${viewMode === 'N' ? 'active' : ''}`}
+            onClick={() => handleSetViewMode('N')}
+            title="Notes Feed List (Press N)"
+          >
+            <FileText size={13} />
+            <span>Notes (N)</span>
+            <span className="sidebar-mode-pill-badge">{activeNotes.length}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          VIEW MODE 'M': Menu, Directory Tree, Books, Folders & Calendar
+          ========================================================================= */}
+      {viewMode === 'M' && (
+        <div className="sidebar-scrollable-area" style={{ flex: 1, overflowY: 'auto' }}>
+          {/* Primary Navigation Views */}
+          {!isNavSectionCollapsed && (
+            <div className="sidebar-section">
+              <div className="sidebar-section-header" style={{ padding: '4px 6px 6px 6px' }}>
+                <span className="section-title-text">Navigation</span>
+              </div>
+              <nav className="nav-list">
+                {/* All Notes */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'all' && !currentFolderId && !selectedTag ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('all');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                >
+                  <div className="nav-item-left">
+                    <FileText size={14} color="#818cf8" />
+                    <span>All Notes</span>
+                  </div>
+                  <span className="nav-item-count">{activeNotes.length}</span>
+                </button>
+
+                {/* Quick Notes */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'quick' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('quick');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                >
+                  <div className="nav-item-left">
+                    <Zap size={14} color="#f59e0b" />
+                    <span>Quick Notes</span>
+                  </div>
+                  {quickNotesCount > 0 && <span className="nav-item-count">{quickNotesCount}</span>}
+                </button>
+
+                {/* Favorites */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'favorites' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('favorites');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                >
+                  <div className="nav-item-left">
+                    <Star size={14} color="#fbbf24" fill="#fbbf24" />
+                    <span>Favorites</span>
+                  </div>
+                  <span className="nav-item-count">{favoriteNotesCount}</span>
+                </button>
+
+                {/* Recent */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'recent' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('recent');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                >
+                  <div className="nav-item-left">
+                    <Clock size={14} color="#38bdf8" />
+                    <span>Recent Notes</span>
+                  </div>
+                </button>
+
+                {/* With Files & Media */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'attachments' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('attachments');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                >
+                  <div className="nav-item-left">
+                    <Paperclip size={14} color="#a78bfa" />
+                    <span>With Files & Media</span>
+                  </div>
+                  <span className="nav-item-count">{withAttachmentsCount}</span>
+                </button>
+
+                {/* Tag Directory */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    className={`nav-item ${selectedTag ? 'active' : ''}`}
+                    onClick={() => setIsTagPopoverOpen(!isTagPopoverOpen)}
+                  >
+                    <div className="nav-item-left">
+                      <Tag size={14} color="#ec4899" />
+                      <span>Tag Directory</span>
+                    </div>
+                    <span className="nav-item-count">{allTags.length}</span>
+                  </button>
+
+                  {isTagPopoverOpen && (
+                    <TagSelectorPopover
+                      notes={activeNotes}
+                      selectedTag={selectedTag}
+                      isOpen={isTagPopoverOpen}
+                      onSelectTag={(t) => {
+                        onSelectTag(t);
+                        setIsTagPopoverOpen(false);
+                        handleSetViewMode('N');
+                        onCloseMobile();
+                      }}
+                      onClose={() => setIsTagPopoverOpen(false)}
+                    />
+                  )}
+                </div>
+
+                {/* Library & Books/Files Manager */}
+                {onOpenLibrary && (
+                  <button
+                    type="button"
+                    className="nav-item"
+                    onClick={onOpenLibrary}
+                  >
+                    <div className="nav-item-left">
+                      <BookOpen size={14} color="#818cf8" />
+                      <span>Library & Files</span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        background: 'rgba(99, 102, 241, 0.15)',
+                        color: '#a5b4fc',
+                        padding: '1px 6px',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      {books.length}b · {notes.filter((n) => n.attachments?.length).length}f
+                    </span>
+                  </button>
+                )}
+              </nav>
+            </div>
+          )}
+
+          {/* Centered Collapse Section Divider */}
+          <div className="sidebar-collapse-section-divider">
+            <button
+              type="button"
+              className="sidebar-collapse-section-btn"
+              onClick={() => setIsNavSectionCollapsed(!isNavSectionCollapsed)}
+              title={isNavSectionCollapsed ? 'Expand Navigation Section' : 'Collapse Navigation Section'}
+            >
+              {isNavSectionCollapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+              <span>{isNavSectionCollapsed ? 'Expand Section' : 'Collapse Section'}</span>
+            </button>
+          </div>
+
+          {/* Books Section */}
+          <div className="sidebar-section">
+            <div
+              className="sidebar-section-header"
+              onClick={() => setIsBooksExpanded(!isBooksExpanded)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {isBooksExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                <span className="section-title-text">📚 Books ({books.length})</span>
+              </div>
+              <button
+                type="button"
+                className="section-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsBookModalOpen(true);
+                }}
+                title="Manage Books"
+              >
+                <SlidersHorizontal size={13} />
+              </button>
+            </div>
+
+            {isBooksExpanded && (
+              <div style={{ padding: '0 6px 4px 6px' }}>
+                {books
+                  .filter((b) => pinnedBookIds.includes(b.id))
+                  .map((book) => {
+                    const isExp = expandedBookIds.has(book.id);
+                    const pages = activeNotes.filter((n) => n.bookId === book.id);
+                    return (
+                      <div key={book.id} className="book-card-item">
+                        <div
+                          className="book-card-header"
+                          onClick={(e) => toggleBook(book.id, e)}
+                        >
+                          <div className="book-header-left">
+                            <span className="book-icon-emoji">{book.icon || '📖'}</span>
+                            <span className="book-title-label">{book.title}</span>
+                          </div>
+                          <span className="book-page-count">{pages.length}p</span>
+                        </div>
+
+                        {isExp && (
+                          <div className="book-pages-container">
+                            {pages.map((page) => (
+                              <div
+                                key={page.id}
+                                className={`book-page-row ${selectedNoteId === page.id ? 'active' : ''}`}
+                                onClick={() => {
+                                  onSelectNote(page.id);
+                                  handleSetViewMode('N');
+                                  onCloseMobile();
+                                }}
+                              >
+                                <span className="book-page-title">{page.title || 'Untitled Page'}</span>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              className="book-add-page-btn"
+                              onClick={() => {
+                                onAddPageToBook(book.id);
+                                handleSetViewMode('N');
+                              }}
+                            >
+                              <Plus size={11} />
+                              <span>Add Chapter</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                <button
+                  type="button"
+                  className="browse-pin-btn"
+                  onClick={() => setIsBookModalOpen(true)}
+                >
+                  <Plus size={12} />
+                  <span>Browse & Pin Books ({books.length})</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Folders Section */}
+          <div className="sidebar-section">
+            <div
+              className="sidebar-section-header"
+              onClick={() => setIsFoldersExpanded(!isFoldersExpanded)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {isFoldersExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                <span className="section-title-text">📁 Folders ({folders.length})</span>
+              </div>
+              <button
+                type="button"
+                className="section-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsFolderModalOpen(true);
+                }}
+                title="Manage Folders"
+              >
+                <SlidersHorizontal size={13} />
+              </button>
+            </div>
+
+            {isFoldersExpanded && (
+              <div style={{ padding: '0 6px 4px 6px' }}>
+                <ul className="folder-tree-list">
+                  {folders
+                    .filter((f) => !f.parentId && pinnedFolderIds.includes(f.id))
+                    .map((f) => renderFolderItem(f))}
+                </ul>
+
+                <button
+                  type="button"
+                  className="browse-pin-btn"
+                  onClick={() => setIsFolderModalOpen(true)}
+                >
+                  <Plus size={12} />
+                  <span>Browse & Pin Folders ({folders.length})</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Optional Sidebar Calendar Accordion */}
+          {showCalendar && (
+            <div className="sidebar-section">
+              <div
+                className="sidebar-section-header"
+                onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CalendarIcon size={13} color="#34d399" />
+                  <span className="section-title-text">Calendar</span>
+                </div>
+                {isCalendarExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </div>
+
+              {isCalendarExpanded && (
+                <div style={{ padding: '4px 8px' }}>
+                  <CalendarWidget
+                    notes={notes}
+                    onSelectDate={(d) => {
+                      onSelectDate(d);
+                      handleSetViewMode('N');
+                    }}
+                    onOpenTodayNote={() => {
+                      onOpenTodayNote();
+                      handleSetViewMode('N');
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Popups & Selectors */}
-      <TagSelectorPopover
-        isOpen={isTagPopoverOpen}
-        onClose={() => setIsTagPopoverOpen(false)}
-        notes={notes}
-        selectedTag={selectedTag}
-        onSelectTag={(tag) => {
-          onSelectTag(tag);
-          if (tag) onSelectFilter('all');
-        }}
-      />
+      {/* =========================================================================
+          VIEW MODE 'N': Notes Feed List
+          ========================================================================= */}
+      {viewMode === 'N' && (
+        <div className="sidebar-notes-view-panel" id="notes-view-panel">
+          {/* Notes Feed Header */}
+          <div className="sidebar-notes-feed-header">
+            <div className="sidebar-notes-headline-row">
+              <div className="sidebar-notes-title-group">
+                <h2>{notesFeedTitle}</h2>
+                <span className="sidebar-notes-count-badge">({filteredNotes.length})</span>
+              </div>
 
+              {onCreateNote && currentFilter !== 'trash' && currentFilter !== 'archive' && (
+                <button
+                  type="button"
+                  className="sidebar-new-note-btn"
+                  onClick={onCreateNote}
+                  title="Create New Note (Cmd+N)"
+                >
+                  <Plus size={13} />
+                  <span>New Note</span>
+                </button>
+              )}
+
+              {currentFilter === 'trash' && onEmptyTrash && filteredNotes.length > 0 && (
+                <button
+                  type="button"
+                  className="sidebar-new-note-btn"
+                  style={{ background: '#ef4444' }}
+                  onClick={onEmptyTrash}
+                  title="Permanently empty trash"
+                >
+                  <Trash2 size={12} />
+                  <span>Empty</span>
+                </button>
+              )}
+            </div>
+
+            {/* Filter Search Input & Sort Selector */}
+            <div className="sidebar-notes-filter-row">
+              <div className="sidebar-notes-search-wrapper">
+                <Search size={12} className="sidebar-notes-search-icon" />
+                <input
+                  type="text"
+                  className="sidebar-notes-search-input"
+                  placeholder="Search notes in list..."
+                  value={notesSearchQuery}
+                  onChange={(e) => setNotesSearchQuery(e.target.value)}
+                />
+                {notesSearchQuery && (
+                  <button
+                    type="button"
+                    className="sidebar-notes-search-clear"
+                    onClick={() => setNotesSearchQuery('')}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort Selector Dropdown */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className="sidebar-notes-sort-btn"
+                  onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
+                  title="Sort notes"
+                >
+                  <SlidersHorizontal size={11} />
+                  <span>{sortOption === 'updated' ? 'Recent' : sortOption === 'created' ? 'Created' : 'Title'}</span>
+                  <ChevronDown size={10} />
+                </button>
+
+                {isSortMenuOpen && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                      onClick={() => setIsSortMenuOpen(false)}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '100%',
+                        marginTop: '4px',
+                        background: '#131824',
+                        border: '1px solid #1c2233',
+                        borderRadius: '6px',
+                        padding: '4px',
+                        zIndex: 50,
+                        minWidth: '120px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="sidebar-theme-option-item"
+                        style={{ width: '100%', fontSize: '11px', padding: '4px 8px' }}
+                        onClick={() => { setSortOption('updated'); setIsSortMenuOpen(false); }}
+                      >
+                        Recent (Modified)
+                      </button>
+                      <button
+                        type="button"
+                        className="sidebar-theme-option-item"
+                        style={{ width: '100%', fontSize: '11px', padding: '4px 8px' }}
+                        onClick={() => { setSortOption('created'); setIsSortMenuOpen(false); }}
+                      >
+                        Date Created
+                      </button>
+                      <button
+                        type="button"
+                        className="sidebar-theme-option-item"
+                        style={{ width: '100%', fontSize: '11px', padding: '4px 8px' }}
+                        onClick={() => { setSortOption('title'); setIsSortMenuOpen(false); }}
+                      >
+                        Title (A-Z)
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable Note Cards */}
+          <div className="sidebar-note-cards-list">
+            {filteredNotes.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+                <FileText size={28} style={{ opacity: 0.3, margin: '0 auto 8px auto' }} />
+                <p style={{ fontSize: '12px', margin: 0 }}>No notes found</p>
+                {onCreateNote && currentFilter !== 'trash' && (
+                  <button
+                    type="button"
+                    style={{
+                      marginTop: '10px',
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      color: '#a5b4fc',
+                      fontSize: '11.5px',
+                      padding: '4px 10px',
+                      borderRadius: '5px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={onCreateNote}
+                  >
+                    + Create a Note
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredNotes.map((note) => {
+                const isSelected = selectedNoteId === note.id;
+                const folder = folders.find((f) => f.id === note.folderId);
+                const snippet = getSnippet(note.content);
+                const hasImages = note.attachments?.some((a) => a.type?.startsWith('image/'));
+                const hasAudio = note.attachments?.some((a) => a.type?.startsWith('audio/'));
+                const hasFiles = (note.attachments?.length || 0) > 0 && !hasImages && !hasAudio;
+
+                return (
+                  <div
+                    key={note.id}
+                    className={`consolidated-note-card ${isSelected ? 'active' : ''}`}
+                    onClick={() => {
+                      onSelectNote(note.id);
+                      onCloseMobile();
+                    }}
+                  >
+                    {/* Top Row: Title & Hover Micro Actions */}
+                    <div className="consolidated-card-top-row">
+                      <div className="consolidated-card-title-group">
+                        {note.isPinned && <Pin size={11} style={{ color: '#818cf8', flexShrink: 0 }} />}
+                        {note.isLocked && <Lock size={11} style={{ color: '#fbbf24', flexShrink: 0 }} />}
+                        <span className="consolidated-card-title">
+                          {note.title || 'Untitled Note'}
+                        </span>
+                      </div>
+
+                      {/* Hover Actions */}
+                      <div className="consolidated-card-hover-actions" onClick={(e) => e.stopPropagation()}>
+                        {note.isTrashed ? (
+                          <>
+                            {onRestoreNote && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn"
+                                onClick={(e) => onRestoreNote(note.id, e)}
+                                title="Restore Note"
+                              >
+                                <RotateCcw size={13} color="#34d399" />
+                              </button>
+                            )}
+                            {onPermanentDeleteNote && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn danger"
+                                onClick={(e) => onPermanentDeleteNote(note.id, e)}
+                                title="Permanently Delete"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {/* Archive Note */}
+                            {onArchiveNote && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn"
+                                onClick={(e) => onArchiveNote(note.id, e)}
+                                title={note.isArchived ? 'Unarchive Note' : 'Archive Note'}
+                              >
+                                <Archive size={12} color={note.isArchived ? '#8b5cf6' : undefined} />
+                              </button>
+                            )}
+
+                            {/* Move to Folder */}
+                            {onMoveNote && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setNoteToMoveId(note.id);
+                                }}
+                                title="Move Note to Folder"
+                              >
+                                <Folder size={12} />
+                              </button>
+                            )}
+
+                            {/* Favorite Star */}
+                            {onToggleFavorite && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn star"
+                                onClick={(e) => onToggleFavorite(note.id, e)}
+                                title={note.isFavorite ? 'Unfavorite' : 'Favorite'}
+                              >
+                                <Star
+                                  size={12}
+                                  fill={note.isFavorite ? '#fbbf24' : 'none'}
+                                  color={note.isFavorite ? '#fbbf24' : 'var(--text-muted)'}
+                                />
+                              </button>
+                            )}
+
+                            {/* Split View */}
+                            {onSelectNoteSplit && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn split"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSelectNoteSplit(note.id);
+                                }}
+                                title="Open Side-by-Side (Split View)"
+                              >
+                                <Columns2 size={12} />
+                              </button>
+                            )}
+
+                            {/* Delete Note */}
+                            {onDeleteNote && (
+                              <button
+                                type="button"
+                                className="card-action-micro-btn danger"
+                                onClick={(e) => onDeleteNote(note.id, e)}
+                                title="Move to Trash Bin"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Metadata Row: Relative Time • Folder Badge • Media Icons */}
+                    <div className="consolidated-card-meta-row">
+                      <span className="consolidated-card-time">{formatRelativeTime(note.updatedAt)}</span>
+                      <span>•</span>
+                      <span className="consolidated-card-folder">
+                        {folder ? (
+                          <>
+                            <span>📁</span>
+                            <span style={{ color: folder.color || 'inherit' }}>{folder.name}</span>
+                          </>
+                        ) : (
+                          <span>📁 Uncategorized</span>
+                        )}
+                      </span>
+
+                      {(hasImages || hasAudio || hasFiles) && (
+                        <>
+                          <span>•</span>
+                          <span style={{ display: 'inline-flex', gap: '3px' }}>
+                            {hasImages && <ImageIcon size={10} />}
+                            {hasAudio && <Music size={10} style={{ color: '#f87171' }} />}
+                            {hasFiles && <Paperclip size={10} />}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* 2-line snippet preview */}
+                    {snippet && (
+                      <p className="card-snippet-2lines" style={{ margin: '2px 0 0 0' }}>
+                        {snippet}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          Unified Sidebar Footer: Archive/Trash, Theme Switcher & More Menu
+          ========================================================================= */}
+      <div className="sidebar-footer-container" style={{ padding: '8px 10px', borderTop: '1px solid var(--border-color)', background: '#0a0d14', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+        {/* Archive & Bin Quick Buttons */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+          <button
+            type="button"
+            className={`nav-item ${currentFilter === 'archive' ? 'active' : ''}`}
+            style={{ padding: '4px 8px', fontSize: '11px', justifyContent: 'space-between', borderRadius: '5px' }}
+            onClick={() => {
+              onSelectFilter('archive');
+              handleSetViewMode('N');
+              onCloseMobile();
+            }}
+            title="Archived Notes"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Archive size={12} color="#8b5cf6" />
+              <span>Archive</span>
+            </div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{archivedNotesCount}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`nav-item ${currentFilter === 'trash' ? 'active' : ''}`}
+            style={{ padding: '4px 8px', fontSize: '11px', justifyContent: 'space-between', borderRadius: '5px' }}
+            onClick={() => {
+              onSelectFilter('trash');
+              handleSetViewMode('N');
+              onCloseMobile();
+            }}
+            title="Trash Bin"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Trash2 size={12} color="#f87171" />
+              <span>Bin</span>
+            </div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{trashedNotesCount}</span>
+          </button>
+        </div>
+
+        {/* Theme Switcher & More Options */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '2px', fontSize: '11px', color: 'var(--text-muted)' }}>
+          {/* Theme Quick Options */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', color: theme === 'light' ? '#6366f1' : 'inherit' }}
+              onClick={() => onChangeTheme && onChangeTheme('light')}
+              title="Light Day Theme"
+            >
+              ☀️ Day
+            </span>
+            <span
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', color: theme === 'dark' ? '#6366f1' : 'inherit' }}
+              onClick={() => onChangeTheme && onChangeTheme('dark')}
+              title="Dark Night Theme"
+            >
+              🌙 Night
+            </span>
+            <span
+              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', color: theme === 'system' ? '#6366f1' : 'inherit' }}
+              onClick={() => onChangeTheme && onChangeTheme('system')}
+              title="Auto System Theme"
+            >
+              🖥️ Auto
+            </span>
+          </div>
+
+          {/* More Options Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', padding: '2px 4px' }}
+              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+              title="More Vault Options"
+            >
+              <Sparkles size={11} color="#818cf8" />
+              <span>More</span>
+              <ChevronDown size={10} />
+            </button>
+
+            {isMoreMenuOpen && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                  onClick={() => setIsMoreMenuOpen(false)}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    bottom: '100%',
+                    marginBottom: '6px',
+                    background: '#131824',
+                    border: '1px solid #1c2233',
+                    borderRadius: '7px',
+                    padding: '4px',
+                    zIndex: 50,
+                    minWidth: '150px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
+                  }}
+                >
+                  {onOpenSettings && (
+                    <button
+                      type="button"
+                      className="sidebar-theme-option-item"
+                      style={{ width: '100%', padding: '6px 8px' }}
+                      onClick={() => {
+                        onOpenSettings('database');
+                        setIsMoreMenuOpen(false);
+                      }}
+                    >
+                      <Settings size={13} />
+                      <span>Vault Settings</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="sidebar-theme-option-item"
+                    style={{ width: '100%', padding: '6px 8px' }}
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('milearn:open-tour'));
+                      setIsMoreMenuOpen(false);
+                    }}
+                  >
+                    <HelpCircle size={13} />
+                    <span>Start Guided Tour</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Move Note Modal */}
+      {noteToMoveId && onMoveNote && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100
+          }}
+          onClick={() => setNoteToMoveId(null)}
+        >
+          <div
+            style={{
+              background: '#131824',
+              border: '1px solid #1c2233',
+              borderRadius: '10px',
+              padding: '16px',
+              width: '320px',
+              maxWidth: '90vw',
+              boxShadow: '0 16px 36px rgba(0,0,0,0.7)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: '#ffffff' }}>
+                Move Note to Folder
+              </h3>
+              <button
+                type="button"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                onClick={() => setNoteToMoveId(null)}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '240px', overflowY: 'auto' }}>
+              <button
+                type="button"
+                className="sidebar-theme-option-item"
+                style={{ padding: '8px 10px', borderRadius: '6px' }}
+                onClick={() => {
+                  onMoveNote(noteToMoveId, null, null);
+                  setNoteToMoveId(null);
+                }}
+              >
+                <Folder size={14} color="#8e9bb5" />
+                <span>📁 Uncategorized (Root)</span>
+              </button>
+
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className="sidebar-theme-option-item"
+                  style={{ padding: '8px 10px', borderRadius: '6px' }}
+                  onClick={() => {
+                    onMoveNote(noteToMoveId, f.id, null);
+                    setNoteToMoveId(null);
+                  }}
+                >
+                  <Folder size={14} style={{ color: f.color || '#6366f1' }} />
+                  <span>{f.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pinned Modals */}
       <FolderSelectorModal
         isOpen={isFolderModalOpen}
         onClose={() => setIsFolderModalOpen(false)}
@@ -488,10 +1466,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         currentFolderId={currentFolderId}
         pinnedFolderIds={pinnedFolderIds}
         onTogglePinFolder={togglePinFolder}
-        onSelectFolder={(fId) => {
-          if (fId) {
-            onSelectFolder(fId);
-            onSelectFilter('all');
+        onSelectFolder={(id) => {
+          if (id) {
+            onSelectFolder(id);
+            handleSetViewMode('N');
           }
         }}
         onCreateFolder={onCreateFolder}
@@ -507,551 +1485,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         pinnedBookIds={pinnedBookIds}
         onTogglePinBook={togglePinBook}
         onSelectBook={(bookId) => {
-          const firstPage = notes.find((n) => n.bookId === bookId && !n.isTrashed);
-          if (firstPage) onSelectNote(firstPage.id);
+          const page = activeNotes.find((n) => n.bookId === bookId);
+          if (page) onSelectNote(page.id);
+          handleSetViewMode('N');
+          setIsBookModalOpen(false);
         }}
         onCreateBook={onCreateBook}
         onDeleteBook={onDeleteBook}
       />
-
-      <aside className={`app-sidebar ${isOpenMobile ? 'open' : ''}`}>
-        {/* Top Header: Persona Switcher with right-aligned collapse button */}
-        <div className="sidebar-top-header">
-          <div className="sidebar-ws-container">
-            <WorkspaceSwitcher
-              workspaces={workspaces}
-              activeWorkspaceId={activeWorkspaceId}
-              notesCountByWorkspace={notesCountByWorkspace}
-              onSelectWorkspace={onSelectWorkspace}
-              onCreateWorkspace={onCreateWorkspace}
-              onRenameWorkspace={onRenameWorkspace}
-              onDeleteWorkspace={onDeleteWorkspace}
-            />
-          </div>
-          {onToggleCollapse && (
-            <button
-              type="button"
-              className="sidebar-collapse-btn"
-              onClick={onToggleCollapse}
-              title="Collapse Sidebar (Cmd+\)"
-              aria-label="Collapse Sidebar"
-            >
-              <PanelLeftClose size={15} />
-            </button>
-          )}
-        </div>
-
-        <div 
-          className="sidebar-scroll" 
-          ref={scrollContainerRef}
-          onScroll={handleSidebarScroll}
-        >
-
-          {/* Section: Quick Navigation */}
-          <div>
-            <div className="sidebar-section-title">Navigation</div>
-            <ul className="sidebar-nav-list">
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'all' && !currentFolderId && !selectedTag ? 'active' : ''}`}
-                onClick={() => {
-                  collapseCalendarOnBrowse();
-                  onSelectFilter('all');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <FileText size={15} />
-                  <span>All Notes</span>
-                </div>
-                <span className="badge-count">{totalNotes}</span>
-              </li>
-
-              {/* Quick Notes under All Notes */}
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'quick' ? 'active' : ''}`}
-                onClick={() => {
-                  collapseCalendarOnBrowse();
-                  onSelectFilter('quick');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <Zap size={15} style={{ color: '#eab308' }} />
-                  <span>Quick Notes</span>
-                </div>
-                {quickNotesCount > 0 && <span className="badge-count">{quickNotesCount}</span>}
-              </li>
-
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'favorites' ? 'active' : ''}`}
-                onClick={() => {
-                  collapseCalendarOnBrowse();
-                  onSelectFilter('favorites');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <Star size={15} style={{ color: '#f59e0b' }} />
-                  <span>Favorites</span>
-                </div>
-                <span className="badge-count">{favoriteNotes}</span>
-              </li>
-
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'recent' ? 'active' : ''}`}
-                onClick={() => {
-                  collapseCalendarOnBrowse();
-                  onSelectFilter('recent');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <Clock size={15} style={{ color: '#0ea5e9' }} />
-                  <span>Recent Notes</span>
-                </div>
-              </li>
-
-              <li 
-                className={`sidebar-nav-item ${currentFilter === 'attachments' ? 'active' : ''}`}
-                onClick={() => {
-                  collapseCalendarOnBrowse();
-                  onSelectFilter('attachments');
-                  onCloseMobile();
-                }}
-              >
-                <div className="nav-item-left">
-                  <Paperclip size={15} style={{ color: '#10b981' }} />
-                  <span>With Files & Media</span>
-                </div>
-                <span className="badge-count">{withAttachments}</span>
-              </li>
-
-              {/* Tags Popup Selector Trigger in Navigation */}
-              <li 
-                className={`sidebar-nav-item ${selectedTag ? 'active' : ''}`}
-                onClick={() => {
-                  collapseCalendarOnBrowse();
-                  setIsTagPopoverOpen(true);
-                }}
-              >
-                <div className="nav-item-left">
-                  <Tag size={15} style={{ color: 'var(--accent-primary)' }} />
-                  <span>{selectedTag ? `Tag: #${selectedTag}` : 'Tag Directory'}</span>
-                </div>
-                <span className="badge-count" style={{ background: selectedTag ? 'var(--accent-primary)' : undefined, color: selectedTag ? 'white' : undefined }}>
-                  {selectedTag ? 'Filtered' : allTags.length}
-                </span>
-              </li>
-
-              {onOpenLibrary && (
-                <li 
-                  className={`sidebar-nav-item ${isLibraryOpen ? 'active' : ''}`}
-                  onClick={() => {
-                    collapseCalendarOnBrowse();
-                    onOpenLibrary();
-                    onCloseMobile();
-                  }}
-                  style={{ marginTop: '4px', background: 'rgba(79, 70, 229, 0.08)', border: '1px solid rgba(79, 70, 229, 0.18)' }}
-                >
-                  <div className="nav-item-left">
-                    <BookOpen size={15} color="var(--accent-primary)" />
-                    <span style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>Library & Files</span>
-                  </div>
-                  <span className="badge-count" style={{ background: 'rgba(79, 70, 229, 0.2)', color: 'var(--accent-primary)' }}>
-                    {books.length}b · {folders.length}f
-                  </span>
-                </li>
-              )}
-            </ul>
-          </div>
-
-          {/* Section: Pinned Books & Notebooks (Collapsible with Popup Selector) */}
-          <div className="sidebar-books-section">
-            <div 
-              className="sidebar-section-title clickable-section-header"
-              onClick={() => {
-                collapseCalendarOnBrowse();
-                setIsBooksExpanded(!isBooksExpanded);
-              }}
-              title={isBooksExpanded ? "Collapse Books" : "Expand Books"}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button 
-                  type="button" 
-                  className="section-toggle-chevron"
-                  aria-label={isBooksExpanded ? "Collapse Books" : "Expand Books"}
-                >
-                  {isBooksExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                </button>
-                <BookOpen size={13} color="var(--accent-primary)" />
-                <span>Books</span>
-                <span className="badge-count-tiny">{displayedBooks.length}</span>
-              </div>
-              <button
-                type="button"
-                className="folder-action-btn"
-                title="Browse & Pin Books"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsBookModalOpen(true);
-                }}
-              >
-                <SlidersHorizontal size={12} />
-              </button>
-            </div>
-
-            {isBooksExpanded && (
-              <div className="sidebar-pinned-books">
-                {displayedBooks.map((book) => {
-                  const isExpanded = expandedBookIds.has(book.id);
-                  const pages = notes
-                    .filter((n) => n.bookId === book.id && !n.isTrashed)
-                    .sort((a, b) => (a.pageOrder || 0) - (b.pageOrder || 0));
-
-                  return (
-                    <div key={book.id} className="book-card-item">
-                      <div 
-                        className="book-card-header"
-                        onClick={(e) => toggleBook(book.id, e)}
-                        title={book.title}
-                      >
-                        <div className="book-header-left">
-                          <span className="book-icon-emoji">{book.icon || '📖'}</span>
-                          <span className="book-title-label">{book.title}</span>
-                          <span className="book-page-count">{pages.length}p</span>
-                        </div>
-                        <div className="book-header-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            className="book-icon-btn"
-                            title="Add Chapter / Page"
-                            onClick={() => onAddPageToBook(book.id)}
-                          >
-                            <Plus size={12} />
-                          </button>
-                          <button
-                            type="button"
-                            className="book-icon-btn"
-                            title="Unpin from Sidebar"
-                            onClick={() => togglePinBook(book.id)}
-                          >
-                            <Pin size={11} fill="var(--accent-primary)" color="var(--accent-primary)" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Nested Pages List */}
-                      {isExpanded && (
-                        <div className="book-pages-sublist">
-                          {pages.map((page, idx) => {
-                            const isSelected = page.id === selectedNoteId;
-                            return (
-                              <div
-                                key={page.id}
-                                className={`book-page-item ${isSelected ? 'active' : ''}`}
-                                onClick={() => {
-                                  collapseCalendarOnBrowse();
-                                  onSelectNote(page.id);
-                                }}
-                                title={page.title}
-                              >
-                                <span className="page-number-dot">{idx + 1}</span>
-                                <FileText size={12} className="page-file-icon" />
-                                <span className="page-title-text">{page.title || 'Untitled Page'}</span>
-                              </div>
-                            );
-                          })}
-                          {pages.length === 0 && (
-                            <div 
-                              className="book-empty-pages"
-                              onClick={() => onAddPageToBook(book.id)}
-                            >
-                              + Add first chapter
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <button
-                  type="button"
-                  className="btn-browse-pin"
-                  onClick={() => setIsBookModalOpen(true)}
-                >
-                  <Plus size={12} />
-                  <span>Browse & Pin Books ({books.length})</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Section: Pinned Folders (Collapsible with Popup Selector) */}
-          <div className="sidebar-folders-section">
-            <div 
-              className="sidebar-section-title clickable-section-header"
-              onClick={() => {
-                collapseCalendarOnBrowse();
-                setIsFoldersExpanded(!isFoldersExpanded);
-              }}
-              title={isFoldersExpanded ? "Collapse Folders" : "Expand Folders"}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button 
-                  type="button" 
-                  className="section-toggle-chevron"
-                  aria-label={isFoldersExpanded ? "Collapse Folders" : "Expand Folders"}
-                >
-                  {isFoldersExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                </button>
-                <Folder size={13} color="var(--text-muted)" />
-                <span>Folders</span>
-                <span className="badge-count-tiny">{displayedFolders.length}</span>
-              </div>
-              <button 
-                className="folder-action-btn"
-                title="Browse & Pin Folders"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsFolderModalOpen(true);
-                }}
-              >
-                <SlidersHorizontal size={12} />
-              </button>
-            </div>
-
-            {isFoldersExpanded && (
-              <div className="sidebar-pinned-folders">
-                <ul className="folder-tree-root">
-                  {displayedFolders.map((folder) => renderFolderItem(folder))}
-                </ul>
-
-                <button
-                  type="button"
-                  className="btn-browse-pin"
-                  onClick={() => setIsFolderModalOpen(true)}
-                >
-                  <Plus size={12} />
-                  <span>Browse & Pin Folders ({folders.length})</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Section: Calendar & Daily Notes (Pinned directly above Bin & Archive footer) */}
-        {showCalendar && (
-          <div className="sidebar-calendar-accordion pinned-above-bins">
-            <div 
-              className="cal-accordion-header"
-              onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-              title={`Today: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} (Click to ${isCalendarExpanded ? 'collapse' : 'expand'})`}
-            >
-              <div className="cal-header-left">
-                <CalendarIcon size={14} color="var(--accent-primary)" />
-                <div className="cal-header-title-wrap">
-                  <span className="cal-header-title">Calendar & Daily Log</span>
-                  <span className="cal-header-date-badge">
-                    {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                className="btn-cal-chevron"
-                aria-label={isCalendarExpanded ? 'Collapse Calendar' : 'Expand Calendar'}
-              >
-                {isCalendarExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-              </button>
-            </div>
-
-            {isCalendarExpanded && (
-              <div className="cal-accordion-body">
-                <CalendarWidget
-                  notes={notes}
-                  onSelectDate={onSelectDate}
-                  onOpenTodayNote={onOpenTodayNote}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Sidebar Footer: Archive & Bin Buttons */}
-        <div className="sidebar-footer-bins">
-          <button 
-            className={`sidebar-bin-pill ${currentFilter === 'archive' ? 'active' : ''}`}
-            onClick={() => {
-              collapseCalendarOnBrowse();
-              onSelectFilter('archive');
-              onCloseMobile();
-            }}
-            title="View Archived Notes"
-          >
-            <Archive size={14} color="#8b5cf6" />
-            <span className="bin-label">Archive</span>
-            {archivedNotesCount > 0 && (
-              <span className="bin-count-chip">{archivedNotesCount}</span>
-            )}
-          </button>
-
-          <button 
-            className={`sidebar-bin-pill danger ${currentFilter === 'trash' ? 'active' : ''}`}
-            onClick={() => {
-              collapseCalendarOnBrowse();
-              onSelectFilter('trash');
-              onCloseMobile();
-            }}
-            title="View Trash Bin"
-          >
-            <Trash2 size={14} color="#ef4444" />
-            <span className="bin-label">Bin</span>
-            {trashedNotesCount > 0 && (
-              <span className="bin-count-chip danger">{trashedNotesCount}</span>
-            )}
-          </button>
-        </div>
-
-        {/* Live Cloud Differential Sync Status Indicator */}
-        <div style={{ padding: isCollapsed ? '4px 0' : '0 10px 8px 10px', display: 'flex', justifyContent: 'center' }}>
-          <SyncStatusIndicator
-            variant={isCollapsed ? 'compact' : 'sidebar'}
-            onOpenSettings={onOpenSettings}
-          />
-        </div>
-
-        {/* Theme Switcher beneath Archive and Bin: Quick Day, Night, System selector & Custom dropdown */}
-        {onChangeTheme && (
-          <div className="sidebar-footer-theme">
-            <div className="sidebar-theme-quick-bar">
-              <button
-                type="button"
-                className={`sidebar-theme-quick-btn ${theme === 'light' ? 'active' : ''}`}
-                onClick={() => onChangeTheme('light')}
-                title="Switch to Day Theme"
-              >
-                <Sun size={12} color="#f59e0b" />
-                <span>Day</span>
-              </button>
-
-              <button
-                type="button"
-                className={`sidebar-theme-quick-btn ${theme === 'dark' ? 'active' : ''}`}
-                onClick={() => onChangeTheme('dark')}
-                title="Switch to Night Theme"
-              >
-                <Moon size={12} color="#8b5cf6" />
-                <span>Night</span>
-              </button>
-
-              <button
-                type="button"
-                className={`sidebar-theme-quick-btn ${theme === 'system' ? 'active' : ''}`}
-                onClick={() => onChangeTheme('system')}
-                title="Sync with System Theme"
-              >
-                <Monitor size={12} />
-                <span>Auto</span>
-              </button>
-
-              {/* Custom Extra Options Dropdown */}
-              <div className="sidebar-theme-custom-wrap">
-                <button
-                  type="button"
-                  className={`sidebar-theme-quick-btn custom ${!['light', 'dark', 'system'].includes(theme) ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsThemeCustomMenuOpen((prev) => !prev);
-                  }}
-                  title="More Luxury Themes (OLED, Tokyo, Nordic, Editorial)"
-                >
-                  <Sparkles size={12} color="#ec4899" />
-                  <span>More</span>
-                  <ChevronDown size={10} />
-                </button>
-
-                {isThemeCustomMenuOpen && (
-                  <>
-                    <div 
-                      className="dropdown-backdrop" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsThemeCustomMenuOpen(false);
-                      }} 
-                    />
-                    <div className="sidebar-theme-custom-popover" onClick={(e) => e.stopPropagation()}>
-                      <div className="sidebar-theme-popover-header">
-                        <span>Luxury Themes</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        className={`sidebar-theme-option-item ${theme === 'oled' ? 'active' : ''}`}
-                        onClick={() => {
-                          onChangeTheme('oled');
-                          setIsThemeCustomMenuOpen(false);
-                        }}
-                      >
-                        <Sparkles size={13} color="#a855f7" />
-                        <div className="theme-opt-text">
-                          <strong>Obsidian Onyx</strong>
-                          <span>Pure black OLED</span>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`sidebar-theme-option-item ${theme === 'tokyo' ? 'active' : ''}`}
-                        onClick={() => {
-                          onChangeTheme('tokyo');
-                          setIsThemeCustomMenuOpen(false);
-                        }}
-                      >
-                        <Zap size={13} color="#38bdf8" />
-                        <div className="theme-opt-text">
-                          <strong>Tokyo Midnight</strong>
-                          <span>Cyber cyan glow</span>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`sidebar-theme-option-item ${theme === 'nordic' ? 'active' : ''}`}
-                        onClick={() => {
-                          onChangeTheme('nordic');
-                          setIsThemeCustomMenuOpen(false);
-                        }}
-                      >
-                        <Cloud size={13} color="#34d399" />
-                        <div className="theme-opt-text">
-                          <strong>Nordic Frost</strong>
-                          <span>Zinc & soft mint</span>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`sidebar-theme-option-item ${theme === 'editorial' ? 'active' : ''}`}
-                        onClick={() => {
-                          onChangeTheme('editorial');
-                          setIsThemeCustomMenuOpen(false);
-                        }}
-                      >
-                        <BookOpen size={13} color="#c2410c" />
-                        <div className="theme-opt-text">
-                          <strong>Editorial Paper</strong>
-                          <span>Ivory & warm serif</span>
-                        </div>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </aside>
-    </>
+    </aside>
   );
 };

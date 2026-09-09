@@ -1,0 +1,522 @@
+<!DOCTYPE html><html class="h-full" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>MILEARNAPP - Personal Vault</title>
+<!-- Tailwind CSS CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: '#090b10',
+              sidebar: '#0d111a',
+              editor: '#0b0e14',
+              surface: '#131824',
+              border: '#1c2233',
+              borderLight: '#262f47',
+              accent: '#6366f1',
+              accentHover: '#4f46e5',
+              accentViolet: '#8b5cf6',
+              textPrimary: '#e2e8f0',
+              textSecondary: '#8e9bb5',
+              textMuted: '#586580',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-scrollbars">
+    /* Custom sleek dark scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e2638;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2f3b57;
+    }
+  </style>
+<style data-purpose="interactive-animations">
+    .transition-custom {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .active-toggle-glow {
+      box-shadow: 0 0 14px rgba(99, 102, 241, 0.35);
+    }
+  </style>
+</head>
+<body class="h-full bg-app-bg text-app-textPrimary font-sans antialiased overflow-hidden flex flex-col select-none">
+<!-- BEGIN: TopGlobalNavigation -->
+<header class="h-12 border-b border-app-border bg-app-sidebar flex items-center justify-between px-3.5 z-30 shrink-0">
+<!-- Brand / App Logo -->
+<div class="flex items-center gap-3 w-72">
+<div class="flex items-center gap-2 tracking-wider font-extrabold text-sm text-white">
+<span class="text-indigo-400 font-black text-base tracking-tighter">MILEARNAPP</span>
+</div>
+</div>
+<!-- Search Bar with Shortcut -->
+<div class="flex-1 max-w-xl px-4">
+<div class="relative flex items-center">
+<svg class="w-4 h-4 text-app-textMuted absolute left-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<input class="w-full bg-[#121622] hover:bg-[#161c2b] focus:bg-[#151a29] text-xs text-app-textPrimary placeholder-app-textMuted rounded-md pl-9 pr-12 py-1.5 border border-app-border focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/40 transition-custom outline-none" placeholder="Search notes, tags, files..." type="text">
+<kbd class="absolute right-2.5 px-1.5 py-0.5 text-[10px] font-mono text-app-textMuted bg-[#181e2e] border border-app-border rounded">⌘K</kbd>
+</div>
+</div>
+<!-- Right Header Controls -->
+<div class="flex items-center gap-2.5">
+<!-- Quick Note button -->
+<button class="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs font-medium transition-custom">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="">Quick Note</span>
+</button>
+<!-- Tools Dropdown -->
+<button class="flex items-center gap-1.5 px-2.5 py-1 bg-app-surface hover:bg-[#1c2438] text-indigo-300 border border-app-border rounded text-xs font-medium transition-custom">
+<svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="">Tools</span>
+<svg class="w-3 h-3 text-app-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+<!-- Connection Status indicator -->
+
+<!-- User Profile Badge -->
+<button class="flex items-center gap-2 pl-1.5 pr-2 py-0.5 hover:bg-app-surface rounded-full border border-app-border/60 transition-custom">
+<div class="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-[10px] font-bold text-white shadow">
+          ⚡
+        </div>
+<span class="text-xs font-medium text-app-textPrimary">Alex Mercer</span>
+<div class="flex items-center gap-1.5 px-2 py-0.5 bg-[#121724] border border-app-border rounded-full text-[10px] text-app-textSecondary mr-0.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span class="">Offline (Saved)</span></div><svg class="w-3.5 h-3.5 text-app-textMuted hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopGlobalNavigation -->
+<!-- BEGIN: MainContentWrapper -->
+<div class="flex flex-1 overflow-hidden">
+<!-- BEGIN: ConsolidatedSidebar -->
+<aside class="w-80 bg-app-sidebar border-r border-app-border flex flex-col shrink-0" data-purpose="consolidated-sidebar">
+<!-- Top Workspace Selector & M / N View Segmented Switcher -->
+<div class="p-2.5 border-b border-app-border space-y-2">
+<div class="flex items-center justify-between gap-2">
+<!-- Workspace Dropdown -->
+<div class="flex items-center gap-2 px-2 py-1.5 bg-[#121624] border border-app-border rounded-md cursor-pointer hover:border-indigo-500/40 transition-custom flex-1 min-w-0">
+<span class="text-sm">🌿</span>
+<div class="leading-tight truncate">
+<div class="text-xs font-semibold text-white flex items-center gap-1">
+<span class="truncate">Personal Vault</span>
+<svg class="w-3 h-3 text-app-textMuted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<div class="text-[10px] text-app-textMuted">Workspace</div>
+</div>
+</div>
+<!-- M / N Quick Toggle (Screen 2 Consolidated Switcher) -->
+<button class="p-1.5 text-app-textMuted hover:text-white hover:bg-app-surface border border-app-border hover:border-indigo-500/40 rounded-md transition-custom cursor-pointer flex items-center justify-center shrink-0" id="sidebar-collapse-btn" onclick="const aside = document.querySelector('aside[data-purpose=&quot;consolidated-sidebar&quot;]'); aside.classList.toggle('w-80'); aside.classList.toggle('w-12'); aside.querySelectorAll('.space-y-2, #tree-view-panel, #notes-view-panel, footer, .p-2').forEach(el =&gt; { if(el.id !== 'sidebar-collapse-bar') el.classList.toggle('hidden'); });" title="Toggle Sidebar (Collapse/Expand)"><svg class="w-4 h-4 text-app-textSecondary hover:text-indigo-400 transition-custom" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect height="18" rx="2" stroke-width="1.8" width="18" x="3" y="3"></rect><path d="M9 3v18" stroke-width="1.8"></path><path d="M14 9l-3 3 3 3" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg></button>
+<!-- Collapse Sidebar Icon -->
+
+</div>
+<!-- Segmented Tab Header Showing Current Consolidated Mode -->
+<div class="grid grid-cols-2 p-0.5 bg-[#0f1422] border border-app-border/80 rounded-md text-xs"><button class="py-1 px-2 text-center font-medium rounded-md bg-[#182033] text-indigo-300 shadow-sm transition-custom flex items-center justify-center gap-1.5 text-xs" id="tab-nav-btn" onclick="switchSidebarView('M')"><span class="">Navigation</span></button><button class="py-1 px-2 text-center font-medium rounded-md text-app-textMuted hover:text-white transition-custom flex items-center justify-center gap-1.5 text-xs" id="tab-notes-btn" onclick="switchSidebarView('N')"><span class="">Notes</span><span class="text-[10px] text-app-textMuted font-mono">7</span></button></div>
+</div>
+<!-- VIEW MODE 'N' (Notes List Feed View) -->
+<div class="flex-1 flex flex-col overflow-hidden hidden" id="notes-view-panel">
+<!-- New Note & Sort Header -->
+<div class="px-3 pt-3 pb-2 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<h2 class="text-xs font-bold text-white uppercase tracking-wider">Notes</h2>
+<span class="text-[11px] text-app-textMuted">7</span>
+</div>
+<button class="px-3 py-1 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-md text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 transition-custom">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+<span class="">New Note</span>
+</button>
+</div>
+<!-- Notes Filter Bar -->
+<div class="flex items-center gap-1.5">
+<div class="relative flex-1">
+<input class="w-full bg-[#121624] text-[11px] text-app-textPrimary placeholder-app-textMuted rounded pl-6 pr-2 py-1 border border-app-border focus:border-indigo-500/50 outline-none" placeholder="Search notes in list..." type="text">
+<svg class="w-3 h-3 text-app-textMuted absolute left-2 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<button class="flex items-center gap-1 px-2 py-1 bg-[#121624] border border-app-border rounded text-[11px] text-app-textSecondary hover:text-white shrink-0">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="">Recent</span>
+<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- Scrollable List of Notes Cards -->
+<div class="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
+<!-- Note Card 1: Active Untitled Note -->
+<div class="p-2.5 rounded-lg bg-[#182033] border border-indigo-500/40 shadow-sm cursor-pointer group relative">
+<div class="flex items-start justify-between gap-1 mb-1">
+<h3 class="text-xs font-semibold text-white tracking-tight">Untitled Note</h3>
+<div class="flex items-center gap-1 opacity-90 group-hover:opacity-100">
+<button class="text-app-textMuted hover:text-indigo-300 p-0.5" title="Move">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="text-app-textMuted hover:text-amber-400 p-0.5" title="Star">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="text-app-textMuted hover:text-indigo-400 p-0.5" title="Split view">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="text-rose-400/70 hover:text-rose-400 p-0.5" title="Delete">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="text-indigo-300">Just now</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5"><span class="text-[9px]">📁</span> Uncategorized</span>
+</div>
+</div>
+<!-- Note Card 2: Chapter 1 -->
+<div class="p-2.5 rounded-lg bg-[#111624] hover:bg-[#151c2d] border border-app-border hover:border-app-borderLight transition-custom cursor-pointer group">
+<div class="flex items-start justify-between gap-1 mb-1">
+<h3 class="text-xs font-medium text-app-textPrimary tracking-tight truncate">Chapter 1: The Mornin...</h3>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-app-textMuted hover:text-white p-0.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button>
+<button class="text-app-textMuted hover:text-amber-400 p-0.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button>
+<button class="text-rose-400/70 hover:text-rose-400 p-0.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button>
+</div>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="">3d ago</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5 text-emerald-400/90"><span class="">📗</span> Daily Notes &amp; J</span>
+</div>
+</div>
+<!-- Note Card 3: Zero Knowledge -->
+<div class="p-2.5 rounded-lg bg-[#111624] hover:bg-[#151c2d] border border-app-border hover:border-app-borderLight transition-custom cursor-pointer group">
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex items-center gap-1 truncate">
+<span class="text-xs">🔒</span>
+<h3 class="text-xs font-medium text-app-textPrimary tracking-tight truncate">Zero-Knowledg...</h3>
+</div>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-amber-400 text-xs">★</span>
+<button class="text-rose-400/70 hover:text-rose-400 p-0.5"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button>
+</div>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="">3d ago</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5 text-amber-300"><span class="">🔒</span> Zero-Knowledge</span>
+</div>
+</div>
+<!-- Note Card 4: Daily Focus -->
+<div class="p-2.5 rounded-lg bg-[#111624] hover:bg-[#151c2d] border border-app-border hover:border-app-borderLight transition-custom cursor-pointer group">
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex items-center gap-1 truncate">
+<span class="text-xs">🗓️</span>
+<h3 class="text-xs font-medium text-app-textPrimary tracking-tight truncate">Daily Focus — 202...</h3>
+</div>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="">3d ago</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5 text-emerald-400/90"><span class="">📗</span> Daily Notes &amp; J</span>
+</div>
+</div>
+<!-- Note Card 5: Welcome to Not... -->
+<div class="p-2.5 rounded-lg bg-[#111624] hover:bg-[#151c2d] border border-app-border hover:border-app-borderLight transition-custom cursor-pointer group">
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex items-center gap-1 truncate">
+<span class="text-xs">📌</span>
+<h3 class="text-xs font-medium text-app-textPrimary tracking-tight truncate">👋 Welcome to Not...</h3>
+</div>
+<span class="text-amber-400 text-xs">★</span>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="">3d ago</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5 text-indigo-400"><span class="">🚀</span> Quick Start &amp; G</span>
+</div>
+</div>
+<!-- Note Card 6: Apple Sketchpad -->
+<div class="p-2.5 rounded-lg bg-[#111624] hover:bg-[#151c2d] border border-app-border hover:border-app-borderLight transition-custom cursor-pointer group">
+<div class="flex items-start justify-between gap-1 mb-1">
+<div class="flex items-center gap-1 truncate">
+<span class="text-xs">🎨</span>
+<h3 class="text-xs font-medium text-app-textPrimary tracking-tight truncate">Apple Sketchpad &amp;...</h3>
+</div>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="">3d ago</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5 text-pink-400"><span class="">🎨</span> Sketches &amp; Aud</span>
+</div>
+</div>
+<!-- Note Card 7: Chapter 2 -->
+<div class="p-2.5 rounded-lg bg-[#111624] hover:bg-[#151c2d] border border-app-border hover:border-app-borderLight transition-custom cursor-pointer group">
+<div class="flex items-start justify-between gap-1 mb-1">
+<h3 class="text-xs font-medium text-app-textPrimary tracking-tight truncate">Chapter 2: Amor Fati &amp;...</h3>
+</div>
+<div class="flex items-center gap-1.5 text-[10px] text-app-textMuted">
+<span class="">3d ago</span>
+<span class="">•</span>
+<span class="flex items-center gap-0.5 text-emerald-400/90"><span class="">📗</span> Daily Notes &amp; J</span>
+</div>
+</div>
+</div>
+</div>
+<!-- VIEW MODE 'M' (Directory & Tree Navigation View - Hidden by Default, Switchable via M Button) -->
+<div class="flex-1 flex flex-col overflow-y-auto px-2.5 py-2 space-y-4" id="tree-view-panel">
+<div>
+<div class="text-[10px] font-bold uppercase tracking-wider text-app-textMuted px-2 mb-1.5">Navigation</div>
+<nav class="space-y-0.5 text-xs">
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-indigo-600/20 text-indigo-300 font-medium" href="#">
+<div class="flex items-center gap-2">
+<svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="">All Notes</span>
+</div>
+<span class="text-[10px] bg-indigo-600 text-white font-mono px-1.5 py-0.5 rounded-full">7</span>
+</a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-app-surface text-app-textSecondary hover:text-white transition-custom" href="#">
+<div class="flex items-center gap-2">
+<span class="text-amber-400">⚡</span>
+<span class="">Quick Notes</span>
+</div>
+</a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-app-surface text-app-textSecondary hover:text-white transition-custom" href="#">
+<div class="flex items-center gap-2">
+<span class="text-amber-300">★</span>
+<span class="">Favorites</span>
+</div>
+<span class="text-[10px] text-app-textMuted font-mono">2</span>
+</a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-app-surface text-app-textSecondary hover:text-white transition-custom" href="#">
+<div class="flex items-center gap-2">
+<span class="">🕒</span>
+<span class="">Recent Notes</span>
+</div>
+</a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-app-surface text-app-textSecondary hover:text-white transition-custom" href="#">
+<div class="flex items-center gap-2">
+<span class="">📎</span>
+<span class="">With Files &amp; Media</span>
+</div>
+<span class="text-[10px] text-app-textMuted font-mono">0</span>
+</a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-app-surface text-app-textSecondary hover:text-white transition-custom" href="#">
+<div class="flex items-center gap-2">
+<span class="">🏷️</span>
+<span class="">Tag Directory</span>
+</div>
+<span class="text-[10px] text-app-textMuted font-mono">19</span>
+</a>
+<a class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-app-surface text-app-textSecondary hover:text-white transition-custom" href="#">
+<div class="flex items-center gap-2">
+<span class="text-indigo-400">📖</span>
+<span class="">Library &amp; Files</span>
+</div>
+<span class="text-[10px] text-indigo-400 font-mono bg-indigo-500/10 px-1 rounded">1b • 5f</span>
+</a>
+</nav>
+</div>
+<!-- Books Section -->
+<div class="relative py-1 my-1 flex items-center justify-center group"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-app-border/80 group-hover:border-indigo-500/40 transition-custom"></div></div><button type="button" onclick="const lower = document.querySelectorAll('#tree-view-panel &gt; div:nth-child(n+3)'); lower.forEach(el =&gt; el.classList.toggle('hidden')); this.querySelector('.collapse-icon').classList.toggle('rotate-180');" class="relative px-2.5 py-0.5 bg-[#121624] hover:bg-[#182033] border border-app-border hover:border-indigo-500/40 text-[10px] text-app-textMuted hover:text-indigo-300 rounded-full flex items-center gap-1.5 transition-custom shadow-sm cursor-pointer"><svg class="w-3 h-3 transition-custom collapse-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg><span class="font-medium">Collapse Section</span></button></div><div>
+<div class="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wider text-app-textMuted mb-1">
+<span class="flex items-center gap-1">▾ <span class="">📚</span> Books <span class="font-normal font-mono">0</span></span>
+<span class="cursor-pointer hover:text-white">⚙</span>
+</div>
+<button class="w-full text-left px-2.5 py-1.5 text-xs text-app-textMuted hover:text-indigo-300 hover:bg-app-surface rounded flex items-center gap-1.5 transition-custom">
+<span class="">+ Browse &amp; Pin Books (1)</span>
+</button>
+</div>
+<!-- Folders Section -->
+<div>
+<div class="flex items-center justify-between px-2 text-[10px] font-bold uppercase tracking-wider text-app-textMuted mb-1">
+<span class="flex items-center gap-1">▾ <span class="">📁</span> Folders <span class="font-normal font-mono">3</span></span>
+<span class="cursor-pointer hover:text-white">⚙</span>
+</div>
+<div class="space-y-0.5 text-xs">
+<div class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-app-surface rounded cursor-pointer text-app-textSecondary hover:text-white">
+<span class="text-xs">📁</span>
+<span class="truncate">🚀 Quick Start &amp; G...</span>
+</div>
+<div class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-app-surface rounded cursor-pointer text-app-textSecondary hover:text-white">
+<span class="text-xs">📁</span>
+<span class="truncate">🗓️ Daily Notes &amp; J...</span>
+</div>
+<div class="flex items-center gap-2 px-2.5 py-1.5 hover:bg-app-surface rounded cursor-pointer text-app-textSecondary hover:text-white">
+<span class="text-xs">📁</span>
+<span class="truncate">🎨 Sketches &amp; Aud...</span>
+</div>
+<button class="w-full text-left px-2.5 py-1.5 text-xs text-app-textMuted hover:text-indigo-300 hover:bg-app-surface rounded flex items-center gap-1.5 transition-custom">
+<span class="">+ Browse &amp; Pin Folders (5)</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Unified Sidebar Footer Actions & Status -->
+<div class="p-2 border-t border-app-border bg-[#0a0d14] space-y-2 shrink-0">
+<!-- Archive and Bin buttons -->
+<div class="grid grid-cols-2 gap-1.5"><button class="py-1 px-2 text-center font-medium rounded-md bg-[#182033] text-indigo-300 shadow-sm transition-custom flex items-center justify-center gap-1.5 text-xs" id="tab-nav-btn" onclick="switchSidebarView('M')"><span class="">Navigation</span></button><button class="py-1 px-2 text-center font-medium rounded-md text-app-textMuted hover:text-white transition-custom flex items-center justify-center gap-1.5 text-xs" id="tab-notes-btn" onclick="switchSidebarView('N')"><span class="">Notes</span><span class="text-[10px] text-app-textMuted font-mono">7</span></button></div>
+<!-- Unsynced Offline Alert Status (from Screen 2) -->
+
+<!-- Theme Switcher & Options -->
+<div class="flex items-center justify-between pt-0.5 text-[11px] text-app-textMuted">
+<div class="flex items-center gap-2">
+<span class="hover:text-white cursor-pointer flex items-center gap-1">☀️ Day</span>
+<span class="hover:text-white cursor-pointer flex items-center gap-1">🌙 Night</span>
+<span class="text-indigo-400 font-semibold cursor-pointer flex items-center gap-1">🖥️ Auto</span>
+</div>
+<button class="hover:text-white flex items-center gap-0.5">
+<span class="">✨ More</span>
+<svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+</aside>
+<!-- END: ConsolidatedSidebar -->
+<!-- BEGIN: ReclaimedEditorWorkspace -->
+<main class="flex-1 flex flex-col bg-app-editor overflow-hidden" data-purpose="reclaimed-note-editor">
+<!-- Ribbon Bar 1: Document Path, Tags & Primary Document Actions -->
+<div class="h-10 border-b border-app-border/60 bg-app-editor flex items-center justify-between px-6 shrink-0 text-xs"><div class="flex items-center gap-2 text-app-textMuted text-[11px]"><span class="flex items-center gap-1 hover:text-app-textSecondary cursor-pointer"><span class="">🌿</span> Personal Vault</span><span class="">/</span><span class="text-app-textSecondary font-medium">Untitled Note</span><span class="ml-2 text-emerald-400/90 text-[10px] font-medium flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Saved</span></div><div class="flex items-center gap-1 text-app-textMuted"><button class="p-1.5 hover:text-white hover:bg-app-surface rounded transition-custom" title="Split View"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button><button class="p-1.5 hover:text-white hover:bg-app-surface rounded transition-custom" title="Find"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button><button class="p-1.5 hover:text-white hover:bg-app-surface rounded transition-custom" title="Zen Mode"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></button><div class="h-3.5 w-px bg-app-border mx-1"></div><button class="flex items-center gap-1 px-2 py-1 text-xs text-app-textSecondary hover:text-white hover:bg-app-surface rounded transition-custom"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg><span class="">Share</span></button></div></div>
+<!-- Ribbon Bar 2: Editor Secondary Controls & Stats -->
+
+<!-- Main Canvas Scrollable Area (Expansive Width Reclaimed!) -->
+<div class="flex-1 overflow-y-auto px-12 py-10">
+<div class="max-w-4xl mx-auto space-y-8">
+<!-- Consolidated Sidebar View Banner / Hint (from Screen 2) -->
+
+<!-- Note Title & Tags Section -->
+<div class="space-y-3">
+<div class="flex items-center gap-3 text-xs text-app-textMuted">
+<span class="flex items-center gap-1">🕒 Last edited just now</span>
+<span class="">•</span>
+<span class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-mono text-[11px] border border-indigo-500/20">#draft</span>
+</div>
+<!-- Main Heading (Editable look) -->
+<h1 class="text-4xl font-extrabold text-white tracking-tight focus:outline-none cursor-text">
+              Untitled Note
+            </h1>
+<!-- Tag Adder Button -->
+<div class="flex items-center gap-2 pt-1">
+<button class="px-2.5 py-1 text-xs text-app-textSecondary hover:text-white bg-[#141926] hover:bg-[#1a2133] border border-app-border rounded-full flex items-center gap-1 transition-custom">
+<span class="text-indigo-400 font-bold">+</span>
+<span class="">Add tag...</span>
+</button>
+</div>
+</div>
+<!-- Note Body Text Section -->
+<div class="text-base text-app-textPrimary leading-relaxed focus:outline-none min-h-[140px] space-y-4">
+<p class="text-lg text-slate-100 font-normal">
+              This is going to be crazy bro
+            </p>
+<p class="text-app-textSecondary text-sm italic">
+              Start typing notes, markdown, to-do checklists, or paste media assets here...
+            </p>
+<!-- Quick Scratchpad To-Do (as shown in Screen 2) -->
+<div class="pt-4 mt-6 border-t border-app-border/40 space-y-2"><div class="text-[11px] font-medium tracking-wide uppercase text-app-textMuted">Scratchpad</div><div class="space-y-1 text-xs"><label class="flex items-center gap-2 text-app-textMuted line-through cursor-pointer"><input checked="" class="rounded bg-[#121624] border-app-border text-indigo-600 focus:ring-0 w-3.5 h-3.5" type="checkbox"><span class="opacity-75">Review encryption key hierarchy for Personal Vault</span></label><label class="flex items-center gap-2 text-app-textSecondary hover:text-white cursor-pointer"><input class="rounded bg-[#121624] border-app-border text-indigo-600 focus:ring-0 w-3.5 h-3.5" type="checkbox"><span class="">Consolidate Notes feed with sidebar switcher dot</span></label><label class="flex items-center gap-2 text-app-textSecondary hover:text-white cursor-pointer"><input class="rounded bg-[#121624] border-app-border text-indigo-600 focus:ring-0 w-3.5 h-3.5" type="checkbox"><span class="">Synchronize 30 offline pending changes once back online</span></label></div></div>
+</div>
+<!-- Attachments & Media Dropzone Container (from Image 1) -->
+<div class="pt-6 border-t border-app-border/40 space-y-3"><div class="flex items-center justify-between text-xs text-app-textMuted"><span class="font-medium">Attachments (0)</span><button class="hover:text-app-textPrimary flex items-center gap-1 text-[11px] transition-custom"><svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg><span class="">Add file</span></button></div><div class="border border-dashed border-app-border/80 hover:border-indigo-500/40 bg-[#0c1017] rounded-lg p-5 text-center transition-custom cursor-pointer flex flex-col items-center justify-center gap-1.5"><svg class="w-4 h-4 text-app-textMuted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg><p class="text-xs text-app-textSecondary">Drop files here or <span class="text-indigo-400 hover:underline">browse</span></p></div></div>
+</div>
+</div>
+<!-- Bottom Status Bar -->
+<footer class="h-8 border-t border-app-border bg-[#090c12] px-4 flex items-center justify-between text-[11px] text-app-textMuted shrink-0">
+<!-- Left Stats -->
+<div class="flex items-center gap-3">
+<span class="text-emerald-400/90 font-medium">Autosaved</span>
+<span class="">•</span>
+<span class=""><b class="text-app-textSecondary">7</b> words</span>
+<span class=""><b class="text-app-textSecondary">29</b> chars</span>
+<span class=""><b class="text-app-textSecondary">1</b> sent</span>
+<span class=""><b class="text-app-textSecondary">1</b> para</span>
+<span class="">~1m read</span>
+</div>
+<!-- Right Mode Indicators -->
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1 text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live</span>
+<span class="">•</span>
+<span class="cursor-pointer hover:text-white">Split</span>
+<span class="">•</span>
+<span class="px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-300 font-mono text-[10px] border border-indigo-500/30 flex items-center gap-1">
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+<span class="">Markdown</span>
+</span>
+</div>
+</footer>
+</main>
+<!-- END: ReclaimedEditorWorkspace -->
+</div>
+<!-- END: MainContentWrapper -->
+<!-- BEGIN: InteractiveScripts -->
+<script data-purpose="sidebar-view-toggle">
+    // Interactive handler for switching between Menu/Directory (M) and Notes List (N) in consolidated sidebar
+    function switchSidebarView(mode) {
+      const notesPanel = document.getElementById('notes-view-panel');
+      const treePanel = document.getElementById('tree-view-panel');
+      const toggleM = document.getElementById('toggle-m-btn');
+      const toggleN = document.getElementById('toggle-n-btn');
+      const tabNav = document.getElementById('tab-nav-btn');
+      const tabNotes = document.getElementById('tab-notes-btn');
+
+      if (mode === 'M') {
+        // Show Tree Navigation
+        notesPanel.classList.add('hidden');
+        treePanel.classList.remove('hidden');
+
+        // Update M toggle styling
+        toggleM.className = "px-2.5 py-1 text-[11px] font-bold rounded-md bg-indigo-600 text-white shadow-sm active-toggle-glow transition-custom";
+        toggleN.className = "px-2.5 py-1 text-[11px] font-bold rounded-md transition-custom text-app-textSecondary hover:text-white";
+
+        // Update segmented tab styling
+        tabNav.className = "py-1 px-2 text-center font-semibold rounded bg-[#1b2338] text-indigo-300 shadow-sm transition-custom flex items-center justify-center gap-1.5";
+        tabNotes.className = "py-1 px-2 text-center font-medium rounded text-app-textMuted hover:text-white transition-custom flex items-center justify-center gap-1.5";
+      } else {
+        // Show Notes Feed
+        treePanel.classList.add('hidden');
+        notesPanel.classList.remove('hidden');
+
+        // Update N toggle styling
+        toggleN.className = "px-2.5 py-1 text-[11px] font-bold rounded-md bg-indigo-600 text-white shadow-sm active-toggle-glow transition-custom";
+        toggleM.className = "px-2.5 py-1 text-[11px] font-bold rounded-md transition-custom text-app-textSecondary hover:text-white";
+
+        // Update segmented tab styling
+        tabNotes.className = "py-1 px-2 text-center font-semibold rounded bg-[#1b2338] text-indigo-300 shadow-sm transition-custom flex items-center justify-center gap-1.5";
+        tabNav.className = "py-1 px-2 text-center font-medium rounded text-app-textMuted hover:text-white transition-custom flex items-center justify-center gap-1.5";
+      }
+    }
+  </script>
+<!-- END: InteractiveScripts -->
+
+
+
+
+</body></html>

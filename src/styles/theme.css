@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    MiLearn Design System - Day & Night Themes
    Apple-inspired, clean, accessible, modern typography & tokens
    ========================================================================== */
@@ -74,35 +74,36 @@
    Night Theme (Dark Mode)
    ========================================================================== */
 [data-theme="dark"] {
-  --bg-app: #0e0f13;
-  --bg-sidebar: #13151b;
-  --bg-column: #161820;
-  --bg-editor: #161820;
-  --bg-card: #1b1d26;
-  --bg-card-hover: #222530;
-  --bg-card-active: #2a2e3d;
-  --bg-card-selected: #252a3d;
+  --bg-app: #090b10;
+  --bg-sidebar: #0d111a;
+  --bg-column: #0d111a;
+  --bg-editor: #0b0e14;
+  --bg-card: #111624;
+  --bg-card-hover: #151c2d;
+  --bg-card-active: #182033;
+  --bg-card-selected: #182033;
   
-  --bg-subtle: #1f222b;
-  --bg-surface: #181a22;
-  --bg-surface-elevated: #1f222c;
-  --bg-modal: #1a1c24;
-  --bg-overlay: rgba(0, 0, 0, 0.72);
+  --bg-subtle: #121622;
+  --bg-surface: #131824;
+  --bg-surface-elevated: #182033;
+  --bg-modal: #131824;
+  --bg-overlay: rgba(0, 0, 0, 0.78);
   
-  --border-color: #262936;
-  --border-subtle: #1e202a;
-  --border-active: #3f4561;
+  --border-color: #1c2233;
+  --border-subtle: #1c2233;
+  --border-light: #262f47;
+  --border-active: #6366f1;
   --border-focus: #818cf8;
 
-  --text-primary: #f3f4f6;
-  --text-secondary: #a1a9b8;
-  --text-muted: #626a79;
-  --text-inverse: #0f1015;
+  --text-primary: #e2e8f0;
+  --text-secondary: #8e9bb5;
+  --text-muted: #586580;
+  --text-inverse: #090b10;
 
   --accent-primary: #6366f1;
   --accent-primary-hover: #4f46e5;
-  --accent-light: #262b45;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --accent-light: #1e2438;
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   
   --color-success: #34d399;
   --color-success-bg: #064e3b;
@@ -121,7 +122,8 @@
   --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 24px 48px rgba(0, 0, 0, 0.75), 0 8px 20px rgba(0, 0, 0, 0.5);
 
-  --scrollbar-thumb: #373b49;
+  --scrollbar-thumb: #1e2638;
+  --scrollbar-thumb-hover: #2f3b57;
   --scrollbar-track: transparent;
 }
 

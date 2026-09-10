@@ -22,6 +22,7 @@ import {
   Plus,
   Sun,
   Moon,
+  Monitor,
   Sparkles,
   Columns2,
   RotateCcw,
@@ -535,59 +536,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className={`app-sidebar ${isOpenMobile ? 'mobile-open' : ''}`}>
       {/* Top Workspace Selector & M / N View Segmented Switcher */}
-      <div className="sidebar-mode-switcher-container">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+      <div className="sidebar-top-bar-row">
+        {/* Unified Capsule: Workspace Dropdown + Menu/Notes Switcher */}
+        <div className="sidebar-unified-capsule">
           {/* Workspace Switcher */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <WorkspaceSwitcher
-              workspaces={workspaces}
-              activeWorkspaceId={activeWorkspaceId}
-              notesCountByWorkspace={notesCountByWorkspace}
-              onSelectWorkspace={onSelectWorkspace}
-              onCreateWorkspace={onCreateWorkspace}
-              onRenameWorkspace={onRenameWorkspace}
-              onDeleteWorkspace={onDeleteWorkspace}
-            />
-          </div>
+          <WorkspaceSwitcher
+            compact
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            notesCountByWorkspace={notesCountByWorkspace}
+            onSelectWorkspace={onSelectWorkspace}
+            onCreateWorkspace={onCreateWorkspace}
+            onRenameWorkspace={onRenameWorkspace}
+            onDeleteWorkspace={onDeleteWorkspace}
+          />
 
-          {/* Collapse Sidebar Button */}
-          {onToggleCollapse && (
+          {/* Segmented Mode Switcher: Menu (M) vs Notes (N) */}
+          <div className="sidebar-mode-segmented-track">
             <button
               type="button"
-              className="sidebar-collapse-btn"
-              onClick={onToggleCollapse}
-              title="Collapse Sidebar"
+              id="tab-nav-btn"
+              className={`sidebar-mode-segmented-btn ${viewMode === 'M' ? 'active' : ''}`}
+              onClick={() => handleSetViewMode('M')}
+              title="Menu & Directory Tree View (Press M)"
             >
-              <PanelLeftClose size={15} />
+              <Menu size={12} />
+              <span>Menu (M)</span>
             </button>
-          )}
+
+            <button
+              type="button"
+              id="tab-notes-btn"
+              className={`sidebar-mode-segmented-btn ${viewMode === 'N' ? 'active' : ''}`}
+              onClick={() => handleSetViewMode('N')}
+              title="Notes Feed List (Press N)"
+            >
+              <FileText size={12} />
+              <span>Notes (N)</span>
+              <span className="sidebar-segmented-count">{activeNotes.length}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Segmented Mode Switcher: Menu (M) vs Notes (N) */}
-        <div className="sidebar-mode-pill-grid">
+        {/* Collapse Sidebar Button */}
+        {onToggleCollapse && (
           <button
             type="button"
-            id="tab-nav-btn"
-            className={`sidebar-mode-pill-btn ${viewMode === 'M' ? 'active' : ''}`}
-            onClick={() => handleSetViewMode('M')}
-            title="Menu & Directory Tree View (Press M)"
+            className="sidebar-collapse-btn"
+            onClick={onToggleCollapse}
+            title="Collapse Sidebar"
           >
-            <Menu size={13} />
-            <span>Menu (M)</span>
+            <PanelLeftClose size={15} />
           </button>
-
-          <button
-            type="button"
-            id="tab-notes-btn"
-            className={`sidebar-mode-pill-btn ${viewMode === 'N' ? 'active' : ''}`}
-            onClick={() => handleSetViewMode('N')}
-            title="Notes Feed List (Press N)"
-          >
-            <FileText size={13} />
-            <span>Notes (N)</span>
-            <span className="sidebar-mode-pill-badge">{activeNotes.length}</span>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* =========================================================================
@@ -1249,13 +1250,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* =========================================================================
           Unified Sidebar Footer: Archive/Trash, Theme Switcher & More Menu
           ========================================================================= */}
-      <div className="sidebar-footer-container" style={{ padding: '8px 10px', borderTop: '1px solid var(--border-color)', background: '#0a0d14', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+      <div className="sidebar-footer-container">
         {/* Archive & Bin Quick Buttons */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+        <div className="sidebar-footer-row">
           <button
             type="button"
-            className={`nav-item ${currentFilter === 'archive' ? 'active' : ''}`}
-            style={{ padding: '4px 8px', fontSize: '11px', justifyContent: 'space-between', borderRadius: '5px' }}
+            className={`sidebar-bottom-pill ${currentFilter === 'archive' ? 'active' : ''}`}
             onClick={() => {
               onSelectFilter('archive');
               handleSetViewMode('N');
@@ -1263,17 +1263,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }}
             title="Archived Notes"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Archive size={12} color="#8b5cf6" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Archive size={13} style={{ color: currentFilter === 'archive' ? 'var(--accent-primary)' : 'var(--accent-secondary, #8b5cf6)' }} />
               <span>Archive</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{archivedNotesCount}</span>
+            <span className="sidebar-bottom-badge">{archivedNotesCount}</span>
           </button>
 
           <button
             type="button"
-            className={`nav-item ${currentFilter === 'trash' ? 'active' : ''}`}
-            style={{ padding: '4px 8px', fontSize: '11px', justifyContent: 'space-between', borderRadius: '5px' }}
+            className={`sidebar-bottom-pill ${currentFilter === 'trash' ? 'active' : ''}`}
             onClick={() => {
               onSelectFilter('trash');
               handleSetViewMode('N');
@@ -1281,52 +1280,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
             }}
             title="Trash Bin"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Trash2 size={12} color="#f87171" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Trash2 size={13} style={{ color: currentFilter === 'trash' ? 'var(--accent-primary)' : '#f87171' }} />
               <span>Bin</span>
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{trashedNotesCount}</span>
+            <span className="sidebar-bottom-badge">{trashedNotesCount}</span>
           </button>
         </div>
 
         {/* Theme Switcher & More Options */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '2px', fontSize: '11px', color: 'var(--text-muted)' }}>
-          {/* Theme Quick Options */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span
-              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', color: theme === 'light' ? '#6366f1' : 'inherit' }}
+        <div className="sidebar-footer-controls">
+          {/* Segmented Theme Switcher */}
+          <div className="sidebar-theme-segmented" role="radiogroup" aria-label="Theme selection">
+            <button
+              type="button"
+              className={`sidebar-theme-chip ${theme === 'light' ? 'active' : ''}`}
               onClick={() => onChangeTheme && onChangeTheme('light')}
               title="Light Day Theme"
+              aria-label="Light Day Theme"
             >
-              ☀️ Day
-            </span>
-            <span
-              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', color: theme === 'dark' ? '#6366f1' : 'inherit' }}
+              <Sun size={12} />
+              <span>Day</span>
+            </button>
+            <button
+              type="button"
+              className={`sidebar-theme-chip ${theme === 'dark' ? 'active' : ''}`}
               onClick={() => onChangeTheme && onChangeTheme('dark')}
               title="Dark Night Theme"
+              aria-label="Dark Night Theme"
             >
-              🌙 Night
-            </span>
-            <span
-              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', color: theme === 'system' ? '#6366f1' : 'inherit' }}
+              <Moon size={12} />
+              <span>Night</span>
+            </button>
+            <button
+              type="button"
+              className={`sidebar-theme-chip ${theme === 'system' ? 'active' : ''}`}
               onClick={() => onChangeTheme && onChangeTheme('system')}
               title="Auto System Theme"
+              aria-label="Auto System Theme"
             >
-              🖥️ Auto
-            </span>
+              <Monitor size={12} />
+              <span>Auto</span>
+            </button>
           </div>
 
           {/* More Options Dropdown */}
           <div style={{ position: 'relative' }}>
             <button
               type="button"
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', padding: '2px 4px' }}
+              className="sidebar-more-trigger-btn"
               onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
               title="More Vault Options"
+              aria-expanded={isMoreMenuOpen}
             >
-              <Sparkles size={11} color="#818cf8" />
+              <Sparkles size={12} style={{ color: 'var(--accent-primary, #818cf8)' }} />
               <span>More</span>
-              <ChevronDown size={10} />
+              <ChevronDown size={11} />
             </button>
 
             {isMoreMenuOpen && (
@@ -1335,26 +1344,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   style={{ position: 'fixed', inset: 0, zIndex: 40 }}
                   onClick={() => setIsMoreMenuOpen(false)}
                 />
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    bottom: '100%',
-                    marginBottom: '6px',
-                    background: '#131824',
-                    border: '1px solid #1c2233',
-                    borderRadius: '7px',
-                    padding: '4px',
-                    zIndex: 50,
-                    minWidth: '150px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
-                  }}
-                >
+                <div className="sidebar-more-dropdown">
                   {onOpenSettings && (
                     <button
                       type="button"
-                      className="sidebar-theme-option-item"
-                      style={{ width: '100%', padding: '6px 8px' }}
+                      className="sidebar-more-dropdown-item"
                       onClick={() => {
                         onOpenSettings('database');
                         setIsMoreMenuOpen(false);
@@ -1367,8 +1361,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   <button
                     type="button"
-                    className="sidebar-theme-option-item"
-                    style={{ width: '100%', padding: '6px 8px' }}
+                    className="sidebar-more-dropdown-item"
                     onClick={() => {
                       window.dispatchEvent(new CustomEvent('milearn:open-tour'));
                       setIsMoreMenuOpen(false);
@@ -1400,8 +1393,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div
             style={{
-              background: '#131824',
-              border: '1px solid #1c2233',
+              background: 'var(--bg-modal)',
+              border: '1px solid var(--border-color)',
               borderRadius: '10px',
               padding: '16px',
               width: '320px',
@@ -1411,7 +1404,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: '#ffffff' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                 Move Note to Folder
               </h3>
               <button

@@ -50,87 +50,87 @@ export interface PassageItem {
 }
 
 export const MONKEY_TYPE_PRESETS: PassageItem[] = [
-  // EASY: Top common smooth English words
+  // EASY: Smooth, encouraging natural English
   {
     id: 'easy-words-1',
-    title: 'Easy: Common Words (15)',
+    title: 'Easy: The Forest Trail',
     category: 'Wisdom',
     difficulty: 'beginner',
-    text: 'the quick brown fox jumps over the lazy dog and runs into the warm sun'
+    text: 'The quick brown fox jumps over the lazy dog and runs freely into the warm morning sun. Songbirds chirp high among the tall evergreen branches, while a gentle stream winds smoothly through the quiet meadow toward the distant hills.'
   },
   {
     id: 'easy-words-2',
-    title: 'Easy: Smooth Cadence (25)',
+    title: 'Easy: Daily Cadence & Flow',
     category: 'Wisdom',
     difficulty: 'beginner',
-    text: 'time will come when you need to know how to write fast and clean every day with good flow'
+    text: 'Every morning brings a new opportunity to build your speed and find your calm rhythm. Keep your fingers resting lightly upon the keys, take deep steady breaths, and let each sentence flow naturally without rushing or tension.'
   },
   {
     id: 'easy-words-3',
-    title: 'Easy: Daily Vocabulary (30)',
+    title: 'Easy: Clear Mind & Joy',
     category: 'Wisdom',
     difficulty: 'beginner',
-    text: 'they say that practice makes perfect so take small steps each morning to build your speed and calm your mind without any fear'
+    text: 'Small daily habits create remarkable long term progress when you stay consistent. Focus on smooth keystrokes rather than brute speed, and you will discover that accuracy and confidence naturally follow with every paragraph you type.'
   },
   {
     id: 'easy-words-4',
-    title: 'Easy: Clear Focus (20)',
+    title: 'Easy: Ocean Breeze',
     category: 'Wisdom',
     difficulty: 'beginner',
-    text: 'keep your fingers relaxed on the home row and let each key press feel light and smooth'
+    text: 'Gentle waves wash against the golden shore as the evening breeze cools the air. Walking quietly beside the tide allows the mind to unwind, setting aside busy thoughts to make space for fresh ideas and peaceful reflections.'
   },
 
   // NORMAL: Everyday knowledge & natural punctuation
   {
     id: 'norm-words-1',
-    title: 'Normal: Local-First Autonomy (25)',
+    title: 'Normal: Local-First Autonomy',
     category: 'Tech',
     difficulty: 'intermediate',
-    text: 'Local-first architecture ensures that your data stays on your own machine, enabling offline access, immediate feedback, and complete privacy at all times.'
+    text: 'Local-first architecture ensures that your data stays on your own device, enabling instant offline access, zero network latency, and complete user sovereignty without reliance on remote centralized servers.'
   },
   {
     id: 'norm-words-2',
-    title: 'Normal: Cognitive Clarity (28)',
+    title: 'Normal: Cognitive Clarity',
     category: 'Science',
     difficulty: 'intermediate',
-    text: 'Writing down your thoughts into a structured second brain reduces mental clutter, allowing deep focus on solving hard problems with confidence and joy.'
+    text: 'Writing down your thoughts into a structured second brain reduces mental clutter, allowing deep sustained focus on solving hard problems with creativity, composure, and genuine intellectual satisfaction.'
   },
   {
     id: 'norm-words-3',
-    title: 'Normal: Spaced Learning (25)',
+    title: 'Normal: Spaced Repetition Mastery',
     category: 'Wisdom',
     difficulty: 'intermediate',
-    text: 'Reviewing difficult concepts right before you forget them strengthens neural pathways, transforming fleeting ideas into permanent understanding over time.'
+    text: 'Reviewing difficult concepts right before the brain forgets them strengthens neural synapses, gradually converting transient thoughts into permanent, durable understanding across months and years of practice.'
   },
   {
     id: 'norm-words-4',
-    title: 'Normal: Modern Web (24)',
+    title: 'Normal: The Craft of Software',
     category: 'Tech',
     difficulty: 'intermediate',
-    text: 'Modern web applications combine responsive typography, rich aesthetics, and instant local state to deliver an experience indistinguishable from native apps.'
+    text: 'Modern web applications combine responsive typography, rich aesthetic styling, and instant local state to deliver an experience that feels as fluid, tactile, and dependable as well-crafted physical tools.'
   },
 
   // HARD: Complex technical vocabulary, punctuation & numbers
   {
     id: 'hard-words-1',
-    title: 'Hard: Distributed Consensus (35)',
+    title: 'Hard: Distributed Consensus',
     category: 'Tech',
     difficulty: 'expert',
-    text: 'Byzantine fault-tolerant protocols, such as PBFT & Raft, maintain state synchronization across n >= 3f + 1 nodes; ensuring quorum commit safety despite asynchronous network partitions and arbitrary message loss.'
+    text: 'Byzantine fault-tolerant protocols, such as PBFT and Raft, maintain distributed state synchronization across n >= 3f + 1 nodes, ensuring quorum commit safety and atomic transitions despite asynchronous network partitions and intermittent packet loss.'
   },
   {
     id: 'hard-words-2',
-    title: 'Hard: Quantum & Cryptography (30)',
+    title: 'Hard: Quantum & Zero-Knowledge',
     category: 'Science',
     difficulty: 'expert',
-    text: 'Zero-knowledge proofs (zk-SNARKs) verify quadratic arithmetic programs with succinct O(1) proofs, preserving cryptographic privacy while validating computational integrity across decentralized ledgers with 256-bit security.'
+    text: 'Zero-knowledge proofs (zk-SNARKs) verify quadratic arithmetic programs with succinct O(1) argument sizes, preserving cryptographic privacy while rigorously proving computational integrity across decentralized ledgers with 256-bit elliptic curves.'
   },
   {
     id: 'hard-words-3',
-    title: 'Hard: Matrix Calculus (30)',
+    title: 'Hard: Matrix Calculus & Physics',
     category: 'Science',
     difficulty: 'expert',
-    text: 'Eigenvalue decomposition of Hermitian operators yields orthogonal eigenvectors: lambda_i * v_i = H * v_i, governing continuous-time Schrödinger evolution in complex Hilbert space H_n with norm ||psi|| = 1.'
+    text: 'Eigenvalue decomposition of Hermitian operators yields orthogonal eigenvectors lambda_i * v_i = H * v_i, governing continuous-time unitary evolution in complex Hilbert space where total probability amplitude satisfies ||psi|| = 1.0.'
   },
 
   // CODE: Real code snippets with symbols
@@ -139,21 +139,21 @@ export const MONKEY_TYPE_PRESETS: PassageItem[] = [
     title: 'Code: TypeScript Function',
     category: 'Code',
     difficulty: 'code',
-    text: 'const calculateWpm = (chars: number, minutes: number): number => Math.round((chars / 5) / minutes);'
+    text: 'const calculateWpm = (chars: number, elapsedMinutes: number): number => Math.max(0, Math.round((chars / 5) / (elapsedMinutes || 1)));'
   },
   {
     id: 'code-snippet-2',
     title: 'Code: React Hook Pipeline',
     category: 'Code',
     difficulty: 'code',
-    text: 'const [state, setState] = useState(() => initialData.filter(item => item.isActive && item.score > 0));'
+    text: 'const [items, setItems] = useState<Note[]>(() => initialData.filter((item) => item.status === "active" && item.score >= 80));'
   },
   {
     id: 'code-snippet-3',
     title: 'Code: SQL Query & Index',
     category: 'Code',
     difficulty: 'code',
-    text: 'SELECT id, title, created_at FROM notes WHERE is_archived = false ORDER BY updated_at DESC LIMIT 50;'
+    text: 'SELECT id, title, updated_at FROM notes WHERE is_archived = false AND word_count > 100 ORDER BY updated_at DESC LIMIT 25;'
   }
 ];
 
@@ -175,12 +175,14 @@ class TypingMetricsService {
   private ambientBurstStartTime: number = 0;
   private ambientResetTimeout: ReturnType<typeof setTimeout> | null = null;
   private ambientLastKeyTime: number = 0;
+  private lastCompletedSession: PracticeGameSession | null = null;
 
   public isSessionActive(): boolean {
     return this.isListening;
   }
 
   public startSession(passageTitle = 'Practice Sprint', expectedText = '') {
+    this.lastCompletedSession = null;
     this.currentKeystrokes = [];
     this.activeKeyDowns.clear();
     this.sessionStartTime = performance.now();
@@ -447,10 +449,11 @@ class TypingMetricsService {
       this.savePracticeSession(gameSession);
     }
 
+    this.lastCompletedSession = gameSession;
     this.currentKeystrokes = [];
     this.activeKeyDowns.clear();
     this.isListening = false;
-    this.notifySubscribers();
+    this.notifySubscribers(gameSession);
     return gameSession;
   }
 
@@ -535,14 +538,18 @@ class TypingMetricsService {
     return [...dynamicVaultPassages, ...basePassages];
   }
 
+  public getLastCompletedSession(): PracticeGameSession | null {
+    return this.lastCompletedSession;
+  }
+
   public subscribe(callback: (stats: TypingSessionStats) => void) {
     this.listeners.add(callback);
     return () => this.listeners.delete(callback);
   }
 
-  private notifySubscribers() {
+  private notifySubscribers(customStats?: TypingSessionStats) {
     if (this.listeners.size === 0) return;
-    const stats = this.calculateStats();
+    const stats = customStats || this.calculateStats();
     this.listeners.forEach((cb) => cb(stats));
   }
 }

@@ -3310,7 +3310,7 @@ kbd {
   position: relative;
   flex-shrink: 0;
   overflow: visible;
-  z-index: 50;
+  z-index: 20;
 }
 
 .note-tabs-scroll {

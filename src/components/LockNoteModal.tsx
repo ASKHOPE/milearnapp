@@ -154,7 +154,7 @@ export const LockNoteModal: React.FC<LockNoteModalProps> = ({
           ? 'Enter your passphrase to decrypt this note into memory.'
           : 'Zero-Knowledge AES-256-GCM encryption with anti-tamper authentication.'
       }
-      icon={isUnlockMode ? <Lock size={20} color="var(--color-warning)" /> : <KeyRound size={20} color="var(--color-primary)" />}
+      icon={isUnlockMode ? <Lock size={20} color="var(--color-warning)" /> : <KeyRound size={20} color="var(--accent-primary, #6366f1)" />}
       maxWidth={520}
     >
       <form onSubmit={isUnlockMode ? handleUnlock : handleLock} className="crypto-form">

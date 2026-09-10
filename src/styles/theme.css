@@ -3,7 +3,8 @@
    Apple-inspired, clean, accessible, modern typography & tokens
    ========================================================================== */
 
-:root {
+:root,
+[data-theme="light"] {
   /* Day Theme (Default Light Mode) */
   --bg-app: #f6f7fb;
   --bg-sidebar: #ffffff;
@@ -19,9 +20,11 @@
   --bg-surface-elevated: #ffffff;
   --bg-modal: #ffffff;
   --bg-overlay: rgba(15, 23, 42, 0.45);
+  --bg-input: #ffffff;
   
   --border-color: #e5e8ef;
   --border-subtle: #edf0f5;
+  --border-light: #e2e8f0;
   --border-active: #c7d2fe;
   --border-focus: #6366f1;
 
@@ -34,6 +37,9 @@
   --accent-primary-hover: #4338ca;
   --accent-light: #eef2ff;
   --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  
+  --color-primary: var(--accent-primary);
+  --color-primary-hover: var(--accent-primary-hover);
   
   --color-success: #10b981;
   --color-success-bg: #ecfdf5;
@@ -88,6 +94,7 @@
   --bg-surface-elevated: #182033;
   --bg-modal: #131824;
   --bg-overlay: rgba(0, 0, 0, 0.78);
+  --bg-input: #0f131d;
   
   --border-color: #1c2233;
   --border-subtle: #1c2233;
@@ -145,9 +152,11 @@
   --bg-surface-elevated: #0f1118;
   --bg-modal: #07080b;
   --bg-overlay: rgba(0, 0, 0, 0.9);
+  --bg-input: #0a0a0d;
   
   --border-color: #1a1d26;
   --border-subtle: #12141c;
+  --border-light: #232733;
   --border-active: #8b5cf6;
   --border-focus: #a855f7;
 
@@ -200,9 +209,11 @@
   --bg-surface-elevated: #181d33;
   --bg-modal: #111426;
   --bg-overlay: rgba(5, 7, 15, 0.82);
+  --bg-input: #121626;
   
   --border-color: #212642;
   --border-subtle: #181d33;
+  --border-light: #2c3359;
   --border-active: #38bdf8;
   --border-focus: #38bdf8;
 
@@ -255,9 +266,11 @@
   --bg-surface-elevated: #1e2434;
   --bg-modal: #151926;
   --bg-overlay: rgba(8, 11, 18, 0.8);
+  --bg-input: #151924;
   
   --border-color: #272f44;
   --border-subtle: #1c2232;
+  --border-light: #333d59;
   --border-active: #34d399;
   --border-focus: #34d399;
 
@@ -310,9 +323,11 @@
   --bg-surface-elevated: #ffffff;
   --bg-modal: #fefdfa;
   --bg-overlay: rgba(41, 37, 36, 0.48);
+  --bg-input: #ffffff;
   
   --border-color: #e5dac5;
   --border-subtle: #ede3d0;
+  --border-light: #dacbb4;
   --border-active: #c2410c;
   --border-focus: #c2410c;
 

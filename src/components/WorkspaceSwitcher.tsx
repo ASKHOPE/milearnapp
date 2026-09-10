@@ -10,6 +10,7 @@ interface WorkspaceSwitcherProps {
   onCreateWorkspace: (name: string, icon: string, color: string, description: string) => void;
   onRenameWorkspace?: (id: string, newName: string, newIcon?: string, newColor?: string) => void;
   onDeleteWorkspace: (id: string) => void;
+  compact?: boolean;
 }
 
 const WS_EMOJIS = ['🏠', '💼', '🎨', '🚀', '🔬', '📚', '⚡', '🌿', '💡'];
@@ -22,7 +23,8 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
   onSelectWorkspace,
   onCreateWorkspace,
   onRenameWorkspace,
-  onDeleteWorkspace
+  onDeleteWorkspace,
+  compact = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,30 +77,50 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
   };
 
   return (
-    <div className="workspace-switcher-container">
-      {/* Active Workspace Pill Trigger */}
-      <div 
-        className="workspace-active-pill"
-        onClick={() => setIsOpen(!isOpen)}
-        title="Switch Workspace"
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setIsOpen(!isOpen);
-          }
-        }}
-      >
-        <div className="workspace-pill-left">
-          <span className="workspace-pill-emoji">{activeWorkspace?.icon || '🏠'}</span>
-          <div className="workspace-pill-info">
-            <span className="workspace-pill-name">{activeWorkspace?.name || 'Workspace'}</span>
-            <span className="workspace-pill-sub">Workspace</span>
-          </div>
+    <div className={`workspace-switcher-container ${compact ? 'compact' : ''}`}>
+      {/* Active Workspace Trigger */}
+      {compact ? (
+        <div 
+          className="workspace-compact-trigger"
+          onClick={() => setIsOpen(!isOpen)}
+          title={`Switch Workspace (${activeWorkspace?.name || 'Workspace'})`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsOpen(!isOpen);
+            }
+          }}
+        >
+          <span className="workspace-compact-emoji">{activeWorkspace?.icon || '🏠'}</span>
+          <span className="workspace-compact-name">{activeWorkspace?.name || 'Workspace'}</span>
+          <ChevronDown size={11} className={`workspace-compact-chevron ${isOpen ? 'open' : ''}`} />
         </div>
-        <ChevronDown size={14} className="workspace-pill-chevron" />
-      </div>
+      ) : (
+        <div 
+          className="workspace-active-pill"
+          onClick={() => setIsOpen(!isOpen)}
+          title="Switch Workspace"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsOpen(!isOpen);
+            }
+          }}
+        >
+          <div className="workspace-pill-left">
+            <span className="workspace-pill-emoji">{activeWorkspace?.icon || '🏠'}</span>
+            <div className="workspace-pill-info">
+              <span className="workspace-pill-name">{activeWorkspace?.name || 'Workspace'}</span>
+              <span className="workspace-pill-sub">Workspace</span>
+            </div>
+          </div>
+          <ChevronDown size={14} className="workspace-pill-chevron" />
+        </div>
+      )}
 
       {/* Dropdown Menu */}
       {isOpen && (
@@ -193,7 +215,7 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
             </div>
 
             <form onSubmit={handleSaveWorkspace} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
+              <div className="form-group">
                 <label className="form-label">Workspace Name</label>
                 <input
                   type="text"
@@ -206,7 +228,7 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                 />
               </div>
 
-              <div>
+              <div className="form-group">
                 <label className="form-label">Description (Optional)</label>
                 <input
                   type="text"
@@ -217,15 +239,16 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                 />
               </div>
 
-              <div>
+              <div className="form-group">
                 <label className="form-label">Icon / Emoji</label>
-                <div className="book-emoji-picker">
+                <div className="book-emoji-picker" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
                   {WS_EMOJIS.map((em) => (
                     <button
                       key={em}
                       type="button"
                       className={`emoji-btn ${selectedEmoji === em ? 'active' : ''}`}
                       onClick={() => setSelectedEmoji(em)}
+                      style={{ width: '36px', height: '36px', borderRadius: '8px', fontSize: '16px' }}
                     >
                       {em}
                     </button>
@@ -233,22 +256,31 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="form-label">Accent Theme Color</label>
-                <div className="book-color-picker">
+              <div className="form-group">
+                <label className="form-label" style={{ marginBottom: '6px' }}>Accent Theme Color</label>
+                <div className="book-color-picker" style={{ display: 'flex', gap: '10px', alignItems: 'center', paddingTop: '4px' }}>
                   {WS_COLORS.map((col) => (
                     <button
                       key={col}
                       type="button"
                       className={`color-dot ${selectedColor === col ? 'active' : ''}`}
-                      style={{ backgroundColor: col }}
+                      style={{
+                        backgroundColor: col,
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        border: selectedColor === col ? '2px solid #ffffff' : '2px solid transparent',
+                        boxShadow: selectedColor === col ? `0 0 0 2px ${col}` : 'none',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s ease'
+                      }}
                       onClick={() => setSelectedColor(col)}
                     />
                   ))}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
                 <button type="button" className="btn-small-ghost" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </button>

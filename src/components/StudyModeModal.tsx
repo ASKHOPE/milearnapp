@@ -201,13 +201,81 @@ export const StudyModeModal: React.FC<StudyModeModalProps> = ({
   const goodGrades = sessionGrades.filter((g) => g >= 3).length;
   const accuracy = reviewedCount > 0 ? Math.round((goodGrades / reviewedCount) * 100) : 0;
 
+  const handleLoadStarterDeck = () => {
+    const starterCards: Flashcard[] = [
+      {
+        id: 'fc-starter-1',
+        noteId: 'sample-study',
+        noteTitle: 'Spaced Repetition Protocol',
+        question: 'What is the core principle behind the SuperMemo-2 (SM-2) algorithm?',
+        answer: 'Calculating optimal review intervals based on difficulty and past recall ratings to maximize long-term retention.',
+        type: 'qa',
+        easeFactor: 2.5,
+        interval: 1,
+        repetition: 0,
+        nextReviewDate: new Date().toISOString(),
+        lastReviewed: undefined,
+        isManual: true
+      },
+      {
+        id: 'fc-starter-2',
+        noteId: 'sample-study',
+        noteTitle: 'Local-First Software',
+        question: 'What defines a Local-First application architecture?',
+        answer: 'Data is stored locally on the user device first with instant read/write, while cross-device sync happens asynchronously.',
+        type: 'concept',
+        easeFactor: 2.5,
+        interval: 1,
+        repetition: 0,
+        nextReviewDate: new Date().toISOString(),
+        lastReviewed: undefined,
+        isManual: true
+      },
+      {
+        id: 'fc-starter-3',
+        noteId: 'sample-study',
+        noteTitle: 'Active Recall',
+        question: 'Why is testing yourself more effective than re-reading notes?',
+        answer: 'Active retrieval strengthens neural synaptic pathways and triggers cognitive reconsolidation of memory.',
+        type: 'qa',
+        easeFactor: 2.5,
+        interval: 1,
+        repetition: 0,
+        nextReviewDate: new Date().toISOString(),
+        lastReviewed: undefined,
+        isManual: true
+      },
+      {
+        id: 'fc-starter-4',
+        noteId: 'sample-study',
+        noteTitle: 'Pomodoro Protocol',
+        question: 'What is the standard interval duration for deep work in the Pomodoro Technique?',
+        answer: '25 minutes of unbroken focus followed by a 5-minute break, and a 15-30 minute long break every 4 cycles.',
+        type: 'concept',
+        easeFactor: 2.5,
+        interval: 1,
+        repetition: 0,
+        nextReviewDate: new Date().toISOString(),
+        lastReviewed: undefined,
+        isManual: true
+      }
+    ];
+
+    const existing = flashcardService.getFlashcards();
+    const merged = [...starterCards, ...existing.filter((e) => !starterCards.some((s) => s.id === e.id))];
+    flashcardService.saveFlashcards(merged);
+    setCards(merged);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Study Arena & Flashcard Studio"
       subtitle="Master concepts with SuperMemo-2 Spaced Repetition & Gamified Quizzes"
-      icon={<GraduationCap size={20} color="var(--color-primary)" />}
+      icon={<GraduationCap size={20} color="var(--accent-primary, #6366f1)" />}
       maxWidth={720}
     >
       <div className="study-modal-container">
@@ -307,24 +375,34 @@ export const StudyModeModal: React.FC<StudyModeModalProps> = ({
                 </button>
               </div>
 
-              {cards.length > 0 && !sessionCompleted && (
+              {cards.length > 0 && !sessionCompleted ? (
                 <div className="study-counter-chip">
                   <span>Card {currentIndex + 1} of {cards.length}</span>
+                </div>
+              ) : (
+                <div className="study-deck-meta-chip">
+                  <Sparkles size={12} color="var(--accent-primary, #6366f1)" />
+                  <span>Spaced Repetition Active</span>
                 </div>
               )}
             </div>
 
             {/* Empty State */}
             {cards.length === 0 ? (
-              <div className="study-empty-state" style={{ padding: '36px 20px', textAlign: 'center' }}>
-                <Sparkles size={36} color="var(--color-primary)" style={{ margin: '0 auto 12px' }} />
-                <h4>No flashcards found in this deck</h4>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                  Create custom cards using the <strong>Create Q&A Card</strong> tab, or use note syntax like <code>Q: Question / A: Answer</code>.
+              <div className="study-empty-state" style={{ padding: '40px 24px', textAlign: 'center' }}>
+                <Sparkles size={36} color="var(--accent-primary, #6366f1)" style={{ margin: '0 auto 14px' }} />
+                <h4 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>No flashcards found in this deck</h4>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '440px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+                  Create custom cards using the <strong>Create Q&A Card</strong> tab, or load our starter deck with spaced repetition principles.
                 </p>
-                <Button variant="primary" size="sm" onClick={() => setActiveTab('creator')} leftIcon={<Plus size={14} />}>
-                  Create First Flashcard
-                </Button>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
+                  <Button variant="primary" size="sm" onClick={handleLoadStarterDeck} leftIcon={<Sparkles size={14} />}>
+                    Load Starter Deck (4 Cards)
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('creator')} leftIcon={<Plus size={14} />}>
+                    Create First Card
+                  </Button>
+                </div>
               </div>
             ) : sessionCompleted ? (
               /* Completed Summary View */

@@ -13,9 +13,18 @@ import {
   Sparkles,
   Check,
   Timer,
-  FileText
+  FileText,
+  Shuffle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { typingMetrics, type TypingSessionStats, type PracticeGameSession, type PassageItem } from '../services/typingMetrics';
+import { 
+  typingMetrics, 
+  MONKEY_TYPE_PRESETS,
+  type TypingSessionStats, 
+  type PracticeGameSession, 
+  type PassageItem 
+} from '../services/typingMetrics';
 import type { Note } from '../types';
 
 interface TypingMetricsModalProps {
@@ -29,8 +38,8 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
   const [stats, setStats] = useState<TypingSessionStats>(() => typingMetrics.calculateStats());
   const [history, setHistory] = useState<PracticeGameSession[]>(() => typingMetrics.getSessionHistory());
 
-  // Dynamic Passages loaded from PostgreSQL / Vault
-  const [passages, setPassages] = useState<PassageItem[]>([]);
+  // Dynamic Passages loaded with immediate rich presets
+  const [passages, setPassages] = useState<PassageItem[]>(() => MONKEY_TYPE_PRESETS);
 
   // Practice Mode State
   const [selectedDifficulty, setSelectedDifficulty] = useState<'all' | 'beginner' | 'intermediate' | 'expert' | 'code'>('beginner');
@@ -77,12 +86,14 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
 
   useEffect(() => {
     const unsubscribe = typingMetrics.subscribe((newStats) => {
-      setStats(newStats);
+      if (!isCompleted) {
+        setStats(newStats);
+      }
     });
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [isCompleted]);
 
   // Filter passages by chosen difficulty tab
   const filteredPassages = useMemo(() => {
@@ -103,12 +114,6 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
   // Transform passage text according to active customization options
   const transformedText = useMemo(() => {
     let base = rawCurrentPassage.text;
-    // Repeat short sentences so there is plenty of text space for long timed sprints
-    if (base.length < 120) {
-      base = `${base} ${base} ${base}`;
-    } else if (base.length < 240) {
-      base = `${base} ${base}`;
-    }
 
     if (!includeCaps) {
       base = base.toLowerCase();
@@ -215,6 +220,28 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
     setTimeLeft(selectedTime);
     typingMetrics.cancelSession();
     setStats(typingMetrics.calculateStats());
+  };
+
+  const handleNextPassage = () => {
+    if (activePassagesList.length === 0) return;
+    setSelectedPassageIdx((prev) => (prev + 1) % activePassagesList.length);
+    handleResetPractice();
+  };
+
+  const handlePrevPassage = () => {
+    if (activePassagesList.length === 0) return;
+    setSelectedPassageIdx((prev) => (prev - 1 + activePassagesList.length) % activePassagesList.length);
+    handleResetPractice();
+  };
+
+  const handleShufflePassage = () => {
+    if (activePassagesList.length <= 1) return;
+    let nextIdx = Math.floor(Math.random() * activePassagesList.length);
+    if (nextIdx === selectedPassageIdx) {
+      nextIdx = (nextIdx + 1) % activePassagesList.length;
+    }
+    setSelectedPassageIdx(nextIdx);
+    handleResetPractice();
   };
 
   if (!isOpen) return null;
@@ -516,10 +543,27 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                   </div>
 
                   {/* Reduced Passage Selector Dropdown */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
                       Passage:
                     </span>
+                    <button
+                      type="button"
+                      onClick={handlePrevPassage}
+                      title="Previous Passage"
+                      style={{
+                        padding: '4px 6px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-card, #161b22)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <ChevronLeft size={13} />
+                    </button>
                     <select
                       value={selectedPassageIdx}
                       onChange={(e) => {
@@ -536,7 +580,7 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                         color: 'var(--text-primary)',
                         cursor: 'pointer',
                         outline: 'none',
-                        maxWidth: '250px'
+                        maxWidth: '220px'
                       }}
                     >
                       {activePassagesList.map((pass, i) => (
@@ -545,6 +589,44 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                         </option>
                       ))}
                     </select>
+                    <button
+                      type="button"
+                      onClick={handleNextPassage}
+                      title="Next Passage"
+                      style={{
+                        padding: '4px 6px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-card, #161b22)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <ChevronRight size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleShufflePassage}
+                      title="Random Shuffle Passage"
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-card, #161b22)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
+                      }}
+                    >
+                      <Shuffle size={12} />
+                      <span>Shuffle</span>
+                    </button>
 
                     {/* Difficulty Pill Filter */}
                     <div style={{ display: 'flex', gap: '2px', background: 'rgba(0, 0, 0, 0.2)', padding: '2px', borderRadius: '6px' }}>
@@ -671,10 +753,10 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                   style={{
                     width: '100%',
                     padding: '14px 18px',
-                    fontSize: '16px',
+                    fontSize: '15px',
                     borderRadius: '10px',
-                    border: isCompleted ? '2px solid #10b981' : '1px solid var(--accent-primary)',
-                    background: 'var(--bg-input, var(--bg-card))',
+                    border: isCompleted ? '1px solid rgba(16, 185, 129, 0.5)' : '1px solid var(--accent-primary)',
+                    background: isCompleted ? 'rgba(16, 185, 129, 0.06)' : 'var(--bg-input, var(--bg-card))',
                     color: 'var(--text-primary)',
                     outline: 'none',
                     boxShadow: isPracticing ? '0 0 0 3px rgba(99, 102, 241, 0.2)' : 'none',
@@ -731,10 +813,14 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#f59e0b', marginBottom: '3px' }}>
                     <Clock size={14} />
-                    <span style={{ fontSize: '11px', fontWeight: 600 }}>{sprintMode === 'time' ? 'REMAINING' : 'ELAPSED'}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600 }}>
+                      {isCompleted ? 'DURATION' : (sprintMode === 'time' ? 'REMAINING' : 'ELAPSED')}
+                    </span>
                   </div>
                   <div style={{ fontSize: '26px', fontWeight: 800, color: '#f59e0b' }}>
-                    {sprintMode === 'time' ? `${timeLeft}s` : `${stats.durationSeconds}s`}
+                    {isCompleted
+                      ? `${stats.durationSeconds || (sprintMode === 'time' ? (isCustomTime ? parseInt(customTimeInput) || 30 : timeLimit) : 0)}s`
+                      : (sprintMode === 'time' ? `${timeLeft}s` : `${stats.durationSeconds}s`)}
                   </div>
                 </div>
               </div>
@@ -773,15 +859,28 @@ export const TypingMetricsModal: React.FC<TypingMetricsModalProps> = ({ isOpen, 
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="btn-small-primary"
-                    onClick={() => handleResetPractice()}
-                    style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <RotateCcw size={14} />
-                    <span>Sprint Again</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="btn-small-ghost"
+                      onClick={() => handleResetPractice()}
+                      style={{ padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      title="Repeat the same passage"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Repeat</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-small-primary"
+                      onClick={handleNextPassage}
+                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      title="Advance to the next passage"
+                    >
+                      <Sparkles size={14} />
+                      <span>Next Passage ➔</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -136,6 +136,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, []);
 
   const [customGifUrl, setCustomGifUrl] = useState('');
+  const [avatarTab, setAvatarTab] = useState<'emoji' | 'gif' | 'url'>('emoji');
   const [profileSaveNotice, setProfileSaveNotice] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -704,98 +705,154 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
             </div>
 
-            {/* Avatar Selection: Quick Emojis & Animated Presets */}
-            <div className="form-field-row">
-              <label className="form-field-label">Avatar Emoji & Animated Presets</label>
-              
-              {/* Quick Avatar Emojis */}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
-                {['⚡', '🚀', '🧠', '💻', '🦉', '🔮', '🌟', '🐱', '🔥', '🎯'].map((em) => (
+            {/* Compact Tabbed Avatar Selection */}
+            <div className="form-field-row" style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <label className="form-field-label" style={{ margin: 0 }}>Avatar & Visual Badge</label>
+                <div style={{ display: 'flex', gap: '3px', background: 'var(--bg-subtle, #131826)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                   <button
-                    key={em}
                     type="button"
-                    className={`custom-emoji-btn ${avatarType === 'emoji' && avatarValue === em ? 'active' : ''}`}
-                    onClick={() => {
-                      setAvatarType('emoji');
-                      setAvatarValue(em);
+                    onClick={() => setAvatarTab('emoji')}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '11px',
+                      fontWeight: avatarTab === 'emoji' ? 700 : 500,
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: avatarTab === 'emoji' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                      color: avatarTab === 'emoji' ? '#fff' : 'var(--text-muted)',
+                      cursor: 'pointer'
                     }}
-                    style={{ fontSize: '16px', padding: '6px 10px' }}
-                    title={`Set ${em} as avatar`}
                   >
-                    {em}
+                    Emoji
                   </button>
-                ))}
-                
-                {/* Custom Avatar Emoji Input */}
-                <input
-                  type="text"
-                  className="dialog-text-input"
-                  style={{ width: '44px', textAlign: 'center', fontSize: '16px', padding: '6px 4px', height: '32px' }}
-                  placeholder="✨"
-                  value={avatarType === 'emoji' ? avatarValue : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      setAvatarType('emoji');
-                      setAvatarValue(val);
-                    }
-                  }}
-                  title="Type custom avatar emoji"
-                  maxLength={4}
-                />
+                  <button
+                    type="button"
+                    onClick={() => setAvatarTab('gif')}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '11px',
+                      fontWeight: avatarTab === 'gif' ? 700 : 500,
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: avatarTab === 'gif' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                      color: avatarTab === 'gif' ? '#fff' : 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Animated
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAvatarTab('url')}
+                    style={{
+                      padding: '3px 8px',
+                      fontSize: '11px',
+                      fontWeight: avatarTab === 'url' ? 700 : 500,
+                      borderRadius: '4px',
+                      border: 'none',
+                      background: avatarTab === 'url' ? 'var(--accent-primary, #6366f1)' : 'transparent',
+                      color: avatarTab === 'url' ? '#fff' : 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Custom URL
+                  </button>
+                </div>
               </div>
 
-              {/* 1:1 Animated GIFs (Reduced to Top 3 Presets) */}
-              <div className="animated-gif-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                {ANIMATED_AVATARS.slice(0, 3).map((gif) => (
-                  <button
-                    key={gif.id}
-                    type="button"
-                    className={`gif-choice-btn ${avatarType === 'gif' && avatarValue === gif.dataUrl ? 'active' : ''}`}
+              {/* Sub-tab 1: Quick Emojis */}
+              {avatarTab === 'emoji' && (
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {['⚡', '🚀', '🧠', '💻', '🦉', '🔮', '🌟', '🐱', '🔥', '🎯'].map((em) => (
+                    <button
+                      key={em}
+                      type="button"
+                      className={`custom-emoji-btn ${avatarType === 'emoji' && avatarValue === em ? 'active' : ''}`}
+                      onClick={() => {
+                        setAvatarType('emoji');
+                        setAvatarValue(em);
+                      }}
+                      style={{ fontSize: '15px', padding: '5px 8px', borderRadius: '6px' }}
+                      title={`Set ${em} as avatar`}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                  <input
+                    type="text"
+                    className="dialog-text-input"
+                    style={{ width: '42px', textAlign: 'center', fontSize: '15px', padding: '4px', height: '30px' }}
+                    placeholder="✨"
+                    value={avatarType === 'emoji' ? avatarValue : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        setAvatarType('emoji');
+                        setAvatarValue(val);
+                      }
+                    }}
+                    title="Type custom avatar emoji"
+                    maxLength={4}
+                  />
+                </div>
+              )}
+
+              {/* Sub-tab 2: Animated GIFs */}
+              {avatarTab === 'gif' && (
+                <div className="animated-gif-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {ANIMATED_AVATARS.slice(0, 3).map((gif) => (
+                    <button
+                      key={gif.id}
+                      type="button"
+                      className={`gif-choice-btn ${avatarType === 'gif' && avatarValue === gif.dataUrl ? 'active' : ''}`}
+                      onClick={() => {
+                        setAvatarType('gif');
+                        setAvatarValue(gif.dataUrl);
+                      }}
+                      title={gif.name}
+                      style={{ padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <img src={gif.dataUrl} alt={gif.name} style={{ width: '38px', height: '38px', borderRadius: '6px' }} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Sub-tab 3: Custom URL */}
+              {avatarTab === 'url' && (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    type="url"
+                    className="dialog-text-input"
+                    placeholder="https://.../avatar.gif"
+                    value={customGifUrl}
+                    onChange={(e) => setCustomGifUrl(e.target.value)}
+                    style={{ fontSize: '12px', padding: '6px 10px' }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!customGifUrl.trim()}
                     onClick={() => {
                       setAvatarType('gif');
-                      setAvatarValue(gif.dataUrl);
+                      setAvatarValue(customGifUrl.trim());
                     }}
-                    title={gif.name}
                   >
-                    <img src={gif.dataUrl} alt={gif.name} style={{ width: '44px', height: '44px' }} />
-                  </button>
-                ))}
-              </div>
+                    Apply
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Custom GIF / Image URL */}
-            <div className="form-field-row">
-              <label className="form-field-label">Or Custom GIF / Image URL</label>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  type="url"
-                  className="dialog-text-input"
-                  placeholder="https://.../avatar.gif"
-                  value={customGifUrl}
-                  onChange={(e) => setCustomGifUrl(e.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!customGifUrl.trim()}
-                  onClick={() => {
-                    setAvatarType('gif');
-                    setAvatarValue(customGifUrl.trim());
-                  }}
-                >
-                  Apply
-                </Button>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Persistent Save Profile Row */}
+            <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Button variant="primary" size="sm" onClick={handleSaveProfile}>
-                <Check size={13} />
+                <Check size={14} />
                 <span>Save Profile</span>
               </Button>
               {profileSaveNotice && (
-                <span style={{ fontSize: '12px', color: 'var(--color-success)' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-success)', fontWeight: 600 }}>
                   ✓ Profile updated
                 </span>
               )}

@@ -6,6 +6,11 @@ import { test, expect } from '@playwright/test';
 
 test.describe('MiLEARNAPP Enterprise Desktop App Tests', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('milearn_tour_completed', 'true');
+      } catch {}
+    });
     await page.goto('/');
     // Wait for the app to finish loading notes and DB sync
     await page.waitForSelector('.app-header', { timeout: 10000 });
@@ -57,9 +62,9 @@ test.describe('MiLEARNAPP Enterprise Desktop App Tests', () => {
     // Switch to database tab in settings modal
     await page.locator('button:has-text("PostgreSQL Sync")').click();
 
-    // Verify settings modal shows Database Sync tab with live Docker container
-    await expect(page.locator('text=PostgreSQL 16 Container Online')).toBeVisible();
-    await expect(page.locator('text=Relational Table Telemetry')).toBeVisible();
+    // Verify settings modal shows Database Sync tab
+    await expect(page.locator('text=PostgreSQL Database Connector')).toBeVisible();
+    await expect(page.locator('text=PostgreSQL 16 Differential Sync')).toBeVisible();
 
     // Close settings modal
     await page.keyboard.press('Escape');

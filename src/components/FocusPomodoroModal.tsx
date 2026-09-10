@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { PomodoroMode } from '../types';
 import { ambientAudio } from '../services/ambientAudio';
 import { Modal } from './ui/Modal';
@@ -14,7 +14,6 @@ import {
   Sparkles,
   Volume2
 } from 'lucide-react';
-import { HourglassPomodoro } from './ui/HourglassPomodoro';
 
 interface FocusPomodoroModalProps {
   isOpen: boolean;
@@ -113,8 +112,8 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
   const seconds = secondsLeft % 60;
   const timeFormatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-  // SVG circular ring calculation
-  const radius = 104;
+  // SVG circular ring calculation (spacious 280x280 dial with 118 radius)
+  const radius = 118;
   const circumference = 2 * Math.PI * radius;
   const progressPercent = (secondsLeft / totalSeconds);
   const strokeDashoffset = circumference - (progressPercent * circumference);
@@ -125,7 +124,7 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
       onClose={onClose}
       title="Focus Pomodoro & Productivity Timer"
       subtitle="Interactive focus intervals with automatic completion audio chime"
-      icon={<Timer size={20} color="var(--color-primary)" />}
+      icon={<Timer size={20} color="var(--accent-primary, #6366f1)" />}
       maxWidth={580}
     >
       <div className="pomo-timer-view" style={{ padding: '8px 0 16px' }}>
@@ -162,35 +161,52 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
           {/* Animated Glow Aura */}
           <div className={`pomo-dial-glow mode-${mode} ${isRunning ? 'active' : ''}`} />
 
-          <svg className="pomo-dial-svg" width="260" height="260" viewBox="0 0 260 260">
+          <svg className="pomo-dial-svg" width="280" height="280" viewBox="0 0 280 280">
             {/* Background Track */}
             <circle
-              cx="130"
-              cy="130"
+              cx="140"
+              cy="140"
               r={radius}
               className="pomo-track-bg"
-              strokeWidth="12"
+              strokeWidth="10"
             />
             {/* Animated Progress Ring */}
             <circle
-              cx="130"
-              cy="130"
+              cx="140"
+              cy="140"
               r={radius}
               className={`pomo-track-progress mode-${mode} ${isRunning ? 'ticking' : ''}`}
-              strokeWidth="12"
+              strokeWidth="10"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
-              transform="rotate(-90 130 130)"
+              transform="rotate(-90 140 140)"
             />
           </svg>
 
           {/* Time readout in center */}
           <div className="pomo-dial-center">
-            <HourglassPomodoro scale={0.65} isRunning={isRunning} className="pomo-hourglass-icon" />
+            <div className={`pomo-center-badge mode-${mode}`}>
+              {mode === 'work' ? (
+                <>
+                  <Flame size={14} color="#ef4444" className={isRunning ? 'pulse-icon' : ''} />
+                  <span>Deep Focus</span>
+                </>
+              ) : mode === 'shortBreak' ? (
+                <>
+                  <Coffee size={14} color="#10b981" className={isRunning ? 'pulse-icon' : ''} />
+                  <span>Short Break</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} color="#6366f1" className={isRunning ? 'pulse-icon' : ''} />
+                  <span>Long Break</span>
+                </>
+              )}
+            </div>
             <span className={`pomo-time-display ${isRunning ? 'active-pulse' : ''}`}>{timeFormatted}</span>
             <span className="pomo-mode-tag">
-              {mode === 'work' ? 'FOCUS INTERVAL' : 'REST & RECHARGE'}
+              {isRunning ? (mode === 'work' ? 'FOCUS INTERVAL' : 'REST & RECHARGE') : 'READY TO START'}
             </span>
           </div>
         </div>
@@ -231,44 +247,35 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
         </div>
 
         {/* Session Progress Strip & Audio Completion Indicator */}
-        <div className="pomo-session-stats" style={{ marginTop: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '360px', padding: '0 8px' }}>
-            <div className="pomo-cycles-strip">
+        <div className="pomo-footer-card">
+          <div className="pomo-footer-stat-group">
+            <div className="pomo-dots-row" title={`Completed ${completedSessions} focus interval${completedSessions !== 1 ? 's' : ''}`}>
               {[0, 1, 2, 3].map((idx) => {
                 const isCurrentCycle = (completedSessions % 4) > idx;
                 return (
-                  <div
+                  <span
                     key={idx}
-                    className={`pomo-cycle-dot ${isCurrentCycle ? 'filled' : ''}`}
-                    title={`Session ${idx + 1} of 4`}
+                    className={`pomo-cycle-dot ${isCurrentCycle ? 'done' : ''}`}
+                    title={`Interval ${idx + 1} of 4`}
                   />
                 );
               })}
-              <span className="pomo-sessions-label">
-                {completedSessions} focus interval{completedSessions !== 1 ? 's' : ''} completed
-              </span>
             </div>
-
-            {/* Chime preview trigger */}
-            <button
-              type="button"
-              className="btn-small-ghost"
-              onClick={handleTestAudio}
-              title="Test Completion Chime Audio"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '11px',
-                color: isChimeTesting ? '#10b981' : 'var(--text-muted)',
-                padding: '4px 8px',
-                borderRadius: '6px'
-              }}
-            >
-              <Volume2 size={13} className={isChimeTesting ? 'pulse-icon' : ''} />
-              <span>{isChimeTesting ? 'Playing Chime...' : 'Test Audio'}</span>
-            </button>
+            <span className="pomo-stat-text">
+              <strong>{completedSessions}</strong> focus interval{completedSessions !== 1 ? 's' : ''} completed
+            </span>
           </div>
+
+          {/* Chime preview trigger */}
+          <button
+            type="button"
+            className="pomo-audio-test-btn"
+            onClick={handleTestAudio}
+            title="Test Completion Chime Audio"
+          >
+            <Volume2 size={13} className={isChimeTesting ? 'pulse-icon' : ''} />
+            <span>{isChimeTesting ? 'Testing...' : 'Test Audio'}</span>
+          </button>
         </div>
       </div>
     </Modal>

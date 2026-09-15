@@ -29,3 +29,7 @@ yarn-error.log*
 
 # TypeScript Cache
 *.tsbuildinfo
+
+# Rust / Tauri Build Artifacts
+src-tauri/target/
+

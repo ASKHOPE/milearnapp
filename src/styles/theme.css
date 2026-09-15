@@ -6,16 +6,16 @@
 :root,
 [data-theme="light"] {
   /* Day Theme (Default Light Mode) */
-  --bg-app: #f6f7fb;
+  --bg-app: #ffffff;
   --bg-sidebar: #ffffff;
-  --bg-column: #f9faff;
+  --bg-column: #ffffff;
   --bg-editor: #ffffff;
   --bg-card: #ffffff;
-  --bg-card-hover: #f1f4f9;
-  --bg-card-active: #e9effd;
+  --bg-card-hover: #f8fafc;
+  --bg-card-active: #f1f5f9;
   --bg-card-selected: #eef2ff;
   
-  --bg-subtle: #f0f2f7;
+  --bg-subtle: #ffffff;
   --bg-surface: #ffffff;
   --bg-surface-elevated: #ffffff;
   --bg-modal: #ffffff;

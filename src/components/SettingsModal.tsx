@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { type Workspace, type Note, type Folder, type Book, type ThemeMode, type TypographySettings, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
+import { type Workspace, type Note, type Folder, type Book, type ThemeMode, type TypographySettings, type UserProfile, type UiLayoutSettings, DEFAULT_USER_PROFILE } from '../types';
 export { DEFAULT_USER_PROFILE };
 import { optimizer, type StorageHealth } from '../services/optimizer';
 import { lockoutManager } from '../services/cryptoLockout';
@@ -49,7 +49,15 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  Settings
+  Settings,
+  Pin,
+  Timer,
+  GraduationCap,
+  Network,
+  Brain,
+  Globe,
+  BookA,
+  GitFork
 } from 'lucide-react';
 import { TutorialFaqTab } from './settings/TutorialFaqTab';
 import { TermsOfServiceTab } from './settings/TermsOfServiceTab';
@@ -74,8 +82,8 @@ interface SettingsModalProps {
   userProfile?: UserProfile;
   onUpdateProfile?: (profile: UserProfile) => void;
   initialTab?: string;
-  uiLayout?: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean };
-  onUpdateUiLayout?: (partial: Partial<{ showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }>) => void;
+  uiLayout?: UiLayoutSettings;
+  onUpdateUiLayout?: (partial: Partial<UiLayoutSettings>) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -1288,6 +1296,349 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="settings-checkbox"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Top Navigation Bar Controls & Pinned Items */}
+          <div className="settings-card-panel" style={{ marginTop: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+              <h4 className="panel-section-title" style={{ margin: 0 }}>
+                <Pin size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                Top Navigation Bar Controls & Pinned Items
+              </h4>
+              {/* Presets */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="settings-pill-btn"
+                  onClick={() => {
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ maxNavWidgets: 0, maxNavIcons: 0, pinnedNavTools: [] });
+                      try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify([])); } catch {}
+                    }
+                  }}
+                  style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  Clean Zen (0 / 0)
+                </button>
+                <button
+                  type="button"
+                  className="settings-pill-btn"
+                  onClick={() => {
+                    const tools = ['pomodoro', 'study', 'knowledge'];
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ maxNavWidgets: 1, maxNavIcons: 2, pinnedNavTools: tools });
+                      try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(tools)); } catch {}
+                    }
+                  }}
+                  style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  Compact (1 / 2)
+                </button>
+                <button
+                  type="button"
+                  className="settings-pill-btn"
+                  onClick={() => {
+                    const tools = ['pomodoro', 'calendar', 'study', 'knowledge'];
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ maxNavWidgets: 3, maxNavIcons: 4, pinnedNavTools: tools });
+                      try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(tools)); } catch {}
+                    }
+                  }}
+                  style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.15)', border: '1px solid var(--accent-primary, #6366f1)', color: 'var(--accent-primary, #6366f1)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Standard (3 / 4)
+                </button>
+                <button
+                  type="button"
+                  className="settings-pill-btn"
+                  onClick={() => {
+                    const tools = ['pomodoro', 'typing', 'calendar', 'study', 'knowledge', 'mind', 'linktree'];
+                    if (onUpdateUiLayout) {
+                      onUpdateUiLayout({ maxNavWidgets: 5, maxNavIcons: 8, pinnedNavTools: tools });
+                      try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(tools)); } catch {}
+                    }
+                  }}
+                  style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  All Available (5 / 8)
+                </button>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Choose how many active live widgets and utility icons you want in the top navigation bar.
+            </p>
+
+            {/* Steppers Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+              {/* Max Widgets */}
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'var(--bg-subtle, rgba(255, 255, 255, 0.03))',
+                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Timer size={14} color="#ef4444" />
+                    <span>Max Live Widgets in Nav</span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Pill badges: Timer, Live Typing, Calendar (0 – 5)
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    disabled={(uiLayout?.maxNavWidgets ?? 3) <= 0}
+                    onClick={() => {
+                      const current = uiLayout?.maxNavWidgets ?? 3;
+                      if (current > 0 && onUpdateUiLayout) {
+                        const nextVal = current - 1;
+                        const currentPinned = uiLayout?.pinnedNavTools ?? ['pomodoro', 'calendar', 'study'];
+                        const widgetIds = ['pomodoro', 'typing', 'calendar'];
+                        let widgets = currentPinned.filter(id => widgetIds.includes(id));
+                        const icons = currentPinned.filter(id => !widgetIds.includes(id));
+                        if (widgets.length > nextVal) {
+                          widgets = widgets.slice(-nextVal);
+                        }
+                        const nextPinned = [...widgets, ...icons];
+                        onUpdateUiLayout({ maxNavWidgets: nextVal, pinnedNavTools: nextPinned });
+                        try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(nextPinned)); } catch {}
+                      }
+                    }}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      cursor: (uiLayout?.maxNavWidgets ?? 3) <= 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: (uiLayout?.maxNavWidgets ?? 3) <= 0 ? 0.35 : 1
+                    }}
+                  >
+                    -
+                  </button>
+                  <span style={{ fontWeight: 700, fontSize: '15px', minWidth: '24px', textAlign: 'center', color: 'var(--accent-primary, #6366f1)' }}>
+                    {uiLayout?.maxNavWidgets ?? 3}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={(uiLayout?.maxNavWidgets ?? 3) >= 5}
+                    onClick={() => {
+                      const current = uiLayout?.maxNavWidgets ?? 3;
+                      if (current < 5 && onUpdateUiLayout) {
+                        onUpdateUiLayout({ maxNavWidgets: current + 1 });
+                      }
+                    }}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      cursor: (uiLayout?.maxNavWidgets ?? 3) >= 5 ? 'not-allowed' : 'pointer',
+                      fontSize: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: (uiLayout?.maxNavWidgets ?? 3) >= 5 ? 0.35 : 1
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Max Tool Icons */}
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'var(--bg-subtle, rgba(255, 255, 255, 0.03))',
+                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Sparkles size={14} color="#0ea5e9" />
+                    <span>Max Quick Tool Icons in Nav</span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Cards, Mind, Graph, Clipper, etc. (0 – 8)
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    disabled={(uiLayout?.maxNavIcons ?? 4) <= 0}
+                    onClick={() => {
+                      const current = uiLayout?.maxNavIcons ?? 4;
+                      if (current > 0 && onUpdateUiLayout) {
+                        const nextVal = current - 1;
+                        const currentPinned = uiLayout?.pinnedNavTools ?? ['pomodoro', 'calendar', 'study'];
+                        const widgetIds = ['pomodoro', 'typing', 'calendar'];
+                        const widgets = currentPinned.filter(id => widgetIds.includes(id));
+                        let icons = currentPinned.filter(id => !widgetIds.includes(id));
+                        if (icons.length > nextVal) {
+                          icons = icons.slice(-nextVal);
+                        }
+                        const nextPinned = [...widgets, ...icons];
+                        onUpdateUiLayout({ maxNavIcons: nextVal, pinnedNavTools: nextPinned });
+                        try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(nextPinned)); } catch {}
+                      }
+                    }}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      cursor: (uiLayout?.maxNavIcons ?? 4) <= 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: (uiLayout?.maxNavIcons ?? 4) <= 0 ? 0.35 : 1
+                    }}
+                  >
+                    -
+                  </button>
+                  <span style={{ fontWeight: 700, fontSize: '15px', minWidth: '24px', textAlign: 'center', color: 'var(--accent-primary, #6366f1)' }}>
+                    {uiLayout?.maxNavIcons ?? 4}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={(uiLayout?.maxNavIcons ?? 4) >= 8}
+                    onClick={() => {
+                      const current = uiLayout?.maxNavIcons ?? 4;
+                      if (current < 8 && onUpdateUiLayout) {
+                        onUpdateUiLayout({ maxNavIcons: current + 1 });
+                      }
+                    }}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      cursor: (uiLayout?.maxNavIcons ?? 4) >= 8 ? 'not-allowed' : 'pointer',
+                      fontSize: '15px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: (uiLayout?.maxNavIcons ?? 4) >= 8 ? 0.35 : 1
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Tool Pin Matrix */}
+            <div style={{ marginTop: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
+                Toggle Which Tools Are Pinned:
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
+                {[
+                  { id: 'pomodoro', name: 'Focus Pomodoro', type: 'widget', icon: <Timer size={14} color="#ef4444" /> },
+                  { id: 'typing', name: 'Typing Metrics', type: 'widget', icon: <Keyboard size={14} color="#6366f1" /> },
+                  { id: 'calendar', name: 'Calendar Schedule', type: 'widget', icon: <Calendar size={14} color="#34d399" /> },
+                  { id: 'study', name: 'Study Flashcards', type: 'icon', icon: <GraduationCap size={14} color="var(--accent-primary)" /> },
+                  { id: 'knowledge', name: 'Galaxy Graph', type: 'icon', icon: <Network size={14} color="#0ea5e9" /> },
+                  { id: 'mind', name: 'Internal Mind', type: 'icon', icon: <Brain size={14} color="#8b5cf6" /> },
+                  { id: 'linktree', name: 'Folder Link Tree', type: 'icon', icon: <GitFork size={14} color="#10b981" /> },
+                  { id: 'dictionary', name: 'Dictionary', type: 'icon', icon: <BookA size={14} color="#0ea5e9" /> },
+                  { id: 'webclipper', name: 'Web Clipper', type: 'icon', icon: <Globe size={14} color="var(--accent-primary)" /> }
+                ].map((tool) => {
+                  const currentPinned = uiLayout?.pinnedNavTools ?? ['pomodoro', 'calendar', 'study'];
+                  const isPinned = currentPinned.includes(tool.id);
+                  const isWidget = tool.type === 'widget';
+                  const maxW = uiLayout?.maxNavWidgets ?? 3;
+                  const maxI = uiLayout?.maxNavIcons ?? 4;
+
+                  const handleToggle = () => {
+                    if (!onUpdateUiLayout) return;
+                    let next: string[];
+                    if (isPinned) {
+                      next = currentPinned.filter(id => id !== tool.id);
+                    } else {
+                      const widgetIds = ['pomodoro', 'typing', 'calendar'];
+                      let curW = currentPinned.filter(id => widgetIds.includes(id));
+                      let curI = currentPinned.filter(id => !widgetIds.includes(id));
+                      if (isWidget) {
+                        if (maxW <= 0) return;
+                        while (curW.length >= maxW) curW.shift();
+                        curW.push(tool.id);
+                      } else {
+                        if (maxI <= 0) return;
+                        while (curI.length >= maxI) curI.shift();
+                        curI.push(tool.id);
+                      }
+                      next = [...curW, ...curI];
+                    }
+                    onUpdateUiLayout({ pinnedNavTools: next });
+                    try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next)); } catch {}
+                  };
+
+                  return (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      onClick={handleToggle}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: isPinned ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+                        border: isPinned ? '1px solid var(--accent-primary, #6366f1)' : '1px solid var(--border-color, rgba(255, 255, 255, 0.07))',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                        <span style={{ display: 'flex', alignItems: 'center' }}>{tool.icon}</span>
+                        <div style={{ overflow: 'hidden' }}>
+                          <div style={{ fontWeight: 600, fontSize: '12px', color: isPinned ? 'var(--text-primary)' : 'var(--text-secondary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                            {tool.name}
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                            {isWidget ? 'Widget' : 'Icon'}
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 500,
+                        background: isPinned ? 'var(--accent-primary, #6366f1)' : 'rgba(255, 255, 255, 0.06)',
+                        color: isPinned ? '#ffffff' : 'var(--text-muted)'
+                      }}>
+                        {isPinned ? 'Pinned' : 'Off'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -19,7 +19,7 @@ import {
   Zap,
   Calendar
 } from 'lucide-react';
-import type { ThemeMode, Workspace, PomodoroMode, UserProfile, Note } from '../types';
+import type { ThemeMode, Workspace, PomodoroMode, UserProfile, Note, UiLayoutSettings } from '../types';
 import { typingMetrics, type TypingSessionStats } from '../services/typingMetrics';
 import { CalendarWidget } from './CalendarWidget';
 
@@ -49,13 +49,15 @@ interface HeaderProps {
   notes?: Note[];
   onSelectDate?: (dateStr: string) => void;
   onOpenTodayNote?: () => void;
+  uiLayout?: UiLayoutSettings;
+  onUpdateUiLayout?: (partial: Partial<UiLayoutSettings>) => void;
 }
 
 const WIDGET_TOOL_IDS = ['pomodoro', 'typing', 'calendar'];
 
 export const Header: React.FC<HeaderProps> = ({
-  userProfile,
-  onOpenProfile,
+  userProfile: _userProfile,
+  onOpenProfile: _onOpenProfile,
   onOpenSettings,
   pomodoroSecondsLeft,
   isPomodoroRunning,
@@ -75,11 +77,20 @@ export const Header: React.FC<HeaderProps> = ({
   onQuickNote,
   notes = [],
   onSelectDate,
-  onOpenTodayNote
+  onOpenTodayNote,
+  uiLayout,
+  onUpdateUiLayout
 }) => {
   const [isToolsTrayOpen, setIsToolsTrayOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  const maxWidgets = uiLayout?.maxNavWidgets ?? 3;
+  const maxIcons = uiLayout?.maxNavIcons ?? 4;
+
   const [pinnedTools, setPinnedTools] = useState<string[]>(() => {
+    if (uiLayout?.pinnedNavTools && Array.isArray(uiLayout.pinnedNavTools)) {
+      return uiLayout.pinnedNavTools;
+    }
     try {
       const saved = localStorage.getItem('milearnapp_pinned_tools');
       return saved ? JSON.parse(saved) : ['pomodoro', 'calendar', 'study'];
@@ -87,6 +98,12 @@ export const Header: React.FC<HeaderProps> = ({
       return ['pomodoro', 'calendar', 'study'];
     }
   });
+
+  useEffect(() => {
+    if (uiLayout?.pinnedNavTools && Array.isArray(uiLayout.pinnedNavTools)) {
+      setPinnedTools(uiLayout.pinnedNavTools);
+    }
+  }, [uiLayout?.pinnedNavTools]);
 
   // Live on-device Typing Metrics state for pinned visual meter
   const [typingStats, setTypingStats] = useState<TypingSessionStats>(() => 
@@ -133,45 +150,47 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   /**
-   * Enforce Pinning Rules:
-   * - Max 3 widget-style pins (Pomodoro timer, live Typing metrics)
-   * - Max 2 icon pins if widgets are pinned, or max 5 icons total if no widgets
+   * Enforce Pinning Rules based on user's layout settings:
+   * - Max widgets configured in settings (default: 3)
+   * - Max icons configured in settings (default: 4)
    */
   const togglePin = (toolId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setPinnedTools((prev) => {
+      let next: string[];
       if (prev.includes(toolId)) {
-        const next = prev.filter((id) => id !== toolId);
-        try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next)); } catch { }
-        return next;
-      }
-
-      const isWidget = WIDGET_TOOL_IDS.includes(toolId);
-      const curWidgets = prev.filter((id) => WIDGET_TOOL_IDS.includes(id));
-      const curIcons = prev.filter((id) => !WIDGET_TOOL_IDS.includes(id));
-
-      let nextWidgets = [...curWidgets];
-      let nextIcons = [...curIcons];
-
-      if (isWidget) {
-        if (nextWidgets.length >= 3) {
-          nextWidgets.shift(); // Remove oldest widget to honor max 3
-        }
-        nextWidgets.push(toolId);
-        // If widgets present, icons limited to max 2
-        if (nextIcons.length > 2) {
-          nextIcons = nextIcons.slice(-2);
-        }
+        next = prev.filter((id) => id !== toolId);
       } else {
-        const maxIcons = nextWidgets.length > 0 ? 2 : 5;
-        if (nextIcons.length >= maxIcons) {
-          nextIcons.shift(); // Remove oldest icon to honor max limit
+        const isWidget = WIDGET_TOOL_IDS.includes(toolId);
+        const curWidgets = prev.filter((id) => WIDGET_TOOL_IDS.includes(id));
+        const curIcons = prev.filter((id) => !WIDGET_TOOL_IDS.includes(id));
+
+        let nextWidgets = [...curWidgets];
+        let nextIcons = [...curIcons];
+
+        if (isWidget) {
+          if (maxWidgets <= 0) return prev;
+          while (nextWidgets.length >= maxWidgets) {
+            nextWidgets.shift();
+          }
+          nextWidgets.push(toolId);
+        } else {
+          if (maxIcons <= 0) return prev;
+          while (nextIcons.length >= maxIcons) {
+            nextIcons.shift();
+          }
+          nextIcons.push(toolId);
         }
-        nextIcons.push(toolId);
+
+        next = [...nextWidgets, ...nextIcons];
       }
 
-      const next = [...nextWidgets, ...nextIcons];
-      try { localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next)); } catch { }
+      try {
+        localStorage.setItem('milearnapp_pinned_tools', JSON.stringify(next));
+      } catch {}
+      if (onUpdateUiLayout) {
+        onUpdateUiLayout({ pinnedNavTools: next });
+      }
       return next;
     });
   };
@@ -199,25 +218,6 @@ export const Header: React.FC<HeaderProps> = ({
             MILEARNAPP
           </span>
         </div>
-
-        {/* User Profile Name Chip next to App Logo */}
-        <button
-          type="button"
-          className="header-profile-brand-chip"
-          onClick={() => (onOpenSettings ? onOpenSettings('profile') : onOpenProfile ? onOpenProfile() : undefined)}
-          title={`Profile: ${userProfile?.name || 'Personal'} • Click to view settings`}
-        >
-          <span className="header-profile-chip-avatar">
-            {userProfile?.avatarType === 'image' || userProfile?.avatarType === 'gif' ? (
-              <img src={userProfile.avatarValue} alt="Avatar" className="header-avatar-mini" />
-            ) : (
-              <span>{userProfile?.avatarValue || '⚡'}</span>
-            )}
-          </span>
-          <span className="header-profile-chip-name">
-            {userProfile?.name || 'Alex Mercer'}
-          </span>
-        </button>
       </div>
 
       {/* Center: Centered Omnisearch Bar */}
@@ -453,7 +453,31 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="tools-tray-dropdown-menu">
                 <div className="tray-menu-header">
                   <span>Tools & Widgets</span>
-                  <span className="tray-pin-hint">Max 3 widgets · 2 icons</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="tray-pin-hint">Max {maxWidgets} widgets · {maxIcons} icons</span>
+                    {onOpenSettings && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsToolsTrayOpen(false);
+                          onOpenSettings('appearance');
+                        }}
+                        title="Configure top navigation controls limit in Settings"
+                        style={{
+                          background: 'rgba(99, 102, 241, 0.12)',
+                          border: '1px solid rgba(99, 102, 241, 0.25)',
+                          color: 'var(--accent-primary, #6366f1)',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          fontWeight: 500
+                        }}
+                      >
+                        Adjust
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* 1. Pomodoro Focus Timer */}

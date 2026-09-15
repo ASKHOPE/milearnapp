@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { Folder as FolderType, Note, ViewFilter, Workspace, Book, ThemeMode, UserProfile } from '../types';
 import { 
   FileText, 
@@ -176,6 +176,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
+  const [isHoverExpanded, setIsHoverExpanded] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnterRail = () => {
+    if (isCollapsed) {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = setTimeout(() => {
+        setIsHoverExpanded(true);
+      }, 120);
+    }
+  };
+
+  const handleMouseLeaveRail = () => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    if (isCollapsed) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        setIsHoverExpanded(false);
+      }, 200);
+    }
+  };
 
   // Limit bottom dock to max 5 pinned workspaces with active space always visible
   const displayedWorkspaces = useMemo(() => {
@@ -506,10 +526,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // COLLAPSED STATE (48px Rail)
-  if (isCollapsed) {
+  // COLLAPSED STATE (48px Rail with Hover Expansion)
+  if (isCollapsed && !isHoverExpanded) {
     return (
-      <aside className={`app-sidebar collapsed ${isOpenMobile ? 'mobile-open' : ''}`}>
+      <aside 
+        className={`app-sidebar collapsed ${isOpenMobile ? 'mobile-open' : ''}`}
+        onMouseEnter={handleMouseEnterRail}
+      >
         <div className="sidebar-collapsed-rail">
           {/* Active Workspace Icon */}
           <div
@@ -600,22 +623,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
-
-        {/* Floating Hover Expand Button on Seam */}
-        {onToggleCollapse && (
-          <button
-            type="button"
-            className="sidebar-hover-toggle-btn collapsed"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleCollapse();
-            }}
-            title="Expand Sidebar"
-            aria-label="Expand Sidebar"
-          >
-            <ChevronRight size={16} />
-          </button>
-        )}
       </aside>
     );
   }
@@ -623,8 +630,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // EXPANDED STATE (Resizable Consolidated Sidebar)
   return (
     <aside 
-      className={`app-sidebar ${isOpenMobile ? 'mobile-open' : ''} ${isResizing ? 'is-resizing' : ''}`}
-      style={{ width: `${sidebarWidth}px` }}
+      className={`app-sidebar ${isCollapsed && isHoverExpanded ? 'hover-expanded' : ''} ${isOpenMobile ? 'mobile-open' : ''} ${isResizing ? 'is-resizing' : ''}`}
+      style={{ width: isCollapsed && isHoverExpanded ? undefined : `${sidebarWidth}px` }}
+      onMouseLeave={isCollapsed ? handleMouseLeaveRail : undefined}
     >
       {/* Top Segmented Switcher: Menu (M) vs Notes (N) + Minimize to Rail Button */}
       <div className="sidebar-top-section">
@@ -1102,8 +1110,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         right: 0,
                         top: '100%',
                         marginTop: '4px',
-                        background: '#131824',
-                        border: '1px solid #1c2233',
+                        background: 'var(--bg-modal)',
+                        border: '1px solid var(--border-color)',
                         borderRadius: '6px',
                         padding: '4px',
                         zIndex: 50,

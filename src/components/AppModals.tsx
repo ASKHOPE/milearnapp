@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import type { Note, Folder, Workspace, Book, ThemeMode, UserProfile, PomodoroMode } from '../types';
+import type { Note, Folder, Workspace, Book, ThemeMode, UserProfile, PomodoroMode, UiLayoutSettings } from '../types';
 import { ErrorBoundary } from './common/ErrorBoundary';
 
 const KnowledgeBaseModal = lazy(() => import('./KnowledgeBaseModal').then(m => ({ default: m.KnowledgeBaseModal })));
@@ -33,8 +33,8 @@ export interface AppModalsProps {
   userProfile: UserProfile;
   onUpdateProfile: (profile: UserProfile) => void;
   settingsInitialTab?: string;
-  uiLayout?: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean };
-  onUpdateUiLayout?: (partial: Partial<{ showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }>) => void;
+  uiLayout?: UiLayoutSettings;
+  onUpdateUiLayout?: (partial: Partial<UiLayoutSettings>) => void;
 
   // Knowledge Base
   isKnowledgeBaseOpen: boolean;

@@ -11,6 +11,9 @@ export interface UiLayoutSettings {
   showSidebarCalendar: boolean;
   sidebarCollapsed: boolean;
   noteListCollapsed: boolean;
+  maxNavWidgets?: number;
+  maxNavIcons?: number;
+  pinnedNavTools?: string[];
 }
 
 export interface UserProfile {

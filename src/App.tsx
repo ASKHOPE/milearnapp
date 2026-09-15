@@ -882,7 +882,7 @@ export const App: React.FC = () => {
   const workspaceFolders = folders.filter((f) => (f.workspaceId || 'ws-personal') === activeWorkspaceId);
   const workspaceBooks = books.filter((b) => (b.workspaceId || 'ws-work') === activeWorkspaceId);
 
-  const handleUpdateUiLayout = (partial: Partial<{ showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }>) => {
+  const handleUpdateUiLayout = (partial: Partial<import('./types').UiLayoutSettings>) => {
     setUiLayout((prev) => {
       const next = { ...prev, ...partial };
       storage.setUiLayoutSettings(next);
@@ -936,6 +936,8 @@ export const App: React.FC = () => {
         notes={workspaceNotes}
         onSelectDate={handleSelectDate}
         onOpenTodayNote={handleOpenTodayNote}
+        uiLayout={uiLayout}
+        onUpdateUiLayout={handleUpdateUiLayout}
       />
 
       {/* 3-Pane Main Application Layout */}
@@ -1066,6 +1068,8 @@ export const App: React.FC = () => {
                 onCloseNote={handleCloseNote}
                 onDuplicateNote={handleDuplicateNote}
                 onMoveNote={handleMoveNote}
+                userProfile={userProfile}
+                onOpenProfile={() => { setSettingsInitialTab('profile'); setIsSettingsOpen(true); }}
               />
             }
             rightPane={
@@ -1100,6 +1104,8 @@ export const App: React.FC = () => {
                 onCloseNote={handleCloseSplit}
                 onDuplicateNote={handleDuplicateNote}
                 onMoveNote={handleMoveNote}
+                userProfile={userProfile}
+                onOpenProfile={() => { setSettingsInitialTab('profile'); setIsSettingsOpen(true); }}
               />
             }
           />
@@ -1135,6 +1141,8 @@ export const App: React.FC = () => {
             onCloseNote={handleCloseNote}
             onDuplicateNote={handleDuplicateNote}
             onMoveNote={handleMoveNote}
+            userProfile={userProfile}
+            onOpenProfile={() => { setSettingsInitialTab('profile'); setIsSettingsOpen(true); }}
           />
         )}
       </div>

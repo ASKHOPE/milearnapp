@@ -1,4 +1,4 @@
-import { type Note, type Folder, type ThemeMode, type ResolvedTheme, type TypographySettings, type Workspace, type Book, type UserProfile, DEFAULT_USER_PROFILE } from '../types';
+import { type Note, type Folder, type ThemeMode, type ResolvedTheme, type TypographySettings, type Workspace, type Book, type UserProfile, type UiLayoutSettings, DEFAULT_USER_PROFILE } from '../types';
 import { validateVaultData } from './validation/schemas';
 import { flashcardService } from './flashcards';
 import { debugLogger } from './debugLogger';
@@ -693,8 +693,15 @@ export const storage = {
   },
 
   // --- UI Layout & Interaction Settings ---
-  getUiLayoutSettings(): { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean } {
-    const defaults = { showSidebarCalendar: true, sidebarCollapsed: false, noteListCollapsed: false };
+  getUiLayoutSettings(): UiLayoutSettings {
+    const defaults: UiLayoutSettings = {
+      showSidebarCalendar: true,
+      sidebarCollapsed: false,
+      noteListCollapsed: false,
+      maxNavWidgets: 3,
+      maxNavIcons: 4,
+      pinnedNavTools: ['pomodoro', 'calendar', 'study']
+    };
     try {
       const saved = localStorage.getItem('milearnapp_ui_layout');
       if (saved) return { ...defaults, ...JSON.parse(saved) };
@@ -702,7 +709,7 @@ export const storage = {
     return defaults;
   },
 
-  setUiLayoutSettings(settings: { showSidebarCalendar: boolean; sidebarCollapsed: boolean; noteListCollapsed: boolean }) {
+  setUiLayoutSettings(settings: UiLayoutSettings) {
     try {
       localStorage.setItem('milearnapp_ui_layout', JSON.stringify(settings));
     } catch (e) {

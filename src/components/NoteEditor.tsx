@@ -4,7 +4,8 @@ import type {
   Folder as FolderType, 
   Attachment,
   Book,
-  Workspace
+  Workspace,
+  UserProfile
 } from '../types';
 import { 
   Trash2, 
@@ -20,11 +21,11 @@ import {
   Zap,
   LayoutTemplate,
   ChevronDown,
+  ChevronUp,
   RotateCcw,
   Lock,
   Unlock,
   ChevronRight,
-  Save,
   Sliders,
   Type,
   Printer,
@@ -34,7 +35,6 @@ import {
   Sparkles,
   Image as ImageIcon
 } from 'lucide-react';
-import { AttachmentManager } from './AttachmentManager';
 import { VoiceRecorder } from './VoiceRecorder';
 import { EditorSuggestions } from './EditorSuggestions';
 import type { SuggestionType } from './EditorSuggestions';
@@ -45,7 +45,6 @@ import { EditorToolbar } from './editor/EditorToolbar';
 import { EditorStudioModals } from './editor/EditorStudioModals';
 import { EditorFooterStatus } from './editor/EditorFooterStatus';
 import { ErrorBoundary } from './common/ErrorBoundary';
-import { BookPageNavigator } from './BookPageNavigator';
 import { MathRenderer } from './MathRenderer';
 import { MermaidRenderer } from './MermaidRenderer';
 import { LockNoteModal } from './LockNoteModal';
@@ -96,6 +95,8 @@ interface NoteEditorProps {
   onCloseNote?: () => void;
   onDuplicateNote?: (note: Note) => void;
   onMoveNote?: (noteId: string, folderId: string | null, bookId: string | null) => void;
+  userProfile?: UserProfile;
+  onOpenProfile?: () => void;
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -129,7 +130,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   onOpenSplit,
   onCloseNote,
   onDuplicateNote,
-  onMoveNote
+  onMoveNote,
+  userProfile,
+  onOpenProfile
 }) => {
   const [mode, setMode] = useState<'live' | 'split' | 'source'>('live');
   const [isInsertImageOpen, setIsInsertImageOpen] = useState(false);
@@ -240,44 +243,59 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     navigator.clipboard.writeText(linkText);
   };
 
-  // 4-Row Toolbar Collapse States
+  // 4-Row Toolbar Collapse States (Default: false for ultra-compact 1-row header)
   const [isRow1Open, setIsRow1Open] = useState<boolean>(() => {
     const saved = localStorage.getItem('milearnapp_editor_row1_open');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
   const [isRow2Open, setIsRow2Open] = useState<boolean>(() => {
     const saved = localStorage.getItem('milearnapp_editor_row2_open');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
   const [isRow3Open, setIsRow3Open] = useState<boolean>(() => {
     const saved = localStorage.getItem('milearnapp_editor_row3_open');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
   const [isRow4Open, setIsRow4Open] = useState<boolean>(() => {
     const saved = localStorage.getItem('milearnapp_editor_row4_open');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
+
+  const collapseAllRows = () => {
+    setIsRow1Open(false);
+    setIsRow2Open(false);
+    setIsRow3Open(false);
+    setIsRow4Open(false);
+    localStorage.setItem('milearnapp_editor_row1_open', 'false');
+    localStorage.setItem('milearnapp_editor_row2_open', 'false');
+    localStorage.setItem('milearnapp_editor_row3_open', 'false');
+    localStorage.setItem('milearnapp_editor_row4_open', 'false');
+  };
 
   const toggleRow = (rowNum: 1 | 2 | 3 | 4) => {
     if (rowNum === 1) {
       setIsRow1Open(prev => {
-        localStorage.setItem('milearnapp_editor_row1_open', String(!prev));
-        return !prev;
+        const next = !prev;
+        localStorage.setItem('milearnapp_editor_row1_open', String(next));
+        return next;
       });
     } else if (rowNum === 2) {
       setIsRow2Open(prev => {
-        localStorage.setItem('milearnapp_editor_row2_open', String(!prev));
-        return !prev;
+        const next = !prev;
+        localStorage.setItem('milearnapp_editor_row2_open', String(next));
+        return next;
       });
     } else if (rowNum === 3) {
       setIsRow3Open(prev => {
-        localStorage.setItem('milearnapp_editor_row3_open', String(!prev));
-        return !prev;
+        const next = !prev;
+        localStorage.setItem('milearnapp_editor_row3_open', String(next));
+        return next;
       });
     } else if (rowNum === 4) {
       setIsRow4Open(prev => {
-        localStorage.setItem('milearnapp_editor_row4_open', String(!prev));
-        return !prev;
+        const next = !prev;
+        localStorage.setItem('milearnapp_editor_row4_open', String(next));
+        return next;
       });
     }
   };
@@ -1871,6 +1889,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 <span>Media</span>
               </button>
 
+              {(isRow1Open || isRow2Open || isRow3Open || isRow4Open) && (
+                <button
+                  type="button"
+                  className="tab-row-pill tab-collapse-all-pill"
+                  onClick={collapseAllRows}
+                  title="Collapse all toolbars into 1 ultra-compact header row"
+                  style={{ background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent-primary)', borderColor: 'rgba(99, 102, 241, 0.3)' }}
+                >
+                  <ChevronUp size={11} />
+                  <span>Compact Header</span>
+                </button>
+              )}
+
               {/* Share & Export Dropdown Button right next to Media */}
               <div className="tab-share-menu-container" style={{ position: 'relative' }}>
                 <button
@@ -2019,18 +2050,6 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 )}
               </div>
             </div>
-
-            {/* Quick Save Pill */}
-            <button
-              type="button"
-              className={`editor-save-btn tab-save-btn ${saveStatus}`}
-              onClick={handleManualSave}
-              disabled={note.isTrashed || saveStatus === 'saving'}
-              title="Save Note (Cmd+S / Ctrl+S)"
-            >
-              <Save size={12} />
-              <span>{saveStatus === 'saving' ? 'Saving...' : saveStatus === 'unsaved' ? 'Save' : 'Saved'}</span>
-            </button>
           </div>
         }
         onRenameTab={(noteId, newTitle) => {
@@ -2551,23 +2570,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             </div>
           )}
 
-          {/* Book Reader Page Navigation Bar (if note is part of a book) */}
-          {currentBook && allBookPages.length > 0 && (
-            <BookPageNavigator
-              currentNote={note}
-              book={currentBook}
-              allBookPages={allBookPages}
-              onSelectPage={onNavigateToNote}
-              onAddPageToBook={onAddPageToBook}
-            />
-          )}
 
-          {/* Multimedia & Attachments Section */}
-          <AttachmentManager
-            attachments={note.attachments || []}
-            onAddAttachment={handleAddAttachment}
-            onDeleteAttachment={handleDeleteAttachment}
-          />
+
+
 
           {/* Backlinks & Connected References */}
           {backlinks.length > 0 && (
@@ -2746,6 +2751,17 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         content={note.content || ''}
         mode={mode}
         setMode={setMode}
+        currentNote={note}
+        book={currentBook || undefined}
+        allBookPages={allBookPages}
+        onSelectPage={onNavigateToNote}
+        onAddPageToBook={onAddPageToBook}
+        onManualSave={handleManualSave}
+        userProfile={userProfile}
+        onOpenProfile={onOpenProfile}
+        attachments={note.attachments || []}
+        onAddAttachment={handleAddAttachment}
+        onDeleteAttachment={handleDeleteAttachment}
       />
         </>
       )}

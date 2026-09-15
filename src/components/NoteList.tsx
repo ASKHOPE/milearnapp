@@ -103,7 +103,7 @@ export const NoteList: React.FC<NoteListProps> = ({
   } else if (currentFilter === 'recent') {
     columnTitle = 'Recent Notes';
   } else if (currentFilter === 'quick') {
-    columnTitle = 'Quick Notes';
+    columnTitle = 'Quick Note';
   } else if (currentFilter === 'attachments') {
     columnTitle = 'Files & Media';
   } else if (currentFilter === 'archive') {

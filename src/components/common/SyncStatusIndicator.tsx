@@ -3,7 +3,7 @@ import { RefreshCw, Cloud } from 'lucide-react';
 import { useSyncStatus } from '../../hooks/useSyncStatus';
 
 interface SyncStatusIndicatorProps {
-  variant?: 'compact' | 'pill' | 'sidebar';
+  variant?: 'compact' | 'pill' | 'sidebar' | 'profile';
   onOpenSettings?: (tab?: string) => void;
   showLabel?: boolean;
   className?: string;
@@ -119,6 +119,37 @@ export const SyncStatusIndicator: React.FC<SyncStatusIndicatorProps> = ({
             display: 'inline-block'
           }}
         />
+      </button>
+    );
+  }
+
+  if (variant === 'profile') {
+    return (
+      <button
+        type="button"
+        className={`profile-sync-pill ${className}`}
+        onClick={handleClick}
+        title={tooltipText}
+      >
+        <span
+          className="profile-sync-dot"
+          style={{
+            backgroundColor: statusColor,
+            boxShadow: `0 0 6px ${statusColor}`
+          }}
+        />
+        {showLabel && (
+          <span className="profile-sync-label">
+            {statusLabel}
+          </span>
+        )}
+        {isSyncing && (
+          <RefreshCw
+            size={9}
+            className="spin-animation profile-sync-spin"
+            style={{ color: statusColor }}
+          />
+        )}
       </button>
     );
   }

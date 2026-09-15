@@ -61,6 +61,8 @@ import { FloatingBubbleToolbar, type FloatingBubblePosition } from './editor/Flo
 import { BlockActionsMenu } from './editor/BlockActionsMenu';
 import { flashcardService } from '../services/flashcards';
 import { ConflictBanner } from './editor/ConflictBanner';
+import { QuickNoteSimpleEditor } from './editor/QuickNoteSimpleEditor';
+import { ConvertQuickNoteModal } from './editor/ConvertQuickNoteModal';
 
 interface NoteEditorProps {
   note: Note | null;
@@ -181,6 +183,30 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     return localStorage.getItem('milearnapp_autosave_enabled') !== 'false';
   });
   const pendingNoteRef = useRef<Note | null>(null);
+
+  // Quick Note Simple vs Advanced Mode
+  const isQuickNote = Boolean(
+    note && (
+      note.tags?.includes('quick-note') ||
+      note.title.startsWith('⚡ Quick') ||
+      note.id.startsWith('n-quick-')
+    )
+  );
+  const [isSimpleEditor, setIsSimpleEditor] = useState<boolean>(true);
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (note) {
+      const isQuick = Boolean(
+        note.tags?.includes('quick-note') ||
+        note.title.startsWith('⚡ Quick') ||
+        note.id.startsWith('n-quick-')
+      );
+      if (isQuick) {
+        setIsSimpleEditor(true);
+      }
+    }
+  }, [note?.id]);
 
   // Export note file helpers for Share dropdown
   const handleExportFile = (format: 'md' | 'html' | 'txt') => {
@@ -2062,7 +2088,49 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         }}
       />
 
-      {/* 4-ROW COLLAPSIBLE SYSTEMATIC TOOLBAR */}
+      {/* Quick Note Simple Editor Mode vs Advanced Mode */}
+      {isQuickNote && isSimpleEditor ? (
+        <QuickNoteSimpleEditor
+          note={note}
+          onUpdateNote={onUpdateNote}
+          onDeleteNote={onDeleteNote}
+          onToggleAdvanced={() => setIsSimpleEditor(false)}
+          onOpenConvertModal={() => setIsConvertModalOpen(true)}
+          saveStatus={saveStatus}
+        />
+      ) : (
+        <>
+          {/* Advanced Mode Banner for Quick Notes */}
+          {isQuickNote && !isSimpleEditor && (
+            <div className="quick-note-advanced-mode-banner">
+              <div className="quick-note-banner-left">
+                <Zap size={13} className="quick-note-banner-icon" />
+                <span>Quick Note (Advanced Editor Mode)</span>
+              </div>
+              <div className="quick-note-banner-right">
+                <button
+                  type="button"
+                  className="quick-note-banner-btn simple"
+                  onClick={() => setIsSimpleEditor(true)}
+                  title="Switch back to clean Simple Editor"
+                >
+                  <Zap size={12} />
+                  <span>Simple Editor</span>
+                </button>
+                <button
+                  type="button"
+                  className="quick-note-banner-btn convert"
+                  onClick={() => setIsConvertModalOpen(true)}
+                  title="Convert this quick note into a standard note or page in a book"
+                >
+                  <Sparkles size={12} />
+                  <span>Convert to Note / Book...</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 4-ROW COLLAPSIBLE SYSTEMATIC TOOLBAR */}
       <EditorToolbar
         note={note}
         folders={folders}
@@ -2679,6 +2747,22 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         mode={mode}
         setMode={setMode}
       />
+        </>
+      )}
+
+      {/* Convert Quick Note Modal */}
+      {note && (
+        <ConvertQuickNoteModal
+          isOpen={isConvertModalOpen}
+          onClose={() => setIsConvertModalOpen(false)}
+          note={note}
+          folders={folders}
+          books={books}
+          allNotes={allNotes}
+          onUpdateNote={onUpdateNote}
+          onConverted={() => setIsSimpleEditor(false)}
+        />
+      )}
     </main>
   );
 };

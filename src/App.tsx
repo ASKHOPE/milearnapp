@@ -910,6 +910,12 @@ export const App: React.FC = () => {
         theme={theme}
         activeWorkspace={activeWorkspace}
         userProfile={userProfile}
+        onToggleSidebar={() => {
+          const next = !isSidebarCollapsed;
+          setIsSidebarCollapsed(next);
+          handleUpdateUiLayout({ sidebarCollapsed: next });
+        }}
+        isSidebarCollapsed={isSidebarCollapsed}
         pomodoroSecondsLeft={pomodoroSecondsLeft}
         isPomodoroRunning={isPomodoroRunning}
         pomodoroMode={pomodoroMode}
@@ -927,11 +933,14 @@ export const App: React.FC = () => {
         onOpenWebClipper={() => setIsWebClipperOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         onQuickNote={handleCreateQuickNote}
+        notes={workspaceNotes}
+        onSelectDate={handleSelectDate}
+        onOpenTodayNote={handleOpenTodayNote}
       />
 
       {/* 3-Pane Main Application Layout */}
       {/* 2-Pane Main Application Layout: Consolidated M/N Sidebar + Reclaimed Editor Workspace */}
-      <div className="app-main">
+      <div className={`app-main ${isSidebarCollapsed ? 'sidebar-is-collapsed' : 'sidebar-is-expanded'}`}>
         {/* Pane 1: Consolidated M & N Sidebar */}
         <Sidebar
           workspaces={workspaces}
@@ -980,6 +989,11 @@ export const App: React.FC = () => {
           onDeleteFolder={handleDeleteFolder}
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
           theme={theme}
+          userProfile={userProfile}
+          onOpenProfile={() => {
+            setSettingsInitialTab('profile');
+            setIsSettingsOpen(true);
+          }}
           onToggleTheme={handleToggleTheme}
           onChangeTheme={handleChangeTheme}
           onOpenSettings={(tab) => {
@@ -988,6 +1002,7 @@ export const App: React.FC = () => {
           }}
           onSelectNoteSplit={handleOpenNoteSplit}
           onCreateNote={handleCreateNote}
+          onCreateQuickNote={handleCreateQuickNote}
           onToggleFavorite={handleToggleFavorite}
           onEmptyTrash={handleEmptyTrash}
           onRestoreNote={handleRestoreNote}

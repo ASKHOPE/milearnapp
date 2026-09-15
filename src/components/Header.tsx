@@ -6,7 +6,6 @@ import {
   Menu,
   GraduationCap,
   Timer,
-  Settings,
   Brain,
   Sparkles,
   ChevronDown,
@@ -17,11 +16,12 @@ import {
   Keyboard,
   BookA,
   Globe,
-  Zap
+  Zap,
+  Calendar
 } from 'lucide-react';
-import type { ThemeMode, Workspace, PomodoroMode, UserProfile } from '../types';
+import type { ThemeMode, Workspace, PomodoroMode, UserProfile, Note } from '../types';
 import { typingMetrics, type TypingSessionStats } from '../services/typingMetrics';
-import { SyncStatusIndicator } from './common/SyncStatusIndicator';
+import { CalendarWidget } from './CalendarWidget';
 
 interface HeaderProps {
   theme?: ThemeMode;
@@ -31,11 +31,13 @@ interface HeaderProps {
   isPomodoroRunning?: boolean;
   pomodoroMode?: PomodoroMode;
   onToggleTheme?: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarCollapsed?: boolean;
   onOpenSearch: () => void;
   onOpenKnowledgeBase: () => void;
   onOpenInternalMind?: () => void;
   onOpenLinkTree: () => void;
-  onOpenProfile: () => void;
+  onOpenProfile?: () => void;
   onOpenSettings?: (tab?: string) => void;
   onOpenStudyMode: () => void;
   onOpenPomodoro: () => void;
@@ -44,37 +46,45 @@ interface HeaderProps {
   onOpenWebClipper?: () => void;
   onToggleMobileSidebar: () => void;
   onQuickNote?: () => void;
+  notes?: Note[];
+  onSelectDate?: (dateStr: string) => void;
+  onOpenTodayNote?: () => void;
 }
 
-const WIDGET_TOOL_IDS = ['pomodoro', 'typing'];
+const WIDGET_TOOL_IDS = ['pomodoro', 'typing', 'calendar'];
 
 export const Header: React.FC<HeaderProps> = ({
-  activeWorkspace,
   userProfile,
+  onOpenProfile,
+  onOpenSettings,
   pomodoroSecondsLeft,
   isPomodoroRunning,
   pomodoroMode = 'work',
+  onToggleSidebar: _onToggleSidebar,
+  isSidebarCollapsed: _isSidebarCollapsed = false,
   onOpenSearch,
   onOpenKnowledgeBase,
   onOpenInternalMind,
   onOpenLinkTree,
-  onOpenProfile,
-  onOpenSettings,
   onOpenStudyMode,
   onOpenPomodoro,
   onOpenTypingMetrics,
   onOpenDictionary,
   onOpenWebClipper,
   onToggleMobileSidebar,
-  onQuickNote
+  onQuickNote,
+  notes = [],
+  onSelectDate,
+  onOpenTodayNote
 }) => {
   const [isToolsTrayOpen, setIsToolsTrayOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [pinnedTools, setPinnedTools] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('milearnapp_pinned_tools');
-      return saved ? JSON.parse(saved) : ['pomodoro', 'study'];
+      return saved ? JSON.parse(saved) : ['pomodoro', 'calendar', 'study'];
     } catch {
-      return ['pomodoro', 'study'];
+      return ['pomodoro', 'calendar', 'study'];
     }
   });
 
@@ -189,6 +199,25 @@ export const Header: React.FC<HeaderProps> = ({
             MILEARNAPP
           </span>
         </div>
+
+        {/* User Profile Name Chip next to App Logo */}
+        <button
+          type="button"
+          className="header-profile-brand-chip"
+          onClick={() => (onOpenSettings ? onOpenSettings('profile') : onOpenProfile ? onOpenProfile() : undefined)}
+          title={`Profile: ${userProfile?.name || 'Personal'} • Click to view settings`}
+        >
+          <span className="header-profile-chip-avatar">
+            {userProfile?.avatarType === 'image' || userProfile?.avatarType === 'gif' ? (
+              <img src={userProfile.avatarValue} alt="Avatar" className="header-avatar-mini" />
+            ) : (
+              <span>{userProfile?.avatarValue || '⚡'}</span>
+            )}
+          </span>
+          <span className="header-profile-chip-name">
+            {userProfile?.name || 'Alex Mercer'}
+          </span>
+        </button>
       </div>
 
       {/* Center: Centered Omnisearch Bar */}
@@ -272,6 +301,45 @@ export const Header: React.FC<HeaderProps> = ({
                   <span className="pinned-widget-acc">{typingStats.accuracy}%</span>
                 </span>
               </button>
+            )}
+
+            {/* WIDGET 3: Live Calendar & Daily Schedule Launcher */}
+            {pinnedTools.includes('calendar') && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  className={`header-pinned-tool-btn header-pinned-widget ${isCalendarOpen ? 'active' : ''}`}
+                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                  title={`Interactive Calendar (${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`}
+                >
+                  <Calendar size={13} color="#34d399" />
+                  <span className="pinned-widget-text">
+                    <strong>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong>
+                  </span>
+                </button>
+
+                {isCalendarOpen && (
+                  <>
+                    <div
+                      className="header-calendar-backdrop"
+                      onClick={() => setIsCalendarOpen(false)}
+                    />
+                    <div className="header-calendar-popover" role="dialog" aria-label="Calendar">
+                      <CalendarWidget
+                        notes={notes}
+                        onSelectDate={(d) => {
+                          onSelectDate?.(d);
+                          setIsCalendarOpen(false);
+                        }}
+                        onOpenTodayNote={() => {
+                          onOpenTodayNote?.();
+                          setIsCalendarOpen(false);
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {/* ICON 1: Study Cards (SRS Flashcards) */}
@@ -439,6 +507,33 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 </div>
 
+                {/* 3. Interactive Calendar & Daily Schedule */}
+                <div className="tray-item-row-wrap">
+                  <button
+                    type="button"
+                    className="tray-item-btn"
+                    onClick={() => {
+                      setIsCalendarOpen(true);
+                      setIsToolsTrayOpen(false);
+                    }}
+                    title="Open Interactive Calendar & Daily Schedule"
+                  >
+                    <Calendar size={15} color="#34d399" />
+                    <div className="tray-item-text">
+                      <strong>Calendar & Daily Notes</strong>
+                      <span>Interactive month view & daily jump</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn-tool-pin ${pinnedTools.includes('calendar') ? 'pinned' : ''}`}
+                    onClick={(e) => togglePin('calendar', e)}
+                    title={pinnedTools.includes('calendar') ? 'Unpin calendar from nav' : 'Pin calendar widget to nav'}
+                  >
+                    {pinnedTools.includes('calendar') ? <PinOff size={13} /> : <Pin size={13} />}
+                  </button>
+                </div>
+
                 {/* 3. Study Flashcards */}
                 <div className="tray-item-row-wrap">
                   <button
@@ -592,36 +687,6 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </div>
-
-        {/* Live Cloud Differential Sync Status Indicator */}
-        <SyncStatusIndicator onOpenSettings={onOpenSettings} />
-
-        {/* Combined Profile & Settings Tablet (Profile Avatar + Name + Settings Gear Icon with Live Postgres Indicator) */}
-        <div
-          className="header-profile-tablet"
-          onClick={() => (onOpenSettings ? onOpenSettings('profile') : onOpenProfile())}
-          title="Account, Identity & Settings (Cmd+,)"
-        >
-          <div className="profile-tablet-avatar">
-            {userProfile?.avatarType === 'image' || userProfile?.avatarType === 'gif' ? (
-              <img
-                src={userProfile.avatarValue}
-                alt="Avatar"
-                className="header-avatar-mini"
-              />
-            ) : (
-              <span>{userProfile?.avatarValue || activeWorkspace?.icon || '⚡'}</span>
-            )}
-          </div>
-          <span className="profile-tablet-name">
-            {userProfile?.name || activeWorkspace?.name || 'Personal'}
-          </span>
-          <div className="profile-tablet-gear-box" title="Open Settings (Cmd+,)">
-            <Settings size={13} className="profile-tablet-gear" />
-            <span className="settings-nav-pg-dot connected" title="PostgreSQL: Connected & Synced" />
-          </div>
-        </div>
-
       </div>
     </header>
   );

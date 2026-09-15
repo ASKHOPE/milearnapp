@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Folder as FolderType, Note, ViewFilter, Workspace, Book, ThemeMode } from '../types';
+import type { Folder as FolderType, Note, ViewFilter, Workspace, Book, ThemeMode, UserProfile } from '../types';
 import { 
   FileText, 
   Star, 
@@ -7,23 +7,21 @@ import {
   Folder, 
   Tag, 
   ChevronRight, 
+  ChevronLeft,
   ChevronDown, 
   ChevronUp,
   Trash2, 
   Paperclip,
   Archive,
-  Calendar as CalendarIcon,
   BookOpen,
-  PanelLeftClose,
   PanelLeftOpen,
+  PanelLeftClose,
   Zap,
   Pin,
   SlidersHorizontal,
   Plus,
   Sun,
   Moon,
-  Monitor,
-  Sparkles,
   Columns2,
   RotateCcw,
   Lock,
@@ -32,11 +30,9 @@ import {
   Menu,
   X,
   Search,
-  Settings,
-  HelpCircle
+  Settings
 } from 'lucide-react';
 
-import { CalendarWidget } from './CalendarWidget';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { TagSelectorPopover } from './TagSelectorPopover';
 import { FolderSelectorModal } from './FolderSelectorModal';
@@ -80,9 +76,12 @@ interface SidebarProps {
   onToggleTheme?: () => void;
   onChangeTheme?: (mode: ThemeMode) => void;
   onOpenSettings?: (tab?: string) => void;
+  userProfile?: UserProfile;
+  onOpenProfile?: () => void;
   // Note List Integration props
   onSelectNoteSplit?: (noteId: string) => void;
   onCreateNote?: () => void;
+  onCreateQuickNote?: () => void;
   onToggleFavorite?: (noteId: string, e: React.MouseEvent) => void;
   onEmptyTrash?: () => void;
   onRestoreNote?: (noteId: string, e: React.MouseEvent) => void;
@@ -134,7 +133,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpenMobile,
   isCollapsed = false,
   onToggleCollapse,
-  showCalendar = false,
   onSelectWorkspace,
   onCreateWorkspace,
   onRenameWorkspace,
@@ -146,8 +144,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectFilter,
   onSelectFolder,
   onSelectTag,
-  onSelectDate,
-  onOpenTodayNote,
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
@@ -156,8 +152,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   theme = 'dark',
   onChangeTheme,
   onOpenSettings,
+  userProfile: _userProfile,
+  onOpenProfile: _onOpenProfile,
   onSelectNoteSplit,
   onCreateNote,
+  onCreateQuickNote,
   onToggleFavorite,
   onEmptyTrash,
   onRestoreNote,
@@ -175,6 +174,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return 'M';
     }
   });
+
+  const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
+
+  // Limit bottom dock to max 5 pinned workspaces with active space always visible
+  const displayedWorkspaces = useMemo(() => {
+    if (workspaces.length <= 5) return workspaces;
+    const activeIndex = workspaces.findIndex((w) => w.id === activeWorkspaceId);
+    if (activeIndex < 5) {
+      return workspaces.slice(0, 5);
+    }
+    return [...workspaces.slice(0, 4), workspaces[activeIndex]];
+  }, [workspaces, activeWorkspaceId]);
+
+  // Resizable Sidebar Width (persisted in localStorage, clamped 220px - 560px)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('milearnapp_sidebar_width');
+      if (saved) {
+        const val = Number(saved);
+        if (!isNaN(val) && val >= 220 && val <= 560) {
+          return val;
+        }
+      }
+    } catch {}
+    return 300;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Resize drag event handler
+  const handleMouseDownResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    document.body.classList.add('is-sidebar-resizing');
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (moveEvt: MouseEvent) => {
+      const delta = moveEvt.clientX - startX;
+      const nextWidth = Math.min(Math.max(startWidth + delta, 220), 560);
+      setSidebarWidth(nextWidth);
+    };
+
+    const handleMouseUp = (upEvt: MouseEvent) => {
+      setIsResizing(false);
+      document.body.classList.remove('is-sidebar-resizing');
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      const delta = upEvt.clientX - startX;
+      const finalWidth = Math.min(Math.max(startWidth + delta, 220), 560);
+      try {
+        localStorage.setItem('milearnapp_sidebar_width', String(finalWidth));
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleResetWidth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSidebarWidth(300);
+    try {
+      localStorage.setItem('milearnapp_sidebar_width', '300');
+    } catch {}
+  };
+
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('is-sidebar-resizing');
+    };
+  }, []);
 
   const handleSetViewMode = (mode: 'M' | 'N') => {
     setViewMode(mode);
@@ -212,14 +285,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [expandedBookIds, setExpandedBookIds] = useState<Set<string>>(new Set());
   const [isFoldersExpanded, setIsFoldersExpanded] = useState(true);
   const [isBooksExpanded, setIsBooksExpanded] = useState(true);
-  const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
   const [isNavSectionCollapsed, setIsNavSectionCollapsed] = useState(false);
 
   // Modal / Popover States
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [noteToMoveId, setNoteToMoveId] = useState<string | null>(null);
 
@@ -264,6 +335,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     });
   };
 
+
   // Note Counts
   const activeNotes = useMemo(() => notes.filter((n) => !n.isTrashed && !n.isArchived), [notes]);
   const quickNotesCount = useMemo(() => activeNotes.filter(
@@ -300,7 +372,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (selectedTag) return `#${selectedTag}`;
     if (currentFilter === 'favorites') return 'Favorites';
     if (currentFilter === 'recent') return 'Recent Notes';
-    if (currentFilter === 'quick') return 'Quick Notes';
+    if (currentFilter === 'quick') return 'Quick Note';
     if (currentFilter === 'attachments') return 'With Media';
     if (currentFilter === 'archive') return 'Archive';
     if (currentFilter === 'trash') return 'Trash Bin';
@@ -504,7 +576,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          <div style={{ flex: 1 }} />
+          <div className="sidebar-rail-divider" />
 
           {/* Theme Quick Toggle */}
           <button
@@ -516,42 +588,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
           </button>
 
-          {/* Settings Trigger */}
+          {/* Settings Quick Toggle */}
           {onOpenSettings && (
             <button
               type="button"
               className="sidebar-rail-btn"
-              onClick={() => onOpenSettings('database')}
-              title="Vault Settings"
+              onClick={() => onOpenSettings('general')}
+              title="Settings (Cmd+,)"
             >
               <Settings size={15} />
             </button>
           )}
         </div>
+
+        {/* Floating Hover Expand Button on Seam */}
+        {onToggleCollapse && (
+          <button
+            type="button"
+            className="sidebar-hover-toggle-btn collapsed"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse();
+            }}
+            title="Expand Sidebar"
+            aria-label="Expand Sidebar"
+          >
+            <ChevronRight size={16} />
+          </button>
+        )}
       </aside>
     );
   }
 
-  // EXPANDED STATE (320px Consolidated Sidebar)
+  // EXPANDED STATE (Resizable Consolidated Sidebar)
   return (
-    <aside className={`app-sidebar ${isOpenMobile ? 'mobile-open' : ''}`}>
-      {/* Top Workspace Selector & M / N View Segmented Switcher */}
-      <div className="sidebar-top-bar-row">
-        {/* Unified Capsule: Workspace Dropdown + Menu/Notes Switcher */}
-        <div className="sidebar-unified-capsule">
-          {/* Workspace Switcher */}
-          <WorkspaceSwitcher
-            compact
-            workspaces={workspaces}
-            activeWorkspaceId={activeWorkspaceId}
-            notesCountByWorkspace={notesCountByWorkspace}
-            onSelectWorkspace={onSelectWorkspace}
-            onCreateWorkspace={onCreateWorkspace}
-            onRenameWorkspace={onRenameWorkspace}
-            onDeleteWorkspace={onDeleteWorkspace}
-          />
-
-          {/* Segmented Mode Switcher: Menu (M) vs Notes (N) */}
+    <aside 
+      className={`app-sidebar ${isOpenMobile ? 'mobile-open' : ''} ${isResizing ? 'is-resizing' : ''}`}
+      style={{ width: `${sidebarWidth}px` }}
+    >
+      {/* Top Segmented Switcher: Menu (M) vs Notes (N) + Minimize to Rail Button */}
+      <div className="sidebar-top-section">
+        <div className="sidebar-top-header-row">
           <div className="sidebar-mode-segmented-track">
             <button
               type="button"
@@ -560,7 +637,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleSetViewMode('M')}
               title="Menu & Directory Tree View (Press M)"
             >
-              <Menu size={12} />
+              <Menu size={13} />
               <span>Menu (M)</span>
             </button>
 
@@ -571,24 +648,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => handleSetViewMode('N')}
               title="Notes Feed List (Press N)"
             >
-              <FileText size={12} />
+              <FileText size={13} />
               <span>Notes (N)</span>
               <span className="sidebar-segmented-count">{activeNotes.length}</span>
             </button>
           </div>
-        </div>
 
-        {/* Collapse Sidebar Button */}
-        {onToggleCollapse && (
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            onClick={onToggleCollapse}
-            title="Collapse Sidebar"
-          >
-            <PanelLeftClose size={15} />
-          </button>
-        )}
+          {onToggleCollapse && (
+            <button
+              type="button"
+              id="sidebar-minimize-rail-btn"
+              className="sidebar-minimize-rail-btn"
+              onClick={onToggleCollapse}
+              title="Minimize to Floating Rail (◧)"
+              aria-label="Minimize to Floating Rail"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* =========================================================================
@@ -620,19 +698,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="nav-item-count">{activeNotes.length}</span>
                 </button>
 
-                {/* Quick Notes */}
+                {/* Quick Note */}
                 <button
                   type="button"
                   className={`nav-item ${currentFilter === 'quick' ? 'active' : ''}`}
                   onClick={() => {
                     onSelectFilter('quick');
                     handleSetViewMode('N');
+                    const latestQuick = activeNotes.find(
+                      (n) => n.tags?.includes('quick-note') || n.title.includes('Quick Scratchpad')
+                    );
+                    if (latestQuick && onSelectNote) {
+                      onSelectNote(latestQuick.id);
+                    } else if (onCreateQuickNote) {
+                      onCreateQuickNote();
+                    }
                     onCloseMobile();
                   }}
                 >
                   <div className="nav-item-left">
                     <Zap size={14} color="#f59e0b" />
-                    <span>Quick Notes</span>
+                    <span>Quick Note</span>
                   </div>
                   {quickNotesCount > 0 && <span className="nav-item-count">{quickNotesCount}</span>}
                 </button>
@@ -742,6 +828,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </span>
                   </button>
                 )}
+
+                {/* Archive */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'archive' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('archive');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                  title="Archived Notes"
+                >
+                  <div className="nav-item-left">
+                    <Archive size={14} color="var(--accent-secondary, #8b5cf6)" />
+                    <span>Archive</span>
+                  </div>
+                  {archivedNotesCount > 0 && <span className="nav-item-count">{archivedNotesCount}</span>}
+                </button>
+
+                {/* Trash Bin */}
+                <button
+                  type="button"
+                  className={`nav-item ${currentFilter === 'trash' ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelectFilter('trash');
+                    handleSetViewMode('N');
+                    onCloseMobile();
+                  }}
+                  title="Trash Bin"
+                >
+                  <div className="nav-item-left">
+                    <Trash2 size={14} color="#f87171" />
+                    <span>Trash Bin</span>
+                  </div>
+                  {trashedNotesCount > 0 && <span className="nav-item-count">{trashedNotesCount}</span>}
+                </button>
               </nav>
             </div>
           )}
@@ -891,38 +1013,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* Optional Sidebar Calendar Accordion */}
-          {showCalendar && (
-            <div className="sidebar-section">
-              <div
-                className="sidebar-section-header"
-                onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <CalendarIcon size={13} color="#34d399" />
-                  <span className="section-title-text">Calendar</span>
-                </div>
-                {isCalendarExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              </div>
-
-              {isCalendarExpanded && (
-                <div style={{ padding: '4px 8px' }}>
-                  <CalendarWidget
-                    notes={notes}
-                    onSelectDate={(d) => {
-                      onSelectDate(d);
-                      handleSetViewMode('N');
-                    }}
-                    onOpenTodayNote={() => {
-                      onOpenTodayNote();
-                      handleSetViewMode('N');
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -1248,130 +1338,88 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* =========================================================================
-          Unified Sidebar Footer: Archive/Trash, Theme Switcher & More Menu
+          Unified Sidebar Footer: Profile Tablet, Archive/Trash & Theme Switcher
           ========================================================================= */}
-      <div className="sidebar-footer-container">
-        {/* Archive & Bin Quick Buttons */}
-        <div className="sidebar-footer-row">
-          <button
-            type="button"
-            className={`sidebar-bottom-pill ${currentFilter === 'archive' ? 'active' : ''}`}
-            onClick={() => {
-              onSelectFilter('archive');
-              handleSetViewMode('N');
-              onCloseMobile();
-            }}
-            title="Archived Notes"
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Archive size={13} style={{ color: currentFilter === 'archive' ? 'var(--accent-primary)' : 'var(--accent-secondary, #8b5cf6)' }} />
-              <span>Archive</span>
-            </div>
-            <span className="sidebar-bottom-badge">{archivedNotesCount}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`sidebar-bottom-pill ${currentFilter === 'trash' ? 'active' : ''}`}
-            onClick={() => {
-              onSelectFilter('trash');
-              handleSetViewMode('N');
-              onCloseMobile();
-            }}
-            title="Trash Bin"
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Trash2 size={13} style={{ color: currentFilter === 'trash' ? 'var(--accent-primary)' : '#f87171' }} />
-              <span>Bin</span>
-            </div>
-            <span className="sidebar-bottom-badge">{trashedNotesCount}</span>
-          </button>
+      {/* =========================================================================
+          ARC INTEGRATED BOTTOM SPACES DOCK
+          [ ⚡ Avatar 🟢 ]         ·  ●  ·  ·         [ + ]  [ ⚙️ ]
+          ========================================================================= */}
+      {/* =========================================================================
+          ARC INTEGRATED BOTTOM AREA
+          Row 1: [ 🎨 Creative Studio ▾ ]
+          Row 2: [ ⚡ Avatar 🟢 ]         ·  ●  ·  ·         [ + ]  [ ⚙️ ]
+          ========================================================================= */}
+      <div className="sidebar-bottom-area">
+        {/* Row 1: Space Title Header */}
+        <div className="sidebar-arc-space-header">
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            notesCountByWorkspace={notesCountByWorkspace}
+            onSelectWorkspace={onSelectWorkspace}
+            onCreateWorkspace={onCreateWorkspace}
+            onRenameWorkspace={onRenameWorkspace}
+            onDeleteWorkspace={onDeleteWorkspace}
+            variant="title"
+            isExternalCreateOpen={isCreateSpaceOpen}
+            onCloseExternalCreate={() => setIsCreateSpaceOpen(false)}
+          />
         </div>
 
-        {/* Theme Switcher & More Options */}
-        <div className="sidebar-footer-controls">
-          {/* Segmented Theme Switcher */}
-          <div className="sidebar-theme-segmented" role="radiogroup" aria-label="Theme selection">
-            <button
-              type="button"
-              className={`sidebar-theme-chip ${theme === 'light' ? 'active' : ''}`}
-              onClick={() => onChangeTheme && onChangeTheme('light')}
-              title="Light Day Theme"
-              aria-label="Light Day Theme"
-            >
-              <Sun size={12} />
-              <span>Day</span>
-            </button>
-            <button
-              type="button"
-              className={`sidebar-theme-chip ${theme === 'dark' ? 'active' : ''}`}
-              onClick={() => onChangeTheme && onChangeTheme('dark')}
-              title="Dark Night Theme"
-              aria-label="Dark Night Theme"
-            >
-              <Moon size={12} />
-              <span>Night</span>
-            </button>
-            <button
-              type="button"
-              className={`sidebar-theme-chip ${theme === 'system' ? 'active' : ''}`}
-              onClick={() => onChangeTheme && onChangeTheme('system')}
-              title="Auto System Theme"
-              aria-label="Auto System Theme"
-            >
-              <Monitor size={12} />
-              <span>Auto</span>
-            </button>
+        {/* Row 2: Bottom Spaces Dock */}
+        <div className="sidebar-arc-bottom-dock">
+          {/* Pinned Space Emoji Chips (Max 5) */}
+          <div className="arc-space-emojis-track" role="tablist" aria-label="Pinned Workspaces">
+            {displayedWorkspaces.map((ws) => {
+              const isActive = ws.id === activeWorkspaceId;
+              const count = notesCountByWorkspace?.get(ws.id) || 0;
+              return (
+                <button
+                  key={ws.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`arc-space-emoji-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => onSelectWorkspace(ws.id)}
+                  title={`${ws.name} (${count} note${count !== 1 ? 's' : ''}) — Click to switch space`}
+                  style={{
+                    '--space-color': ws.color || 'var(--accent-primary)'
+                  } as React.CSSProperties}
+                >
+                  <span className="arc-space-emoji-char">{ws.icon || '📁'}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* More Options Dropdown */}
-          <div style={{ position: 'relative' }}>
+          {/* Right: Actions [ + ] [ ⚙️ ] [ ◧ ] */}
+          <div className="arc-dock-actions-right">
             <button
               type="button"
-              className="sidebar-more-trigger-btn"
-              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-              title="More Vault Options"
-              aria-expanded={isMoreMenuOpen}
+              className="arc-dock-action-btn"
+              onClick={() => setIsCreateSpaceOpen(true)}
+              title="Create New Space (+)"
             >
-              <Sparkles size={12} style={{ color: 'var(--accent-primary, #818cf8)' }} />
-              <span>More</span>
-              <ChevronDown size={11} />
+              <Plus size={14} />
             </button>
-
-            {isMoreMenuOpen && (
-              <>
-                <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 40 }}
-                  onClick={() => setIsMoreMenuOpen(false)}
-                />
-                <div className="sidebar-more-dropdown">
-                  {onOpenSettings && (
-                    <button
-                      type="button"
-                      className="sidebar-more-dropdown-item"
-                      onClick={() => {
-                        onOpenSettings('database');
-                        setIsMoreMenuOpen(false);
-                      }}
-                    >
-                      <Settings size={13} />
-                      <span>Vault Settings</span>
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    className="sidebar-more-dropdown-item"
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent('milearn:open-tour'));
-                      setIsMoreMenuOpen(false);
-                    }}
-                  >
-                    <HelpCircle size={13} />
-                    <span>Start Guided Tour</span>
-                  </button>
-                </div>
-              </>
+            <button
+              type="button"
+              className="arc-dock-action-btn"
+              onClick={() => onOpenSettings?.('general')}
+              title="Settings (Cmd+,)"
+            >
+              <Settings size={14} />
+            </button>
+            {onToggleCollapse && (
+              <button
+                type="button"
+                className="arc-dock-action-btn"
+                onClick={onToggleCollapse}
+                title="Minimize to Floating Rail (◧)"
+                aria-label="Minimize to Floating Rail"
+              >
+                <PanelLeftClose size={14} />
+              </button>
             )}
           </div>
         </div>
@@ -1486,6 +1534,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         onCreateBook={onCreateBook}
         onDeleteBook={onDeleteBook}
       />
+
+      {/* Floating Hover Collapse Button on Sidebar Seam */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          className="sidebar-hover-toggle-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse();
+          }}
+          title="Minimize to Floating Rail (◧)"
+          aria-label="Minimize to Floating Rail"
+        >
+          <ChevronLeft size={16} />
+        </button>
+      )}
+
+      {/* Draggable Resize Handle */}
+      <div
+        className={`sidebar-resize-handle ${isResizing ? 'active' : ''}`}
+        onMouseDown={handleMouseDownResize}
+        onDoubleClick={handleResetWidth}
+        title="Drag to resize sidebar · Double-click to reset (300px)"
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: -4,
+          width: 8,
+          height: '100%',
+          cursor: 'col-resize',
+          zIndex: 110
+        }}
+      >
+        <div className="sidebar-resize-handle-line" />
+      </div>
     </aside>
   );
 };

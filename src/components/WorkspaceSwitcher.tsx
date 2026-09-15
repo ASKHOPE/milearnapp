@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Workspace } from '../types';
 import { ChevronDown, Plus, Check, Trash2, Sparkles, X, Edit2 } from 'lucide-react';
 
@@ -11,10 +11,13 @@ interface WorkspaceSwitcherProps {
   onRenameWorkspace?: (id: string, newName: string, newIcon?: string, newColor?: string) => void;
   onDeleteWorkspace: (id: string) => void;
   compact?: boolean;
+  variant?: 'dock' | 'header' | 'dropdown' | 'title';
+  isExternalCreateOpen?: boolean;
+  onCloseExternalCreate?: () => void;
 }
 
-const WS_EMOJIS = ['🏠', '💼', '🎨', '🚀', '🔬', '📚', '⚡', '🌿', '💡'];
-const WS_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const WS_EMOJIS = ['🏠', '💼', '🎨', '🚀', '🔬', '📚', '⚡', '🌿', '💡', '🧪', '🌐', '🎯'];
+const WS_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
   workspaces,
@@ -24,7 +27,10 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
   onCreateWorkspace,
   onRenameWorkspace,
   onDeleteWorkspace,
-  compact = false
+  compact = false,
+  variant = 'dock',
+  isExternalCreateOpen = false,
+  onCloseExternalCreate
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,7 +42,35 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
 
-  const handleOpenCreate = () => {
+  useEffect(() => {
+    if (isExternalCreateOpen) {
+      setEditingWorkspace(null);
+      setName('');
+      setDescription('');
+      setSelectedEmoji('🚀');
+      setSelectedColor('#4f46e5');
+      setIsModalOpen(true);
+    }
+  }, [isExternalCreateOpen]);
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    onCloseExternalCreate?.();
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  const handleOpenCreate = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setEditingWorkspace(null);
     setName('');
     setDescription('');
@@ -74,12 +108,107 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
     setEditingWorkspace(null);
     setIsModalOpen(false);
     setIsOpen(false);
+    onCloseExternalCreate?.();
   };
 
+  const isArcDock = variant === 'dock' || variant === 'header';
+
   return (
-    <div className={`workspace-switcher-container ${compact ? 'compact' : ''}`}>
-      {/* Active Workspace Trigger */}
-      {compact ? (
+    <div className={`workspace-switcher-container ${compact ? 'compact' : ''} ${variant === 'title' ? 'arc-title-mode' : ''} ${isArcDock ? 'arc-spaces-dock' : ''} ${variant === 'header' ? 'arc-header-dock' : 'arc-sidebar-dock'}`}>
+      {/* ARC PROMINENT TITLE HEADER (Tier 1) */}
+      {variant === 'title' ? (
+        <div
+          className="arc-space-title-header"
+          onClick={() => setIsOpen(!isOpen)}
+          title={`${activeWorkspace?.name || 'Workspace'} — Click to manage space`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsOpen(!isOpen);
+            }
+          }}
+          style={{
+            '--space-tint': activeWorkspace?.color || 'var(--accent-primary)'
+          } as React.CSSProperties}
+        >
+          <div className="arc-space-title-left">
+            <span className="arc-space-title-icon">{activeWorkspace?.icon || '🪴'}</span>
+            <span className="arc-space-title-name">{activeWorkspace?.name || 'Personal'}</span>
+          </div>
+          <ChevronDown size={14} className={`arc-space-title-chevron ${isOpen ? 'open' : ''}`} />
+        </div>
+      ) : isArcDock ? (
+        <div className="arc-spaces-track">
+          {workspaces.map((ws) => {
+            const isActive = ws.id === activeWorkspaceId;
+            const count = notesCountByWorkspace?.get(ws.id) || 0;
+
+            if (isActive) {
+              return (
+                <div
+                  key={ws.id}
+                  className="arc-space-pill active"
+                  style={{
+                    borderColor: ws.color || 'var(--accent-primary)',
+                    background: `color-mix(in srgb, ${ws.color || '#6366f1'} 16%, var(--bg-card))`,
+                    boxShadow: `0 2px 10px color-mix(in srgb, ${ws.color || '#6366f1'} 25%, transparent)`
+                  }}
+                  onClick={() => setIsOpen(!isOpen)}
+                  title={`${ws.name} (${count} note${count !== 1 ? 's' : ''}) — Click to manage space`}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setIsOpen(!isOpen);
+                    }
+                  }}
+                >
+                  <span className="arc-space-icon">{ws.icon || '🏠'}</span>
+                  <span className="arc-space-name">{ws.name}</span>
+                  {count > 0 && (
+                    <span
+                      className="arc-space-count"
+                      style={{ background: `color-mix(in srgb, ${ws.color || '#6366f1'} 28%, transparent)` }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                  <ChevronDown size={11} className={`arc-space-chevron ${isOpen ? 'open' : ''}`} />
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={ws.id}
+                type="button"
+                className="arc-space-chip"
+                onClick={() => onSelectWorkspace(ws.id)}
+                title={`Switch to ${ws.name} (${count} note${count !== 1 ? 's' : ''})`}
+                style={{
+                  '--space-accent': ws.color || 'var(--accent-primary)'
+                } as React.CSSProperties}
+              >
+                <span className="arc-space-chip-icon">{ws.icon || '📁'}</span>
+              </button>
+            );
+          })}
+
+          {/* Plus (+) Button to Add New Space */}
+          <button
+            type="button"
+            className="arc-space-add-chip"
+            onClick={(e) => handleOpenCreate(e)}
+            title="Create New Space (+)"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+      ) : compact ? (
+        /* Legacy Compact Trigger */
         <div 
           className="workspace-compact-trigger"
           onClick={() => setIsOpen(!isOpen)}
@@ -98,10 +227,11 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
           <ChevronDown size={11} className={`workspace-compact-chevron ${isOpen ? 'open' : ''}`} />
         </div>
       ) : (
+        /* Legacy Pill Trigger */
         <div 
           className="workspace-active-pill"
           onClick={() => setIsOpen(!isOpen)}
-          title="Switch Workspace"
+          title={`Switch Workspace (Current: ${activeWorkspace?.name || 'Workspace'})`}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
@@ -118,23 +248,23 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
               <span className="workspace-pill-sub">Workspace</span>
             </div>
           </div>
-          <ChevronDown size={14} className="workspace-pill-chevron" />
+          <ChevronDown size={14} className={`workspace-pill-chevron ${isOpen ? 'open' : ''}`} />
         </div>
       )}
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu / Space Management Popover */}
       {isOpen && (
         <>
           <div className="dropdown-backdrop workspace-backdrop" onClick={() => setIsOpen(false)} />
-          <div className="workspace-dropdown-menu">
+          <div className="workspace-dropdown-menu" role="menu" aria-label="Workspaces">
             <div className="workspace-dropdown-header">
-              <span>Switch Workspace</span>
+              <span>Spaces & Workspaces ({workspaces.length})</span>
             </div>
 
             <div className="workspace-items-list">
               {workspaces.map((ws) => {
                 const isActive = ws.id === activeWorkspaceId;
-                const count = notesCountByWorkspace.get(ws.id) || 0;
+                const count = notesCountByWorkspace?.get(ws.id) || 0;
 
                 return (
                   <div
@@ -146,8 +276,15 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                     }}
                     role="button"
                     tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSelectWorkspace(ws.id);
+                        setIsOpen(false);
+                      }
+                    }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flex: 1, minWidth: 0 }}>
                       <span className="workspace-item-icon">{ws.icon}</span>
                       <div className="workspace-item-text">
                         <span className="workspace-item-name">{ws.name}</span>
@@ -155,13 +292,13 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {isActive && <Check size={14} color="var(--accent-primary)" />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                      {isActive && <Check size={14} color="var(--accent-primary, #818cf8)" />}
                       {onRenameWorkspace && (
                         <button
                           type="button"
                           className="workspace-action-icon-btn"
-                          title="Rename Workspace"
+                          title="Rename / Customize Space"
                           onClick={(e) => handleOpenRename(ws, e)}
                         >
                           <Edit2 size={12} />
@@ -171,7 +308,7 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
                         <button
                           type="button"
                           className="workspace-delete-btn"
-                          title="Delete Workspace"
+                          title="Delete Space"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (confirm(`Delete workspace "${ws.name}"?`)) {
@@ -190,11 +327,12 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
 
             {/* Create New Workspace Button */}
             <button
+              type="button"
               className="workspace-add-btn"
-              onClick={handleOpenCreate}
+              onClick={(e) => handleOpenCreate(e)}
             >
               <Plus size={14} />
-              <span>New Workspace</span>
+              <span>Create New Space</span>
             </button>
           </div>
         </>
@@ -202,21 +340,21 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
 
       {/* Create / Rename Workspace Modal */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+        <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-card" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">
                 <Sparkles size={18} color="var(--accent-primary)" />
-                <span>{editingWorkspace ? 'Rename Workspace' : 'Create New Workspace'}</span>
+                <span>{editingWorkspace ? 'Customize Space' : 'Create New Space'}</span>
               </div>
-              <button className="modal-close-btn" onClick={() => setIsModalOpen(false)}>
+              <button className="modal-close-btn" onClick={handleCloseModal}>
                 <X size={16} />
               </button>
             </div>
 
             <form onSubmit={handleSaveWorkspace} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div className="form-group">
-                <label className="form-label">Workspace Name</label>
+                <label className="form-label">Space Name</label>
                 <input
                   type="text"
                   className="modal-input"
@@ -281,11 +419,11 @@ export const WorkspaceSwitcher: React.FC<WorkspaceSwitcherProps> = ({
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
-                <button type="button" className="btn-small-ghost" onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="btn-small-ghost" onClick={handleCloseModal}>
                   Cancel
                 </button>
                 <button type="submit" className="btn-small-primary">
-                  {editingWorkspace ? 'Save Changes' : 'Create Workspace'}
+                  {editingWorkspace ? 'Save Changes' : 'Create Space'}
                 </button>
               </div>
             </form>

@@ -4,6 +4,7 @@ import { storage } from './services/storage';
 import { storageShield } from './services/storageShield';
 import { inactivityLockManager } from './services/inactivityLock';
 import { freezeServices, assertCriticalIntegrity } from './services/integrity';
+import { ambientAudio } from './services/ambientAudio';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
@@ -40,7 +41,10 @@ export const App: React.FC = () => {
   
   // UI & Layout Preferences
   const [uiLayout, setUiLayout] = useState(() => storage.getUiLayoutSettings());
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => storage.getUiLayoutSettings().sidebarCollapsed);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const s = storage.getUiLayoutSettings();
+    return s.sidebarNavigationStyle === 'classic' ? false : true;
+  });
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // Modals, Study, Inactivity & Focus
@@ -63,6 +67,43 @@ export const App: React.FC = () => {
   const [pomodoroSecondsLeft, setPomodoroSecondsLeft] = useState(25 * 60);
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
   const [pomodoroMode, setPomodoroMode] = useState<PomodoroMode>('work');
+  const [pomodoroSessions, setPomodoroSessions] = useState(() => {
+    return parseInt(localStorage.getItem('milearn_pomo_sessions') || '0', 10);
+  });
+
+  // Global Pomodoro Timer Countdown (Keeps running in background when modal is closed)
+  useEffect(() => {
+    if (!isPomodoroRunning) return;
+
+    const interval = setInterval(() => {
+      setPomodoroSecondsLeft((prev) => {
+        if (prev <= 1) {
+          ambientAudio.playCompletionChime();
+
+          if (pomodoroMode === 'work') {
+            const nextCount = pomodoroSessions + 1;
+            setPomodoroSessions(nextCount);
+            localStorage.setItem('milearn_pomo_sessions', nextCount.toString());
+
+            if (nextCount % 4 === 0) {
+              setPomodoroMode('longBreak');
+              return 15 * 60;
+            } else {
+              setPomodoroMode('shortBreak');
+              return 5 * 60;
+            }
+          } else {
+            setPomodoroMode('work');
+            return 25 * 60;
+          }
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPomodoroRunning, pomodoroMode, pomodoroSessions]);
+
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isZenMode, setIsZenMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -206,6 +247,11 @@ export const App: React.FC = () => {
 
   // Open note in tab (left pane / primary)
   const handleOpenNote = (noteId: string) => {
+    const targetNote = notes.find((n) => n.id === noteId);
+    if (targetNote && targetNote.workspaceId && targetNote.workspaceId !== activeWorkspaceId) {
+      setActiveWorkspaceId(targetNote.workspaceId);
+    }
+    setIsLibraryOpen(false);
     setSelectedNoteId(noteId);
     setOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
     setActiveSplitSide('left');
@@ -213,6 +259,11 @@ export const App: React.FC = () => {
 
   // Open note targeting currently active pane in split mode
   const handleOpenNoteInActivePane = (noteId: string) => {
+    const targetNote = notes.find((n) => n.id === noteId);
+    if (targetNote && targetNote.workspaceId && targetNote.workspaceId !== activeWorkspaceId) {
+      setActiveWorkspaceId(targetNote.workspaceId);
+    }
+    setIsLibraryOpen(false);
     if (secondaryNoteId && activeSplitSide === 'right') {
       setSecondaryNoteId(noteId);
       setRightOpenNoteIds((prev) => (prev.includes(noteId) ? prev : [...prev, noteId]));
@@ -885,10 +936,18 @@ export const App: React.FC = () => {
   const handleUpdateUiLayout = (partial: Partial<import('./types').UiLayoutSettings>) => {
     setUiLayout((prev) => {
       const next = { ...prev, ...partial };
-      storage.setUiLayoutSettings(next);
-      if (partial.sidebarCollapsed !== undefined) {
+      if (partial.sidebarNavigationStyle !== undefined) {
+        if (partial.sidebarNavigationStyle === 'xp') {
+          next.sidebarCollapsed = true;
+          setIsSidebarCollapsed(true);
+        } else if (partial.sidebarNavigationStyle === 'classic') {
+          next.sidebarCollapsed = false;
+          setIsSidebarCollapsed(false);
+        }
+      } else if (partial.sidebarCollapsed !== undefined) {
         setIsSidebarCollapsed(partial.sidebarCollapsed);
       }
+      storage.setUiLayoutSettings(next);
       return next;
     });
   };
@@ -996,6 +1055,7 @@ export const App: React.FC = () => {
             setSettingsInitialTab('profile');
             setIsSettingsOpen(true);
           }}
+          onUpdateProfile={setUserProfile}
           onToggleTheme={handleToggleTheme}
           onChangeTheme={handleChangeTheme}
           onOpenSettings={(tab) => {
@@ -1012,6 +1072,15 @@ export const App: React.FC = () => {
           onDeleteNote={handleSoftDeleteNote}
           onPermanentDeleteNote={handlePermanentDeleteNote}
           onMoveNote={handleMoveNote}
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
+          onOpenInternalMind={() => setIsInternalMindOpen(true)}
+          onOpenLinkTree={() => setIsLinkTreeOpen(true)}
+          onOpenStudyMode={() => setIsStudyModeOpen(true)}
+          onOpenPomodoro={() => setIsPomodoroOpen(true)}
+          onOpenTypingMetrics={() => setIsTypingMetricsOpen(true)}
+          onOpenDictionary={() => setIsDictionaryOpen(true)}
+          onOpenWebClipper={() => setIsWebClipperOpen(true)}
         />
 
         {/* Pane 3: Rich Note Editor / Dual Side-by-Side Split View */}
@@ -1182,11 +1251,14 @@ export const App: React.FC = () => {
         currentNote={currentNote}
         isPomodoroOpen={isPomodoroOpen}
         onClosePomodoro={() => setIsPomodoroOpen(false)}
-        onTimerTick={(seconds, running, m) => {
-          setPomodoroSecondsLeft(seconds);
-          setIsPomodoroRunning(running);
-          setPomodoroMode(m);
-        }}
+        pomodoroSecondsLeft={pomodoroSecondsLeft}
+        setPomodoroSecondsLeft={setPomodoroSecondsLeft}
+        isPomodoroRunning={isPomodoroRunning}
+        setIsPomodoroRunning={setIsPomodoroRunning}
+        pomodoroMode={pomodoroMode}
+        setPomodoroMode={setPomodoroMode}
+        pomodoroSessions={pomodoroSessions}
+        setPomodoroSessions={setPomodoroSessions}
         isInternalMindOpen={isInternalMindOpen}
         onCloseInternalMind={() => setIsInternalMindOpen(false)}
         isTypingMetricsOpen={isTypingMetricsOpen}

@@ -159,6 +159,44 @@
   width: 100%;
 }
 
+.editor-scroll-area.live-document-mode {
+  cursor: text;
+  min-height: 100%;
+}
+
+.live-document-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 520px;
+  cursor: text;
+}
+
+.live-rich-document {
+  cursor: text;
+}
+
+.live-empty-trailing-space {
+  flex: 1;
+  min-height: 320px;
+  cursor: text;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 16px;
+}
+
+.trailing-prompt-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+  user-select: none;
+}
+
+.live-empty-trailing-space:hover .trailing-prompt-hint {
+  opacity: 0.75;
+}
+
 .editor-title-input {
   font-size: 28px;
   font-weight: 700;
@@ -2714,6 +2752,24 @@
   color: var(--text-primary, #ffffff);
 }
 
+.bubble-btn-sub-pill {
+  background: var(--bg-subtle, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  color: var(--text-secondary, #cbd5e1);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.bubble-btn-sub-pill:hover {
+  background: var(--accent-subtle, rgba(99, 102, 241, 0.15));
+  border-color: var(--accent-primary, #6366f1);
+  color: var(--text-primary, #ffffff);
+}
+
 /* 2. Editor.js-Style Block Gutter Tune Action Handles */
 .editorjs-block-row {
   position: relative;
@@ -2865,75 +2921,208 @@
   background: var(--bg-hover, rgba(255, 255, 255, 0.1));
 }
 
-/* Font styles applied to the Live Document */
-.live-rich-document.font-sans {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+/* Font styles applied universally across Live Document, Textarea & Split Preview */
+.font-sans,
+textarea.font-sans,
+.editor-content-textarea.font-sans,
+.markdown-body.font-sans {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
 }
 
-.live-rich-document.font-serif {
-  font-family: "Charter", "Bitstream Charter", "Sitka Text", "Cambria", Georgia, serif;
+.font-serif,
+textarea.font-serif,
+.editor-content-textarea.font-serif,
+.markdown-body.font-serif {
+  font-family: "Charter", "Bitstream Charter", "Merriweather", "Sitka Text", "Cambria", Georgia, "Times New Roman", serif !important;
 }
 
-.live-rich-document.font-mono {
-  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+.font-mono,
+textarea.font-mono,
+.editor-content-textarea.font-mono,
+.markdown-body.font-mono {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Monaco, Consolas, monospace !important;
+}
+
+/* Explicit high-specificity selectors for inline selection spans */
+span.font-sans,
+.markdown-body span.font-sans,
+.markdown-body .font-sans {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+span.font-serif,
+.markdown-body span.font-serif,
+.markdown-body .font-serif {
+  font-family: "Charter", "Bitstream Charter", "Merriweather", "Sitka Text", "Cambria", Georgia, "Times New Roman", serif !important;
+}
+
+span.font-mono,
+.markdown-body span.font-mono,
+.markdown-body .font-mono {
+  font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Monaco, Consolas, monospace !important;
+}
+
+span.size-sm,
+.markdown-body span.size-sm,
+.markdown-body .size-sm {
+  font-size: 13px !important;
+}
+
+span.size-base,
+.markdown-body span.size-base,
+.markdown-body .size-base {
+  font-size: 15px !important;
+}
+
+span.size-lg,
+.markdown-body span.size-lg,
+.markdown-body .size-lg {
+  font-size: 17px !important;
+}
+
+span.size-xl,
+.markdown-body span.size-xl,
+.markdown-body .size-xl {
+  font-size: 19px !important;
 }
 
 /* Font Size Scales */
-.live-rich-document.size-sm {
+.size-sm,
+textarea.size-sm,
+.editor-content-textarea.size-sm,
+.markdown-body.size-sm,
+.markdown-body.size-sm p,
+.markdown-body.size-sm li,
+.markdown-body.size-sm div,
+.markdown-body.size-sm span {
   font-size: 13px !important;
 }
-.live-rich-document.size-sm p,
-.live-rich-document.size-sm li {
-  font-size: 13px !important;
-}
+.markdown-body.size-sm h1 { font-size: 20px !important; }
+.markdown-body.size-sm h2 { font-size: 17px !important; }
+.markdown-body.size-sm h3 { font-size: 15px !important; }
+.markdown-body.size-sm h4 { font-size: 14px !important; }
 
-.live-rich-document.size-base {
+.size-base,
+textarea.size-base,
+.editor-content-textarea.size-base,
+.markdown-body.size-base,
+.markdown-body.size-base p,
+.markdown-body.size-base li,
+.markdown-body.size-base div,
+.markdown-body.size-base span {
   font-size: 15px !important;
 }
-.live-rich-document.size-base p,
-.live-rich-document.size-base li {
-  font-size: 15px !important;
-}
+.markdown-body.size-base h1 { font-size: 24px !important; }
+.markdown-body.size-base h2 { font-size: 20px !important; }
+.markdown-body.size-base h3 { font-size: 17px !important; }
+.markdown-body.size-base h4 { font-size: 15px !important; }
 
-.live-rich-document.size-lg {
+.size-lg,
+textarea.size-lg,
+.editor-content-textarea.size-lg,
+.markdown-body.size-lg,
+.markdown-body.size-lg p,
+.markdown-body.size-lg li,
+.markdown-body.size-lg div,
+.markdown-body.size-lg span {
   font-size: 17px !important;
 }
-.live-rich-document.size-lg p,
-.live-rich-document.size-lg li {
-  font-size: 17px !important;
-}
+.markdown-body.size-lg h1 { font-size: 28px !important; }
+.markdown-body.size-lg h2 { font-size: 23px !important; }
+.markdown-body.size-lg h3 { font-size: 19px !important; }
+.markdown-body.size-lg h4 { font-size: 17px !important; }
 
-.live-rich-document.size-xl {
+.size-xl,
+textarea.size-xl,
+.editor-content-textarea.size-xl,
+.markdown-body.size-xl,
+.markdown-body.size-xl p,
+.markdown-body.size-xl li,
+.markdown-body.size-xl div,
+.markdown-body.size-xl span {
   font-size: 19px !important;
 }
-.live-rich-document.size-xl p,
-.live-rich-document.size-xl li {
-  font-size: 19px !important;
-}
+.markdown-body.size-xl h1 { font-size: 32px !important; }
+.markdown-body.size-xl h2 { font-size: 26px !important; }
+.markdown-body.size-xl h3 { font-size: 22px !important; }
+.markdown-body.size-xl h4 { font-size: 19px !important; }
 
 /* Line Height Spacing */
-.live-rich-document.leading-normal {
-  line-height: 1.65;
-}
-.live-rich-document.leading-relaxed {
-  line-height: 1.95;
-}
-.live-rich-document.leading-loose {
-  line-height: 2.25;
+.leading-normal,
+textarea.leading-normal,
+.editor-content-textarea.leading-normal,
+.markdown-body.leading-normal,
+.markdown-body.leading-normal p,
+.markdown-body.leading-normal li {
+  line-height: 1.65 !important;
 }
 
-/* Paragraph Text Alignment */
-.live-rich-document.align-left {
-  text-align: left;
+.leading-relaxed,
+textarea.leading-relaxed,
+.editor-content-textarea.leading-relaxed,
+.markdown-body.leading-relaxed,
+.markdown-body.leading-relaxed p,
+.markdown-body.leading-relaxed li {
+  line-height: 1.95 !important;
 }
-.live-rich-document.align-center {
-  text-align: center;
+
+.leading-loose,
+textarea.leading-loose,
+.editor-content-textarea.leading-loose,
+.markdown-body.leading-loose,
+.markdown-body.leading-loose p,
+.markdown-body.leading-loose li {
+  line-height: 2.25 !important;
 }
-.live-rich-document.align-right {
-  text-align: right;
+
+/* Paragraph & Editor Text Alignment */
+.align-left,
+textarea.align-left,
+.editor-content-textarea.align-left,
+.markdown-body.align-left,
+.markdown-body.align-left p,
+.markdown-body.align-left h1,
+.markdown-body.align-left h2,
+.markdown-body.align-left h3,
+.markdown-body.align-left h4,
+.markdown-body.align-left h5,
+.markdown-body.align-left li {
+  text-align: left !important;
 }
-.live-rich-document.align-justify {
-  text-align: justify;
+
+.align-center,
+textarea.align-center,
+.editor-content-textarea.align-center,
+.markdown-body.align-center,
+.markdown-body.align-center p,
+.markdown-body.align-center h1,
+.markdown-body.align-center h2,
+.markdown-body.align-center h3,
+.markdown-body.align-center h4,
+.markdown-body.align-center h5 {
+  text-align: center !important;
+}
+
+.align-right,
+textarea.align-right,
+.editor-content-textarea.align-right,
+.markdown-body.align-right,
+.markdown-body.align-right p,
+.markdown-body.align-right h1,
+.markdown-body.align-right h2,
+.markdown-body.align-right h3,
+.markdown-body.align-right h4,
+.markdown-body.align-right h5 {
+  text-align: right !important;
+}
+
+.align-justify,
+textarea.align-justify,
+.editor-content-textarea.align-justify,
+.markdown-body.align-justify,
+.markdown-body.align-justify p,
+.markdown-body.align-justify li {
+  text-align: justify !important;
 }
 
 .editor-align-btn-group .toolbar-btn.active {
@@ -3680,6 +3869,12 @@ kbd {
 .page-margin-wide .markdown-body,
 .page-margin-wide .live-document-wrapper {
   padding: 64px 60px !important;
+}
+
+.split-view-container .split-pane-editor .editor-content-textarea {
+  max-width: 100% !important;
+  margin: 0 !important;
+  min-height: 100%;
 }
 
 

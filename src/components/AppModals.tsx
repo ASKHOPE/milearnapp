@@ -57,7 +57,15 @@ export interface AppModalsProps {
   // Focus Pomodoro
   isPomodoroOpen: boolean;
   onClosePomodoro: () => void;
-  onTimerTick: (seconds: number, isRunning: boolean, mode: PomodoroMode) => void;
+  onTimerTick?: (seconds: number, isRunning: boolean, mode: PomodoroMode) => void;
+  pomodoroSecondsLeft?: number;
+  setPomodoroSecondsLeft?: React.Dispatch<React.SetStateAction<number>>;
+  isPomodoroRunning?: boolean;
+  setIsPomodoroRunning?: React.Dispatch<React.SetStateAction<boolean>>;
+  pomodoroMode?: PomodoroMode;
+  setPomodoroMode?: (mode: PomodoroMode) => void;
+  pomodoroSessions?: number;
+  setPomodoroSessions?: React.Dispatch<React.SetStateAction<number>>;
 
   // Internal Mind
   isInternalMindOpen: boolean;
@@ -137,6 +145,14 @@ export const AppModals: React.FC<AppModalsProps> = ({
   isPomodoroOpen,
   onClosePomodoro,
   onTimerTick,
+  pomodoroSecondsLeft,
+  setPomodoroSecondsLeft,
+  isPomodoroRunning,
+  setIsPomodoroRunning,
+  pomodoroMode,
+  setPomodoroMode,
+  pomodoroSessions,
+  setPomodoroSessions,
 
   isInternalMindOpen,
   onCloseInternalMind,
@@ -268,6 +284,14 @@ export const AppModals: React.FC<AppModalsProps> = ({
             isOpen={isPomodoroOpen}
             onClose={onClosePomodoro}
             onTimerTick={onTimerTick}
+            secondsLeft={pomodoroSecondsLeft}
+            setSecondsLeft={setPomodoroSecondsLeft}
+            isRunning={isPomodoroRunning}
+            setIsRunning={setIsPomodoroRunning}
+            mode={pomodoroMode}
+            setMode={setPomodoroMode}
+            completedSessions={pomodoroSessions}
+            setCompletedSessions={setPomodoroSessions}
           />
         </ErrorBoundary>
       )}

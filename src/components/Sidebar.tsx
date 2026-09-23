@@ -14,7 +14,6 @@ import {
   Paperclip,
   Archive,
   BookOpen,
-  PanelLeftOpen,
   PanelLeftClose,
   Zap,
   Pin,
@@ -37,6 +36,8 @@ import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { TagSelectorPopover } from './TagSelectorPopover';
 import { FolderSelectorModal } from './FolderSelectorModal';
 import { BookSelectorModal } from './BookSelectorModal';
+import { ProfileSwitcherPopover } from './ProfileSwitcherPopover';
+import { WindowsXPStartMenu } from './WindowsXPStartMenu';
 
 interface SidebarProps {
   workspaces: Workspace[];
@@ -78,6 +79,7 @@ interface SidebarProps {
   onOpenSettings?: (tab?: string) => void;
   userProfile?: UserProfile;
   onOpenProfile?: () => void;
+  onUpdateProfile?: (profile: UserProfile) => void;
   // Note List Integration props
   onSelectNoteSplit?: (noteId: string) => void;
   onCreateNote?: () => void;
@@ -89,6 +91,16 @@ interface SidebarProps {
   onDeleteNote?: (noteId: string, e: React.MouseEvent) => void;
   onPermanentDeleteNote?: (noteId: string, e?: React.MouseEvent) => void;
   onMoveNote?: (noteId: string, targetFolderId: string | null, targetBookId: string | null) => void;
+  // Tool Launchers
+  onOpenSearch?: () => void;
+  onOpenKnowledgeBase?: () => void;
+  onOpenInternalMind?: () => void;
+  onOpenLinkTree?: () => void;
+  onOpenStudyMode?: () => void;
+  onOpenPomodoro?: () => void;
+  onOpenTypingMetrics?: () => void;
+  onOpenDictionary?: () => void;
+  onOpenWebClipper?: () => void;
 }
 
 // Relative time formatting helper
@@ -112,7 +124,7 @@ const getSnippet = (content: string) => {
   return content
     .replace(/^#+\s+/gm, '')
     .replace(/\[\[(.*?)\]\]/g, '$1')
-    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/!\[.*?\](?:\(.*?\))?/g, '')
     .replace(/`{1,3}.*?`{1,3}/gs, '')
     .replace(/-\s\[[ x]\]\s/g, '')
     .replace(/\n+/g, ' ')
@@ -149,11 +161,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteFolder,
   onCloseMobile,
   onOpenLibrary,
+  onOpenTodayNote,
   theme = 'dark',
   onChangeTheme,
   onOpenSettings,
-  userProfile: _userProfile,
-  onOpenProfile: _onOpenProfile,
+  userProfile,
+  onOpenProfile,
+  onUpdateProfile,
   onSelectNoteSplit,
   onCreateNote,
   onCreateQuickNote,
@@ -163,7 +177,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onArchiveNote,
   onDeleteNote,
   onPermanentDeleteNote,
-  onMoveNote
+  onMoveNote,
+  onOpenSearch,
+  onOpenKnowledgeBase,
+  onOpenInternalMind,
+  onOpenLinkTree,
+  onOpenStudyMode,
+  onOpenPomodoro,
+  onOpenTypingMetrics,
+  onOpenDictionary,
+  onOpenWebClipper
 }) => {
   // Consolidated View Mode: 'M' = Menu/Directory, 'N' = Notes Feed
   const [viewMode, setViewMode] = useState<'M' | 'N'>(() => {
@@ -177,16 +200,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
   const [isHoverExpanded, setIsHoverExpanded] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMouseEnterRail = () => {
-    if (isCollapsed) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = setTimeout(() => {
-        setIsHoverExpanded(true);
-      }, 120);
-    }
-  };
 
   const handleMouseLeaveRail = () => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -366,8 +382,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const archivedNotesCount = useMemo(() => notes.filter((n) => n.isArchived && !n.isTrashed).length, [notes]);
   const trashedNotesCount = useMemo(() => notes.filter((n) => n.isTrashed).length, [notes]);
 
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
-
   const notesCountByWorkspace = propNotesCount || useMemo(() => {
     const map = new Map<string, number>();
     notes.forEach((n) => {
@@ -526,103 +540,143 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // COLLAPSED STATE (48px Rail with Hover Expansion)
+  // COLLAPSED STATE — compact floating rail, no auto hover-expand
   if (isCollapsed && !isHoverExpanded) {
     return (
-      <aside 
+      <aside
         className={`app-sidebar collapsed ${isOpenMobile ? 'mobile-open' : ''}`}
-        onMouseEnter={handleMouseEnterRail}
       >
         <div className="sidebar-collapsed-rail">
-          {/* Active Workspace Icon */}
-          <div
-            className="sidebar-rail-btn"
-            title={`Workspace: ${activeWorkspace?.name || 'Personal'}`}
-            style={{ cursor: 'default', fontSize: '14px' }}
+          {/* 1. Profile Switcher */}
+          <button
+            type="button"
+            className={`sidebar-rail-btn sidebar-rail-profile-btn ${isProfileOpen ? 'active' : ''}`}
+            data-label={userProfile?.name ? `Profile: ${userProfile.name}` : 'Profile Switcher'}
+            onClick={() => {
+              setIsProfileOpen((prev) => !prev);
+              setIsStartMenuOpen(false);
+            }}
+            title="User Profile & Status"
           >
-            <span>{activeWorkspace?.icon || '🌿'}</span>
-          </div>
+            {userProfile?.avatarType === 'image' || userProfile?.avatarType === 'gif' ? (
+              <img src={userProfile.avatarValue} alt="Avatar" className="rail-avatar-thumb" />
+            ) : (
+              <span className="rail-avatar-emoji">{userProfile?.avatarValue || '🦊'}</span>
+            )}
+            <span className="rail-avatar-status-dot" />
+          </button>
 
-          {/* Expand Button */}
+          {/* 2. Windows XP Start Menu Style Button */}
+          <button
+            type="button"
+            className={`sidebar-rail-btn sidebar-rail-start-btn ${isStartMenuOpen ? 'active' : ''}`}
+            data-label="Start Menu"
+            onClick={() => {
+              setIsStartMenuOpen((prev) => !prev);
+              setIsProfileOpen(false);
+            }}
+            title="Windows XP Start Menu"
+          >
+            <div className="xp-start-flag">
+              <span className="xp-flag-tile red" />
+              <span className="xp-flag-tile green" />
+              <span className="xp-flag-tile blue" />
+              <span className="xp-flag-tile yellow" />
+            </div>
+          </button>
+
+          <div className="sidebar-rail-divider" />
+
+          {/* 3. Theme Changer */}
           <button
             type="button"
             className="sidebar-rail-btn"
-            onClick={onToggleCollapse}
-            title="Expand Sidebar (◧)"
+            data-label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            onClick={() => onChangeTheme && onChangeTheme(theme === 'dark' ? 'light' : 'dark')}
+            title="Toggle Theme"
           >
-            <PanelLeftOpen size={16} />
+            {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
 
-          {/* M - Menu Toggle */}
-          <button
-            type="button"
-            className={`sidebar-rail-btn ${viewMode === 'M' ? 'active' : ''}`}
-            onClick={() => handleSetViewMode('M')}
-            title="Menu / Navigation Directory (M)"
-          >
-            <Menu size={16} />
-          </button>
-
-          {/* N - Notes Feed Toggle */}
-          <button
-            type="button"
-            className={`sidebar-rail-btn ${viewMode === 'N' ? 'active' : ''}`}
-            onClick={() => handleSetViewMode('N')}
-            title="Notes Feed (N)"
-          >
-            <FileText size={16} />
-            <span
-              style={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: '#6366f1'
-              }}
-            />
-          </button>
-
-          {/* Quick New Note */}
+          {/* 4. Create Note Button */}
           {onCreateNote && (
             <button
               type="button"
               className="sidebar-rail-btn"
+              data-label="New Note"
               onClick={() => {
                 onCreateNote();
-                handleSetViewMode('N');
               }}
-              title="Create New Note (+)"
+              title="Create New Note"
             >
               <Plus size={16} />
             </button>
           )}
 
-          <div className="sidebar-rail-divider" />
-
-          {/* Theme Quick Toggle */}
-          <button
-            type="button"
-            className="sidebar-rail-btn"
-            onClick={() => onChangeTheme && onChangeTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={`Switch theme (current: ${theme})`}
-          >
-            {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
-          </button>
-
-          {/* Settings Quick Toggle */}
+          {/* 5. Quick Settings Button */}
           {onOpenSettings && (
             <button
               type="button"
               className="sidebar-rail-btn"
+              data-label="Settings"
               onClick={() => onOpenSettings('general')}
-              title="Settings (Cmd+,)"
+              title="Quick Settings"
             >
-              <Settings size={15} />
+              <Settings size={16} />
             </button>
           )}
         </div>
+
+        {/* Profile Switcher Popover Tethered to Rail */}
+        <ProfileSwitcherPopover
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          userProfile={userProfile}
+          onUpdateProfile={onUpdateProfile}
+          onOpenProfileSettings={(tab) => {
+            if (tab && onOpenSettings) {
+              onOpenSettings(tab);
+            } else {
+              onOpenProfile?.();
+            }
+          }}
+          onOpenSettings={onOpenSettings}
+        />
+
+        {/* Windows XP Start Menu Tethered to Rail */}
+        <WindowsXPStartMenu
+          isOpen={isStartMenuOpen}
+          onClose={() => setIsStartMenuOpen(false)}
+          userProfile={userProfile}
+          onOpenProfile={onOpenProfile}
+          onUpdateProfile={onUpdateProfile}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={onSelectWorkspace}
+          folders={folders}
+          onSelectFolder={onSelectFolder}
+          books={books}
+          notes={notes}
+          onSelectNote={onSelectNote}
+          onSelectFilter={onSelectFilter}
+          currentFilter={currentFilter}
+          theme={theme}
+          onChangeTheme={onChangeTheme}
+          onOpenSettings={onOpenSettings}
+          onCreateNote={onCreateNote}
+          onCreateQuickNote={onCreateQuickNote}
+          onToggleCollapse={onToggleCollapse}
+          onOpenTodayNote={onOpenTodayNote}
+          onOpenSearch={onOpenSearch}
+          onOpenKnowledgeBase={onOpenKnowledgeBase}
+          onOpenInternalMind={onOpenInternalMind}
+          onOpenLinkTree={onOpenLinkTree}
+          onOpenStudyMode={onOpenStudyMode}
+          onOpenPomodoro={onOpenPomodoro}
+          onOpenTypingMetrics={onOpenTypingMetrics}
+          onOpenDictionary={onOpenDictionary}
+          onOpenWebClipper={onOpenWebClipper}
+        />
       </aside>
     );
   }
@@ -662,14 +716,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {onToggleCollapse && (
+          {(onToggleCollapse || isHoverExpanded) && (
             <button
               type="button"
               id="sidebar-minimize-rail-btn"
               className="sidebar-minimize-rail-btn"
-              onClick={onToggleCollapse}
-              title="Minimize to Floating Rail (◧)"
-              aria-label="Minimize to Floating Rail"
+              onClick={() => {
+                if (isCollapsed && isHoverExpanded) {
+                  // We're in hover-preview mode — just close the hover, stay collapsed
+                  setIsHoverExpanded(false);
+                } else {
+                  // Normal expanded → collapse to rail
+                  onToggleCollapse?.();
+                }
+              }}
+              title={isCollapsed && isHoverExpanded ? 'Close Preview (◧)' : 'Minimize to Floating Rail (◧)'}
+              aria-label="Minimize Sidebar"
             >
               <PanelLeftClose size={15} />
             </button>

@@ -12,7 +12,8 @@ import {
   UploadCloud,
   FileSpreadsheet,
   FileCode,
-  BookOpen
+  BookOpen,
+  Plus
 } from 'lucide-react';
 import { PdfViewerModal } from './PdfViewerModal';
 import { EpubViewerModal } from './EpubViewerModal';
@@ -22,12 +23,14 @@ interface AttachmentManagerProps {
   attachments: Attachment[];
   onAddAttachment: (attachment: Attachment) => void;
   onDeleteAttachment: (attachmentId: string) => void;
+  onInsertAttachment?: (attachment: Attachment) => void;
 }
 
 export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   attachments,
   onAddAttachment,
-  onDeleteAttachment
+  onDeleteAttachment,
+  onInsertAttachment
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -256,6 +259,15 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                         onClick={() => setEpubViewerAtt(att)}
                       >
                         <BookOpen size={13} />
+                      </button>
+                    )}
+                    {onInsertAttachment && (
+                      <button
+                        className="attachment-btn"
+                        title={att.type === 'image' ? 'Insert image reference into note' : 'Insert link into note'}
+                        onClick={() => onInsertAttachment(att)}
+                      >
+                        <Plus size={13} />
                       </button>
                     )}
                     <button 

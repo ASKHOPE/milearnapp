@@ -230,6 +230,32 @@ export const storage = {
           n.isTrashed = false;
           changed = true;
         }
+        // Image migration: clean raw Base64 data from note content & store in attachments
+        if (n.content && n.content.includes('data:image/')) {
+          const rawRegex = /(?:!\[(.*?)\])?(?:\s*\r?\n?\s*)\((data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
+          const atts = [...(n.attachments || [])];
+          n.content = n.content.replace(rawRegex, (_m, alt, rawUrl) => {
+            const dataUrl = rawUrl.replace(/\s+/g, '');
+            const cleanAlt = (alt || '').trim();
+            const titleOnly = cleanAlt.split('|')[0].trim() || 'Image';
+            if (!atts.some((a) => a.dataUrl === dataUrl || a.name === titleOnly || a.name.replace(/\.[^/.]+$/, '') === titleOnly)) {
+              const mime = dataUrl.match(/^data:([^;]+);/)?.[1] || 'image/jpeg';
+              const ext = mime.split('/')[1] || 'jpg';
+              atts.push({
+                id: 'att-' + Math.random().toString(36).substr(2, 9),
+                name: titleOnly.includes('.') ? titleOnly : `${titleOnly}.${ext}`,
+                type: 'image',
+                size: Math.round((dataUrl.length * 3) / 4),
+                mimeType: mime,
+                dataUrl: dataUrl,
+                createdAt: new Date().toISOString()
+              });
+            }
+            return `![${cleanAlt || 'Image'}]`;
+          });
+          n.attachments = atts;
+          changed = true;
+        }
         if (changed) {
           store.put(n);
         }
@@ -696,11 +722,12 @@ export const storage = {
   getUiLayoutSettings(): UiLayoutSettings {
     const defaults: UiLayoutSettings = {
       showSidebarCalendar: true,
-      sidebarCollapsed: false,
+      sidebarCollapsed: true,
       noteListCollapsed: false,
       maxNavWidgets: 3,
       maxNavIcons: 4,
-      pinnedNavTools: ['pomodoro', 'calendar', 'study']
+      pinnedNavTools: ['pomodoro', 'calendar', 'study'],
+      sidebarNavigationStyle: 'xp'
     };
     try {
       const saved = localStorage.getItem('milearnapp_ui_layout');

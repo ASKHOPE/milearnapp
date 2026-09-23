@@ -20,20 +20,48 @@ interface FocusPomodoroModalProps {
   onClose: () => void;
   // Expose active state to header
   onTimerTick?: (secondsLeft: number, isRunning: boolean, mode: PomodoroMode) => void;
+  // Shared persistent state (persists countdown when modal is closed)
+  secondsLeft?: number;
+  setSecondsLeft?: React.Dispatch<React.SetStateAction<number>>;
+  isRunning?: boolean;
+  setIsRunning?: React.Dispatch<React.SetStateAction<boolean>>;
+  mode?: PomodoroMode;
+  setMode?: (mode: PomodoroMode) => void;
+  completedSessions?: number;
+  setCompletedSessions?: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
   isOpen,
   onClose,
-  onTimerTick
+  onTimerTick,
+  secondsLeft: propsSecondsLeft,
+  setSecondsLeft: propsSetSecondsLeft,
+  isRunning: propsIsRunning,
+  setIsRunning: propsSetIsRunning,
+  mode: propsMode,
+  setMode: propsSetMode,
+  completedSessions: propsCompletedSessions,
+  setCompletedSessions: propsSetCompletedSessions
 }) => {
-  const [mode, setMode] = useState<PomodoroMode>('work');
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState(() => {
+  const [internalMode, setInternalMode] = useState<PomodoroMode>('work');
+  const [internalSecondsLeft, setInternalSecondsLeft] = useState(25 * 60);
+  const [internalIsRunning, setInternalIsRunning] = useState(false);
+  const [internalCompletedSessions, setInternalCompletedSessions] = useState(() => {
     return parseInt(localStorage.getItem('milearn_pomo_sessions') || '0', 10);
   });
   const [isChimeTesting, setIsChimeTesting] = useState(false);
+
+  // Use props if provided (lifting state to App.tsx for background continuity), otherwise local state
+  const isControlled = propsSecondsLeft !== undefined && propsSetSecondsLeft !== undefined;
+  const mode = isControlled && propsMode !== undefined ? propsMode : internalMode;
+  const setMode = isControlled && propsSetMode !== undefined ? propsSetMode : setInternalMode;
+  const secondsLeft = isControlled ? propsSecondsLeft : internalSecondsLeft;
+  const setSecondsLeft = isControlled ? propsSetSecondsLeft : setInternalSecondsLeft;
+  const isRunning = isControlled && propsIsRunning !== undefined ? propsIsRunning : internalIsRunning;
+  const setIsRunning = isControlled && propsSetIsRunning !== undefined ? propsSetIsRunning : setInternalIsRunning;
+  const completedSessions = isControlled && propsCompletedSessions !== undefined ? propsCompletedSessions : internalCompletedSessions;
+  const setCompletedSessions = isControlled && propsSetCompletedSessions !== undefined ? propsSetCompletedSessions : setInternalCompletedSessions;
 
   // Total duration in seconds for progress ring
   const totalSeconds = mode === 'work' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60;
@@ -45,14 +73,14 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
     }
   }, [secondsLeft, isRunning, mode, onTimerTick]);
 
-  // Main Timer Countdown
+  // Main Timer Countdown: Only run local interval if NOT controlled by parent App.tsx
   useEffect(() => {
+    if (isControlled) return;
     if (!isRunning) return;
 
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) {
-          // Timer completed! Play rich synthesized audio chime
           ambientAudio.playCompletionChime();
 
           if (mode === 'work') {
@@ -60,7 +88,6 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
             setCompletedSessions(nextCount);
             localStorage.setItem('milearn_pomo_sessions', nextCount.toString());
 
-            // Check for long break
             if (nextCount % 4 === 0) {
               setMode('longBreak');
               return 15 * 60;
@@ -78,7 +105,7 @@ export const FocusPomodoroModal: React.FC<FocusPomodoroModalProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, mode, completedSessions]);
+  }, [isControlled, isRunning, mode, completedSessions, setSecondsLeft, setCompletedSessions, setMode]);
 
   // Mode change
   const handleSetMode = (newMode: PomodoroMode) => {

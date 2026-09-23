@@ -14,6 +14,7 @@ export interface UiLayoutSettings {
   maxNavWidgets?: number;
   maxNavIcons?: number;
   pinnedNavTools?: string[];
+  sidebarNavigationStyle?: 'xp' | 'classic';
 }
 
 export interface UserProfile {

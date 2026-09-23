@@ -91,8 +91,10 @@ export interface EditorToolbarProps {
   // Typography states
   fontFamily: 'sans' | 'serif' | 'mono';
   setFontFamily: (val: 'sans' | 'serif' | 'mono') => void;
+  onFontFamilyChange?: (val: 'sans' | 'serif' | 'mono') => void;
   fontSize: 'sm' | 'base' | 'lg' | 'xl';
   setFontSize: (val: 'sm' | 'base' | 'lg' | 'xl') => void;
+  onFontSizeChange?: (val: 'sm' | 'base' | 'lg' | 'xl') => void;
   lineHeight: 'normal' | 'relaxed' | 'loose';
   setLineHeight: (val: 'normal' | 'relaxed' | 'loose') => void;
   textAlign: 'left' | 'center' | 'right' | 'justify';
@@ -147,8 +149,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   isZenMode,
   mode: _mode,
   setMode: _setMode,
-  wordCount,
-  charCount,
+  wordCount: _wordCount,
+  charCount: _charCount,
   isRow1Open,
   isRow2Open,
   isRow3Open,
@@ -166,8 +168,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onCloseSplit,
   fontFamily,
   setFontFamily,
+  onFontFamilyChange,
   fontSize,
   setFontSize,
+  onFontSizeChange,
   lineHeight,
   setLineHeight,
   textAlign,
@@ -246,8 +250,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               ))}
             </select>
           </div>
-
-          <span className="toolbar-stat-pill">{wordCount}w · {charCount}c</span>
 
           <div className="toolbar-divider" />
 
@@ -467,7 +469,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 } else if (val === 'code') {
                   insertFormatting('```\n', '\n```');
                 } else if (val === 'p') {
-                  insertFormatting('');
+                  insertFormatting('p');
                 }
                 e.target.value = '';
               }}
@@ -494,8 +496,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             value={fontFamily}
             onChange={(e) => {
               const val = e.target.value as any;
-              setFontFamily(val);
-              localStorage.setItem('milearnapp_editor_font_family', val);
+              if (onFontFamilyChange) {
+                onFontFamilyChange(val);
+              } else {
+                setFontFamily(val);
+                localStorage.setItem('milearnapp_editor_font_family', val);
+              }
             }}
             title="Font Family"
           >
@@ -509,8 +515,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             value={fontSize}
             onChange={(e) => {
               const val = e.target.value as any;
-              setFontSize(val);
-              localStorage.setItem('milearnapp_editor_font_size', val);
+              if (onFontSizeChange) {
+                onFontSizeChange(val);
+              } else {
+                setFontSize(val);
+                localStorage.setItem('milearnapp_editor_font_size', val);
+              }
             }}
             title="Font Size"
           >
@@ -523,7 +533,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <select
             className="editor-font-select"
             value={lineHeight}
-            onChange={(e) => setLineHeight(e.target.value as any)}
+            onChange={(e) => {
+              const val = e.target.value as any;
+              setLineHeight(val);
+              localStorage.setItem('milearnapp_editor_line_height', val);
+            }}
             title="Line Spacing / Height"
           >
             <option value="normal">Normal Line Spacing</option>
@@ -539,7 +553,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               className={`toolbar-btn ${textAlign === 'left' ? 'active' : ''}`}
               onClick={() => {
                 setTextAlign('left');
-                insertFormatting('<div align="left">\n\n', '\n\n</div>');
+                localStorage.setItem('milearnapp_editor_text_align', 'left');
               }}
               disabled={note.isTrashed}
               title="Align Left"
@@ -551,7 +565,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               className={`toolbar-btn ${textAlign === 'center' ? 'active' : ''}`}
               onClick={() => {
                 setTextAlign('center');
-                insertFormatting('<div align="center">\n\n', '\n\n</div>');
+                localStorage.setItem('milearnapp_editor_text_align', 'center');
               }}
               disabled={note.isTrashed}
               title="Align Center"
@@ -563,7 +577,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               className={`toolbar-btn ${textAlign === 'right' ? 'active' : ''}`}
               onClick={() => {
                 setTextAlign('right');
-                insertFormatting('<div align="right">\n\n', '\n\n</div>');
+                localStorage.setItem('milearnapp_editor_text_align', 'right');
               }}
               disabled={note.isTrashed}
               title="Align Right"
@@ -575,7 +589,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               className={`toolbar-btn ${textAlign === 'justify' ? 'active' : ''}`}
               onClick={() => {
                 setTextAlign('justify');
-                insertFormatting('<div style="text-align: justify;">\n\n', '\n\n</div>');
+                localStorage.setItem('milearnapp_editor_text_align', 'justify');
               }}
               disabled={note.isTrashed}
               title="Justify Text"

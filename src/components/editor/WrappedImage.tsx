@@ -9,7 +9,8 @@ import {
   MoveDown, 
   Sliders,
   Maximize,
-  Check
+  Check,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export type ImageAlignMode = 'left' | 'center' | 'right' | 'full';
@@ -46,6 +47,7 @@ export const WrappedImage: React.FC<WrappedImageProps> = ({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isCustomWidthOpen, setIsCustomWidthOpen] = useState(false);
   const [pixelWidthInput, setPixelWidthInput] = useState<number>(customWidth || 400);
+  const [hasError, setHasError] = useState(false);
 
   // Compute CSS width based on size mode
   let renderedWidthStyle: React.CSSProperties = {};
@@ -114,14 +116,43 @@ export const WrappedImage: React.FC<WrappedImageProps> = ({
     <>
       <figure className={containerClasses} style={align === 'center' ? {} : renderedWidthStyle}>
         <div className="image-content-wrapper" style={renderedWidthStyle}>
-          <img
-            src={src}
-            alt={cleanCaption || 'Image'}
-            className="wrapped-img-element"
-            onClick={() => setIsLightboxOpen(true)}
-            loading="lazy"
-            style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px' }}
-          />
+          {src && !hasError ? (
+            <img
+              src={src}
+              alt={cleanCaption || 'Image'}
+              className="wrapped-img-element"
+              onClick={() => setIsLightboxOpen(true)}
+              onError={() => setHasError(true)}
+              loading="lazy"
+              style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '8px' }}
+            />
+          ) : (
+            <div 
+              className="wrapped-image-fallback"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px 16px',
+                background: 'var(--bg-secondary, rgba(255,255,255,0.04))',
+                border: '1px dashed var(--border-color, #444)',
+                borderRadius: '8px',
+                gap: '8px',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ padding: '8px', borderRadius: '50%', background: 'rgba(99,102,241,0.12)' }}>
+                <ImageIcon size={22} color="var(--accent-primary, #6366f1)" />
+              </div>
+              <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                {cleanCaption || 'Image Attachment'}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Attached in note media
+              </span>
+            </div>
+          )}
 
           {/* Hover Alignment & Resizing Dock */}
           {!isReadOnly && lineIndex !== undefined && onUpdateImageProps && (

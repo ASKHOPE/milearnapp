@@ -64,7 +64,7 @@ export const QuickNoteSimpleEditor: React.FC<QuickNoteSimpleEditorProps> = ({
     const current = note.content;
     const selected = current.substring(start, end);
 
-    const replacement = `${prefix}${selected || (prefix.startsWith('- [ ]') ? '' : 'text')}${suffix}`;
+    const replacement = selected ? `${prefix}${selected}${suffix}` : `${prefix}${suffix}`;
     const nextContent = current.substring(0, start) + replacement + current.substring(end);
 
     onUpdateNote({
@@ -75,8 +75,8 @@ export const QuickNoteSimpleEditor: React.FC<QuickNoteSimpleEditorProps> = ({
 
     setTimeout(() => {
       textarea.focus();
-      const cursorTarget = start + prefix.length + (selected ? selected.length : (prefix.startsWith('- [ ]') ? 0 : 4));
-      textarea.setSelectionRange(cursorTarget, cursorTarget);
+      const cursorTarget = start + prefix.length;
+      textarea.setSelectionRange(cursorTarget, cursorTarget + (selected ? selected.length : 0));
     }, 0);
   };
 

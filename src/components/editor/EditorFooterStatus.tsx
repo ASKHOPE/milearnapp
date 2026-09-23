@@ -20,6 +20,7 @@ interface EditorFooterStatusProps {
   attachments?: Attachment[];
   onAddAttachment?: (attachment: Attachment) => void;
   onDeleteAttachment?: (attachmentId: string) => void;
+  onInsertAttachment?: (attachment: Attachment) => void;
 }
 
 export const EditorFooterStatus: React.FC<EditorFooterStatusProps> = ({
@@ -37,7 +38,8 @@ export const EditorFooterStatus: React.FC<EditorFooterStatusProps> = ({
   onOpenProfile,
   attachments = [],
   onAddAttachment,
-  onDeleteAttachment
+  onDeleteAttachment,
+  onInsertAttachment
 }) => {
   const [isAttachmentsOpen, setIsAttachmentsOpen] = useState(false);
   const { wordCount, charCount, sentenceCount, paragraphCount, readTimeMinutes } = useMemo(() => {
@@ -168,6 +170,7 @@ export const EditorFooterStatus: React.FC<EditorFooterStatusProps> = ({
                       attachments={attachments}
                       onAddAttachment={onAddAttachment}
                       onDeleteAttachment={onDeleteAttachment}
+                      onInsertAttachment={onInsertAttachment}
                     />
                   </div>
                 </div>

@@ -62,6 +62,64 @@ import { flashcardService } from '../services/flashcards';
 import { ConflictBanner } from './editor/ConflictBanner';
 import { QuickNoteSimpleEditor } from './editor/QuickNoteSimpleEditor';
 import { ConvertQuickNoteModal } from './editor/ConvertQuickNoteModal';
+import { optimizer } from '../services/optimizer';
+
+// Migration helper: Convert raw embedded Base64 images in note content to clean tags & attachments
+export const migrateRawImages = (note: Note): { migrated: boolean; updatedNote: Note } => {
+  if (!note.content || !note.content.includes('data:image/')) {
+    return { migrated: false, updatedNote: note };
+  }
+
+  let hasChanged = false;
+  let newContent = note.content;
+  const currentAttachments = [...(note.attachments || [])];
+
+  const rawImageRegex = /(?:!\[(.*?)\])?(?:\s*\r?\n?\s*)\((data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s]+)\)/g;
+
+  newContent = newContent.replace(rawImageRegex, (_fullMatch, altText, dataUrlRaw) => {
+    hasChanged = true;
+    const dataUrl = dataUrlRaw.replace(/\s+/g, '');
+    const cleanAlt = (altText || '').trim();
+    const titleOnly = cleanAlt.split('|')[0].trim() || 'Image';
+
+    const existing = currentAttachments.find(
+      (a) => a.dataUrl === dataUrl || a.name === titleOnly || a.name.replace(/\.[^/.]+$/, '') === titleOnly
+    );
+
+    if (!existing) {
+      const mimeMatch = dataUrl.match(/^data:([^;]+);/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const ext = mimeType.split('/')[1] || 'jpg';
+      const attName = titleOnly.includes('.') ? titleOnly : `${titleOnly}.${ext}`;
+
+      currentAttachments.push({
+        id: 'att-' + Math.random().toString(36).substr(2, 9),
+        name: attName,
+        type: 'image',
+        size: Math.round((dataUrl.length * 3) / 4),
+        mimeType: mimeType,
+        dataUrl: dataUrl,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    return `![${cleanAlt || 'Image'}]`;
+  });
+
+  if (hasChanged) {
+    return {
+      migrated: true,
+      updatedNote: {
+        ...note,
+        content: newContent,
+        attachments: currentAttachments,
+        updatedAt: new Date().toISOString()
+      }
+    };
+  }
+
+  return { migrated: false, updatedNote: note };
+};
 
 interface NoteEditorProps {
   note: Note | null;
@@ -134,7 +192,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   userProfile,
   onOpenProfile
 }) => {
-  const [mode, setMode] = useState<'live' | 'split' | 'source'>('live');
+  const [mode, setModeState] = useState<'live' | 'split' | 'source'>(() => {
+    return (localStorage.getItem('milearnapp_editor_mode') as any) || 'live';
+  });
+
+  const setMode = (newMode: 'live' | 'split' | 'source') => {
+    setModeState(newMode);
+    localStorage.setItem('milearnapp_editor_mode', newMode);
+  };
   const [isInsertImageOpen, setIsInsertImageOpen] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   const [isVoiceRecorderOpen, setIsVoiceRecorderOpen] = useState(false);
@@ -326,8 +391,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg' | 'xl'>(() => {
     return (localStorage.getItem('milearnapp_editor_font_size') as any) || 'base';
   });
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right' | 'justify'>('left');
-  const [lineHeight, setLineHeight] = useState<'normal' | 'relaxed' | 'loose'>('normal');
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right' | 'justify'>(() => {
+    return (localStorage.getItem('milearnapp_editor_text_align') as any) || 'left';
+  });
+  const [lineHeight, setLineHeight] = useState<'normal' | 'relaxed' | 'loose'>(() => {
+    return (localStorage.getItem('milearnapp_editor_line_height') as any) || 'normal';
+  });
+
+  // Combined typography and layout class string applied across all editor modes
+  const typographyClasses = `font-${fontFamily} size-${fontSize} leading-${lineHeight} align-${textAlign}`;
 
   // Floating Contextual Bubble Toolbar state (Froala / Editor.js)
   const [bubblePosition, setBubblePosition] = useState<FloatingBubblePosition>({
@@ -361,6 +433,17 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       pendingNoteRef.current = note;
     }
   }, [note]);
+
+  // Auto-clean & migrate raw embedded Base64 images into Note Attachments
+  useEffect(() => {
+    if (!note || !note.content || note.isTrashed) return;
+    if (note.content.includes('data:image/')) {
+      const { migrated, updatedNote } = migrateRawImages(note);
+      if (migrated) {
+        onUpdateNote(updatedNote);
+      }
+    }
+  }, [note?.id, note?.content]);
 
   // Keyboard shortcut listener (Cmd+F for search, Cmd+S for manual save)
   useEffect(() => {
@@ -453,9 +536,21 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Handle title change
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (note.isTrashed) return;
+    let newTitle = e.target.value;
+
+    // If the title was default "Untitled Note" or "Untitled" and user typed new character(s),
+    // automatically erase the default text and keep only the newly typed characters!
+    const isDefaultTitle = note.title === 'Untitled Note' || note.title === 'Untitled';
+    if (isDefaultTitle && newTitle.length > note.title.length) {
+      const typed = newTitle.replace(note.title, '');
+      if (typed) {
+        newTitle = typed;
+      }
+    }
+
     const updated = {
       ...note,
-      title: e.target.value,
+      title: newTitle,
       updatedAt: new Date().toISOString()
     };
     pendingNoteRef.current = updated;
@@ -466,6 +561,52 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     } else {
       setSaveStatus('unsaved');
     }
+  };
+
+  const handleTitleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (note.title === 'Untitled Note' || note.title === 'Untitled') {
+      e.currentTarget.select();
+    }
+  };
+
+  const handleTitleMouseUp = (e: React.MouseEvent<HTMLInputElement>) => {
+    if (note.title === 'Untitled Note' || note.title === 'Untitled') {
+      if (e.currentTarget.selectionStart === e.currentTarget.selectionEnd) {
+        e.currentTarget.select();
+      }
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // If backspacing while title is default "Untitled Note", erase the placeholder to empty
+    if ((e.key === 'Backspace' || e.key === 'Delete') && (note.title === 'Untitled Note' || note.title === 'Untitled')) {
+      e.preventDefault();
+      const updated = {
+        ...note,
+        title: '',
+        updatedAt: new Date().toISOString()
+      };
+      pendingNoteRef.current = updated;
+      if (autoSaveEnabled) {
+        onUpdateNote(updated);
+        setSaveStatus('saved');
+      } else {
+        setSaveStatus('unsaved');
+      }
+    }
+  };
+
+  // Helper to transition from Live view into editable Source view and place cursor at end
+  const handleStartTypingInEditor = (cursorPos?: number) => {
+    if (note.isTrashed) return;
+    setMode('source');
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const pos = typeof cursorPos === 'number' ? cursorPos : note.content.length;
+        textareaRef.current.setSelectionRange(pos, pos);
+      }
+    }, 50);
   };
 
   // Handle content change & Slash / Wiki-link triggers
@@ -575,56 +716,185 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     });
   };
 
-  // Markdown Formatting Helper
+  // Enhanced Line-aware & Selection-aware Markdown Formatting Helper
   const insertFormatting = (prefix: string, suffix = '') => {
     if (note.isTrashed) return;
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      let textToAppend = '';
-      if (prefix.startsWith('```mermaid')) {
-        textToAppend = `\n\n${prefix}\n`;
-      } else if (prefix === '- [ ] ') {
-        textToAppend = `\n\n- [ ] New Checklist Item\n`;
-      } else if (prefix.includes('|')) {
-        textToAppend = `\n${prefix}\n`;
-      } else if (prefix === '[[') {
-        textToAppend = ` [[New Note]] `;
-      } else {
-        textToAppend = `\n\n${prefix}Text${suffix}\n`;
+    const currentText = note.content || '';
+
+    // Check if this is a block-level line header/prefix
+    const isHeadingOrBlock = prefix.startsWith('#') || prefix === '> ' || prefix === 'p' || prefix === '- ' || prefix === '1. ' || prefix === '- [ ] ';
+    const isCodeBlock = prefix.startsWith('```');
+
+    let textarea = textareaRef.current;
+
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = currentText.substring(start, end);
+
+      if (isHeadingOrBlock) {
+        // Line-aware formatting: applies directly to the current line or selection
+        const lineStart = currentText.lastIndexOf('\n', start - 1) + 1;
+        const lineEnd = currentText.indexOf('\n', end);
+        const actualEnd = lineEnd === -1 ? currentText.length : lineEnd;
+        const targetLines = currentText.substring(lineStart, actualEnd).split('\n');
+
+        const transformedLines = targetLines.map((line, idx) => {
+          // Strip existing heading, quote, or list prefix
+          const cleanLine = line.replace(/^(?:#{1,6}\s*|>+\s*|-\s*\[[ x]\]\s*|-\s*|\d+\.\s*)/, '');
+          if (prefix === 'p') {
+            return cleanLine;
+          }
+          if (prefix === '- [ ] ') {
+            return line.startsWith('- [ ] ') ? cleanLine : `- [ ] ${cleanLine}`;
+          }
+          if (prefix === '- ') {
+            return line.startsWith('- ') ? cleanLine : `- ${cleanLine}`;
+          }
+          if (prefix === '1. ') {
+            return /^\d+\.\s*/.test(line) ? cleanLine : `${idx + 1}. ${cleanLine}`;
+          }
+          return `${prefix}${cleanLine}${suffix || ''}`;
+        });
+
+        const newBlock = transformedLines.join('\n');
+        const newContent = currentText.substring(0, lineStart) + newBlock + currentText.substring(actualEnd);
+
+        onUpdateNote({
+          ...note,
+          content: newContent,
+          updatedAt: new Date().toISOString()
+        });
+
+        setTimeout(() => {
+          textarea?.focus();
+          const newPos = lineStart + newBlock.length;
+          textarea?.setSelectionRange(newPos, newPos);
+        }, 10);
+        return;
       }
+
+      if (isCodeBlock) {
+        const replacement = selectedText 
+          ? `${prefix}${selectedText}${suffix}`
+          : `${prefix}// Code snippet\n${suffix}`;
+        const newContent = currentText.substring(0, start) + replacement + currentText.substring(end);
+        onUpdateNote({
+          ...note,
+          content: newContent,
+          updatedAt: new Date().toISOString()
+        });
+        setTimeout(() => {
+          textarea?.focus();
+          textarea?.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
+        }, 10);
+        return;
+      }
+
+      // Inline formatting: Bold, Italic, Highlight, Code, Underline, etc.
+      let replacement = '';
+      let cursorStart = start;
+      let cursorEnd = end;
+
+      if (selectedText) {
+        // Toggle support: if already wrapped with prefix & suffix, unwrap it!
+        if (
+          prefix && suffix &&
+          selectedText.startsWith(prefix) &&
+          selectedText.endsWith(suffix) &&
+          selectedText.length >= prefix.length + suffix.length
+        ) {
+          replacement = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+          cursorStart = start;
+          cursorEnd = start + replacement.length;
+        } else if (
+          prefix && suffix &&
+          start >= prefix.length &&
+          currentText.substring(start - prefix.length, start) === prefix &&
+          currentText.substring(end, end + suffix.length) === suffix
+        ) {
+          // Wrapped around the selection boundary
+          const unwrapped = currentText.substring(0, start - prefix.length) + selectedText + currentText.substring(end + suffix.length);
+          onUpdateNote({
+            ...note,
+            content: unwrapped,
+            updatedAt: new Date().toISOString()
+          });
+          setTimeout(() => {
+            textarea?.focus();
+            textarea?.setSelectionRange(start - prefix.length, end - prefix.length);
+          }, 10);
+          return;
+        } else {
+          replacement = `${prefix}${selectedText}${suffix}`;
+          cursorStart = start + prefix.length;
+          cursorEnd = start + prefix.length + selectedText.length;
+        }
+      } else {
+        // No selection: insert prefix + suffix and place cursor in between (e.g. **|**)
+        replacement = `${prefix}${suffix}`;
+        cursorStart = start + prefix.length;
+        cursorEnd = start + prefix.length;
+      }
+
+      const newContent = currentText.substring(0, start) + replacement + currentText.substring(end);
       onUpdateNote({
         ...note,
-        content: (note.content ? note.content + textToAppend : textToAppend).trim(),
+        content: newContent,
         updatedAt: new Date().toISOString()
       });
-      return;
-    }
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const currentText = note.content;
-    const selectedText = currentText.substring(start, end);
-
-    let replacement = '';
-    if (prefix === '- [ ] ') {
-      replacement = `\n- [ ] ${selectedText || 'Task item'}\n`;
-    } else if (prefix === '[[') {
-      replacement = `[[${selectedText || 'Note Title'}]]`;
+      setTimeout(() => {
+        textarea?.focus();
+        textarea?.setSelectionRange(cursorStart, cursorEnd);
+      }, 10);
     } else {
-      replacement = `${prefix}${selectedText || 'text'}${suffix}`;
+      // In Live mode:
+      const domSelection = window.getSelection()?.toString() || activeSelectionRange?.selectedText || '';
+      if (domSelection) {
+        let replacement = '';
+        if (isHeadingOrBlock) {
+          replacement = prefix === 'p' ? domSelection : `${prefix}${domSelection}${suffix || ''}`;
+        } else {
+          replacement = `${prefix}${domSelection}${suffix}`;
+        }
+        const idx = currentText.indexOf(domSelection);
+        if (idx !== -1) {
+          const newContent = currentText.slice(0, idx) + replacement + currentText.slice(idx + domSelection.length);
+          onUpdateNote({
+            ...note,
+            content: newContent,
+            updatedAt: new Date().toISOString()
+          });
+          return;
+        }
+      }
+
+      // If no text is selected in Live mode, switch to source mode to mount textarea and insert formatting
+      setMode('source');
+      setTimeout(() => {
+        const newTextarea = textareaRef.current;
+        if (newTextarea) {
+          let replacement = '';
+          if (isHeadingOrBlock) {
+            replacement = prefix === 'p' ? '' : `\n${prefix}`;
+          } else {
+            replacement = `${prefix}${suffix}`;
+          }
+          const newContent = currentText ? `${currentText}\n${replacement}` : replacement;
+          onUpdateNote({
+            ...note,
+            content: newContent,
+            updatedAt: new Date().toISOString()
+          });
+          setTimeout(() => {
+            newTextarea.focus();
+            const cursorPos = newContent.length - suffix.length;
+            newTextarea.setSelectionRange(cursorPos, cursorPos);
+          }, 20);
+        }
+      }, 50);
     }
-
-    const newContent = currentText.substring(0, start) + replacement + currentText.substring(end);
-    onUpdateNote({
-      ...note,
-      content: newContent,
-      updatedAt: new Date().toISOString()
-    });
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + replacement.length - suffix.length);
-    }, 10);
   };
 
   // Floating Bubble Formatting Action Handler (Froala / Quill / SunEditor / RoosterJS)
@@ -720,6 +990,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         prefix = '\n<div align="right">\n';
         suffix = '\n</div>\n';
         break;
+      case 'font-family':
+        prefix = `<span class="font-${value}">`;
+        suffix = '</span>';
+        break;
+      case 'font-size':
+        prefix = `<span class="size-${value}">`;
+        suffix = '</span>';
+        break;
       default:
         break;
     }
@@ -752,6 +1030,113 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }
 
     setBubblePosition((prev) => ({ ...prev, visible: false }));
+  };
+
+  // Inline Font Family & Size Applicator (Applies to selection only, preserving document defaults)
+  const applyInlineClassToSelection = (kind: 'font' | 'size', value: string): boolean => {
+    if (note.isTrashed) return false;
+
+    const classPrefix = kind === 'font' ? 'font-' : 'size-';
+    const newClass = `${classPrefix}${value}`;
+
+    // 1. Textarea selection (Source or Split mode)
+    const textarea = textareaRef.current;
+    if (textarea && (mode === 'source' || mode === 'split')) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      if (start !== undefined && end !== undefined && start !== end) {
+        const current = note.content;
+        const targetText = current.substring(start, end);
+        if (targetText) {
+          const spanRegex = new RegExp(`^<span class="${classPrefix}[^"]*">([\\s\\S]*?)<\\/span>$`, 'i');
+          const match = targetText.match(spanRegex);
+          const inner = match ? match[1] : targetText;
+          const replaced = `<span class="${newClass}">${inner}</span>`;
+          const newContent = current.substring(0, start) + replaced + current.substring(end);
+          onUpdateNote({
+            ...note,
+            content: newContent,
+            updatedAt: new Date().toISOString()
+          });
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              textareaRef.current.setSelectionRange(start, start + replaced.length);
+            }
+          }, 50);
+          return true;
+        }
+      }
+    }
+
+    // 2. Direct range replacement if activeSelectionRange has valid offsets
+    if (activeSelectionRange && activeSelectionRange.start !== -1 && activeSelectionRange.start !== activeSelectionRange.end) {
+      const { start, end } = activeSelectionRange;
+      const current = note.content;
+      const targetText = current.substring(start, end) || activeSelectionRange.selectedText;
+      if (targetText) {
+        const spanRegex = new RegExp(`^<span class="${classPrefix}[^"]*">([\\s\\S]*?)<\\/span>$`, 'i');
+        const match = targetText.match(spanRegex);
+        const inner = match ? match[1] : targetText;
+        const replaced = `<span class="${newClass}">${inner}</span>`;
+        const newContent = current.substring(0, start) + replaced + current.substring(end);
+        onUpdateNote({
+          ...note,
+          content: newContent,
+          updatedAt: new Date().toISOString()
+        });
+        return true;
+      }
+    }
+
+    // 3. Fallback: DOM selection in Live preview mode
+    const domSel = window.getSelection()?.toString();
+    const selText = activeSelectionRange?.selectedText || domSel || '';
+    if (selText && selText.trim()) {
+      const current = note.content;
+      const cleanSel = selText.trim();
+
+      const wrappedPattern = new RegExp(`<span class="${classPrefix}[^"]*">(${cleanSel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})<\\/span>`);
+      if (wrappedPattern.test(current)) {
+        const newContent = current.replace(wrappedPattern, `<span class="${newClass}">$1</span>`);
+        onUpdateNote({
+          ...note,
+          content: newContent,
+          updatedAt: new Date().toISOString()
+        });
+        return true;
+      }
+
+      const idx = current.indexOf(cleanSel);
+      if (idx !== -1) {
+        const replaced = `<span class="${newClass}">${cleanSel}</span>`;
+        const newContent = current.slice(0, idx) + replaced + current.slice(idx + cleanSel.length);
+        onUpdateNote({
+          ...note,
+          content: newContent,
+          updatedAt: new Date().toISOString()
+        });
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const handleFontFamilyChange = (val: 'sans' | 'serif' | 'mono') => {
+    const applied = applyInlineClassToSelection('font', val);
+    if (!applied) {
+      setFontFamily(val);
+      localStorage.setItem('milearnapp_editor_font_family', val);
+    }
+  };
+
+  const handleFontSizeChange = (val: 'sm' | 'base' | 'lg' | 'xl') => {
+    const applied = applyInlineClassToSelection('size', val);
+    if (!applied) {
+      setFontSize(val);
+      localStorage.setItem('milearnapp_editor_font_size', val);
+    }
   };
 
   // Editor.js-Style Block Actions (Move, Duplicate, Delete, Convert)
@@ -984,7 +1369,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (note.isTrashed) return;
     const allLines = note.content.split('\n');
     const line = allLines[lineIndex] || '';
-    const match = line.match(/^!\[(.*?)\]\((.*?)\)/);
+    const match = line.match(/^!\[(.*?)\](?:\((.*?)\))?/);
     if (match) {
       const rawAlt = match[1];
       const cleanAlt = rawAlt.split('|')[0].trim();
@@ -993,7 +1378,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       if (newSize === 'custom' && customWidth) {
         meta += `|${customWidth}px`;
       }
-      allLines[lineIndex] = `![${meta}](${url})`;
+      allLines[lineIndex] = (url && !url.startsWith('data:image/'))
+        ? `![${meta}](${url})`
+        : `![${meta}]`;
       onUpdateNote({
         ...note,
         content: allLines.join('\n'),
@@ -1123,10 +1510,14 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   };
 
-  // Insert image tag handler
-  const handleInsertImageTag = (tag: string) => {
+  // Insert image tag handler (supports optional attachment object)
+  const handleInsertImageTag = (tag: string, attachment?: Attachment) => {
     if (note.isTrashed) return;
     const textarea = textareaRef.current;
+    const nextAttachments = attachment
+      ? [...(note.attachments || []).filter((a) => a.id !== attachment.id), attachment]
+      : (note.attachments || []);
+
     if (textarea) {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
@@ -1134,14 +1525,78 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       onUpdateNote({
         ...note,
         content: newContent,
+        attachments: nextAttachments,
         updatedAt: new Date().toISOString()
       });
     } else {
       onUpdateNote({
         ...note,
         content: note.content + '\n\n' + tag,
+        attachments: nextAttachments,
         updatedAt: new Date().toISOString()
       });
+    }
+  };
+
+  // Insert reference to existing attachment into document
+  const handleInsertAttachmentReference = (att: Attachment) => {
+    if (note.isTrashed) return;
+    const titleOnly = att.name.replace(/\.[^/.]+$/, '');
+    const tag = att.type === 'image' ? `![${titleOnly}|center]` : `[📎 ${att.name}](${att.name})`;
+    handleInsertImageTag(tag);
+  };
+
+  // Handle pasted image files directly into the editor
+  const handleEditorPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (note.isTrashed) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        let dataUrl = '';
+        let mimeType = file.type || 'image/png';
+        try {
+          const opt = await optimizer.compressImage(file);
+          dataUrl = opt.dataUrl;
+          mimeType = opt.mimeType;
+        } catch {
+          dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string) || '');
+            reader.readAsDataURL(file);
+          });
+        }
+
+        if (!dataUrl) return;
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const imgName = file.name && file.name !== 'image.png'
+          ? file.name.replace(/\.[^/.]+$/, '')
+          : `Image_${dateStr}_${Math.random().toString(36).slice(2, 6)}`;
+
+        const ext = mimeType.split('/')[1] || 'png';
+        const attName = imgName.includes('.') ? imgName : `${imgName}.${ext}`;
+
+        const newAtt: Attachment = {
+          id: 'att-' + Math.random().toString(36).substr(2, 9),
+          name: attName,
+          type: 'image',
+          size: Math.round((dataUrl.length * 3) / 4),
+          mimeType: mimeType,
+          dataUrl: dataUrl,
+          createdAt: new Date().toISOString()
+        };
+
+        const tag = `![${imgName}|center]`;
+        handleInsertImageTag(tag, newAtt);
+        return;
+      }
     }
   };
 
@@ -1202,6 +1657,65 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   // Book pages lookup
   const currentBook = note.bookId ? books.find((b) => b.id === note.bookId) : null;
   const allBookPages = note.bookId ? allNotes.filter((n) => n.bookId === note.bookId && !n.isTrashed) : [];
+
+  // Resolve image source from note attachments or web URL
+  const resolveImageSrc = (targetUrl: string | undefined, caption: string): string => {
+    const url = (targetUrl || '').trim();
+
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+      return url;
+    }
+
+    if (url.startsWith('data:image/')) {
+      return url;
+    }
+
+    const attachments = note.attachments || [];
+    if (attachments.length > 0) {
+      const cleanUrl = url.replace(/^attachment:/i, '').trim();
+      const cleanCaption = caption.trim();
+
+      // Priority 1: Match by attachment ID
+      if (cleanUrl) {
+        const byId = attachments.find((a) => a.id === cleanUrl);
+        if (byId?.dataUrl) return byId.dataUrl;
+      }
+
+      // Priority 2: Exact name or filename match (with or without extension)
+      const byName = attachments.find((a) => {
+        const attBase = a.name.replace(/\.[^/.]+$/, '').toLowerCase();
+        if (cleanUrl) {
+          if (a.name.toLowerCase() === cleanUrl.toLowerCase()) return true;
+          if (attBase === cleanUrl.toLowerCase()) return true;
+        }
+        if (cleanCaption) {
+          if (a.name.toLowerCase() === cleanCaption.toLowerCase()) return true;
+          if (attBase === cleanCaption.toLowerCase()) return true;
+        }
+        return false;
+      });
+      if (byName?.dataUrl) return byName.dataUrl;
+
+      // Priority 3: Fuzzy / partial name match
+      if (cleanCaption) {
+        const byFuzzy = attachments.find((a) => {
+          if (a.type !== 'image' && !a.dataUrl?.startsWith('data:image/')) return false;
+          const attBase = a.name.replace(/\.[^/.]+$/, '').toLowerCase();
+          const capLower = cleanCaption.toLowerCase();
+          return attBase.includes(capLower) || capLower.includes(attBase);
+        });
+        if (byFuzzy?.dataUrl) return byFuzzy.dataUrl;
+      }
+
+      // Priority 4: Single image attachment fallback
+      const imageAtts = attachments.filter((a) => a.type === 'image' || a.dataUrl?.startsWith('data:image/'));
+      if (imageAtts.length === 1 && (!cleanUrl || cleanUrl === cleanCaption)) {
+        return imageAtts[0].dataUrl;
+      }
+    }
+
+    return url || '';
+  };
 
   // Custom Markdown Parser
   const renderMarkdownPreview = (text: string) => {
@@ -1305,17 +1819,41 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           return <u key={i}>{part.slice(3, -4)}</u>;
         }
 
-        // HTML <span style="...">...</span>
+        // HTML <span class="..." style="...">...</span>
         if (part.startsWith('<span') && part.endsWith('</span>')) {
-          const spanMatch = part.match(/<span(?:\s+style="([^"]*)")?>(.*?)<\/span>/i);
+          const spanMatch = part.match(/<span(?:\s+([^>]*?))?>(.*?)<\/span>/is);
           if (spanMatch) {
-            const inlineStyle = spanMatch[1] || '';
+            const rawAttrs = spanMatch[1] || '';
             const textContent = spanMatch[2];
+
+            // Parse class="..."
+            const classMatch = rawAttrs.match(/class="([^"]*)"/i);
+            const className = classMatch ? classMatch[1] : undefined;
+
+            // Parse style="..."
+            const styleMatch = rawAttrs.match(/style="([^"]*)"/i);
+            const inlineStyle = styleMatch ? styleMatch[1] : '';
+
+            const styleObj: React.CSSProperties = {};
             const colorMatch = inlineStyle.match(/color:\s*([^;]+)/i);
-            const colorHex = colorMatch ? colorMatch[1].trim() : undefined;
+            if (colorMatch) styleObj.color = colorMatch[1].trim();
+
+            const bgMatch = inlineStyle.match(/background-color:\s*([^;]+)/i);
+            if (bgMatch) styleObj.backgroundColor = bgMatch[1].trim();
+
+            const fontFamMatch = inlineStyle.match(/font-family:\s*([^;]+)/i);
+            if (fontFamMatch) styleObj.fontFamily = fontFamMatch[1].trim();
+
+            const fontSizeMatch = inlineStyle.match(/font-size:\s*([^;]+)/i);
+            if (fontSizeMatch) styleObj.fontSize = fontSizeMatch[1].trim();
+
             return (
-              <span key={i} style={{ color: colorHex }}>
-                {textContent}
+              <span
+                key={i}
+                className={className}
+                style={Object.keys(styleObj).length > 0 ? styleObj : undefined}
+              >
+                {parseInlineSpans(textContent)}
               </span>
             );
           }
@@ -1583,15 +2121,24 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         continue;
       }
 
-      // Image with optional text wrap & sizing: ![caption|align|size|width](url)
-      const imgMatch = line.match(/^!\[(.*?)\]\((.*?)\)/);
+      // Image with optional text wrap & sizing:
+      // Supports: ![caption|align|size|width](url), ![caption|align|size|width], ![[caption|align|size|width]]
+      const trimmedLine = line.trim();
+      let imgMatch: RegExpMatchArray | null = trimmedLine.match(/^!\[(.*?)\](?:\((.*?)\))?$/);
+      if (!imgMatch) {
+        const wikiMatch = trimmedLine.match(/^!\[\[(.*?)\]\]$/);
+        if (wikiMatch) {
+          imgMatch = [wikiMatch[0], wikiMatch[1], ''] as unknown as RegExpMatchArray;
+        }
+      }
+
       if (imgMatch) {
         if (insideTable) flushTable(index);
         if (insideCallout) flushCallout(index);
         if (insideTasks) flushTasks(index);
 
         const rawAlt = imgMatch[1];
-        const url = imgMatch[2];
+        const rawUrl = (imgMatch[2] || '').trim();
         let align: ImageAlignMode = 'center';
         let size: ImageSizeMode = 'normal';
         let customWidth: number | undefined = undefined;
@@ -1613,6 +2160,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           }
         }
 
+        const resolvedSrc = resolveImageSrc(rawUrl, caption);
+
         elements.push(
           <div key={`img-wrap-${index}`} className="editorjs-block-row">
             <BlockActionsMenu
@@ -1630,7 +2179,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             />
             <div className="editorjs-block-content" style={{ width: '100%' }}>
               <WrappedImage
-                src={url}
+                src={resolvedSrc}
                 alt={caption}
                 align={align}
                 size={size}
@@ -2163,8 +2712,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         isRow4Open={isRow4Open}
         fontFamily={fontFamily}
         setFontFamily={setFontFamily}
+        onFontFamilyChange={handleFontFamilyChange}
         fontSize={fontSize}
         setFontSize={setFontSize}
+        onFontSizeChange={handleFontSizeChange}
         lineHeight={lineHeight}
         setLineHeight={setLineHeight}
         textAlign={textAlign}
@@ -2357,7 +2908,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       ) : mode === 'split' ? (
-        <div className={`split-view-container page-format-${pageFormat} page-margin-${pageMargin}`}>
+        <div className={`split-view-container page-format-${pageFormat} page-margin-${pageMargin} ${typographyClasses}`}>
           {/* Left Pane: Raw Markdown Editor */}
           <div className="split-pane-editor">
             <input
@@ -2367,6 +2918,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               value={note.title}
               disabled={note.isTrashed}
               onChange={handleTitleChange}
+              onFocus={handleTitleFocus}
+              onMouseUp={handleTitleMouseUp}
+              onKeyDown={handleTitleKeyDown}
             />
             <div className="editor-tags-bar">
               {note.tags?.map((tag) => (
@@ -2390,39 +2944,63 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             </div>
             <textarea
               ref={textareaRef}
-              className="editor-content-textarea selectable-text"
+              className={`editor-content-textarea selectable-text ${typographyClasses}`}
               placeholder="Type markdown, / for commands, or [[ for note links..."
               value={note.content}
               disabled={note.isTrashed}
               onChange={handleContentChange}
+              onPaste={handleEditorPaste}
               style={{ minHeight: '600px' }}
             />
           </div>
 
           {/* Right Pane: Live Rendered Output */}
           <div className="split-pane-preview">
-            <div className="markdown-body selectable-text">
+            <div className={`markdown-body selectable-text ${typographyClasses}`}>
               {renderMarkdownPreview(note.content)}
             </div>
           </div>
         </div>
       ) : (
         <div 
-          className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''} page-format-${pageFormat} page-margin-${pageMargin}`} 
+          className={`editor-scroll-area ${mode === 'live' ? 'live-document-mode' : ''} page-format-${pageFormat} page-margin-${pageMargin} ${typographyClasses}`} 
           ref={scrollAreaRef}
           onClick={(e) => {
+            if (note.isTrashed) return;
             const target = e.target as HTMLElement;
+
+            // Don't intercept clicks on interactive buttons, links, inputs, tags, breadcrumbs, modals, or task checkboxes
             if (
-              target === e.currentTarget || 
-              target.classList.contains('editor-scroll-area') || 
-              target.classList.contains('live-document-wrapper') ||
-              target.classList.contains('live-empty-canvas-prompt') ||
-              target.closest('.live-empty-canvas-prompt') ||
-              target.closest('.live-empty-trailing-space')
+              target.closest('button') ||
+              target.closest('a') ||
+              target.closest('input') ||
+              target.closest('.editor-tags-bar') ||
+              target.closest('.editor-hierarchy-breadcrumbs') ||
+              target.closest('.backlinks-section') ||
+              target.closest('.ai-summary-card') ||
+              target.closest('.wiki-link-pill') ||
+              target.closest('.task-item-checkbox') ||
+              target.closest('.copy-code-btn')
             ) {
+              return;
+            }
+
+            // In live mode, clicking on the white space or document area enters editing mode if no text is selected
+            if (mode === 'live') {
+              const selection = window.getSelection()?.toString();
+              if (!selection) {
+                handleStartTypingInEditor(note.content.length);
+              }
+            } else if (mode === 'source') {
               if (textareaRef.current) {
                 textareaRef.current.focus();
-                textareaRef.current.setSelectionRange(note.content.length, note.content.length);
+                if (
+                  target === e.currentTarget || 
+                  target.classList.contains('editor-scroll-area') || 
+                  target.classList.contains('live-empty-trailing-space')
+                ) {
+                  textareaRef.current.setSelectionRange(note.content.length, note.content.length);
+                }
               }
             }
           }}
@@ -2475,6 +3053,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             value={note.title}
             disabled={note.isTrashed}
             onChange={handleTitleChange}
+            onFocus={handleTitleFocus}
+            onMouseUp={handleTitleMouseUp}
+            onKeyDown={handleTitleKeyDown}
           />
 
           {/* Tags Bar */}
@@ -2509,24 +3090,29 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           {mode === 'source' ? (
             <textarea
               ref={textareaRef}
-              className="editor-content-textarea selectable-text"
+              className={`editor-content-textarea selectable-text ${typographyClasses}`}
               placeholder="Write markdown, type / for commands, or [[ for note links..."
               value={note.content}
               disabled={note.isTrashed}
               onChange={handleContentChange}
+              onPaste={handleEditorPaste}
             />
           ) : (
-            <div className="live-document-wrapper">
+            <div 
+              className="live-document-wrapper"
+              onClick={() => {
+                const selection = window.getSelection()?.toString();
+                if (!selection) {
+                  handleStartTypingInEditor(note.content.length);
+                }
+              }}
+            >
               {(!note.content || !note.content.trim()) && !note.isTrashed && (
                 <div 
                   className="live-empty-canvas-prompt"
-                  onClick={() => {
-                    setMode('source');
-                    setTimeout(() => {
-                      if (textareaRef.current) {
-                        textareaRef.current.focus();
-                      }
-                    }, 50);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStartTypingInEditor(0);
                   }}
                   title="Click to write or edit"
                 >
@@ -2534,7 +3120,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                   <span>Click here or anywhere in this space to type, or type <code>/</code> for templates & commands</span>
                 </div>
               )}
-              <div className={`markdown-body live-rich-document font-${fontFamily} size-${fontSize} leading-${lineHeight} align-${textAlign} selectable-text`}>
+              <div 
+                className={`markdown-body live-rich-document ${typographyClasses} selectable-text`}
+                onDoubleClick={() => handleStartTypingInEditor(note.content.length)}
+              >
                 {renderMarkdownPreview(
                   (() => {
                     const trimmedContent = note.content.trim();
@@ -2553,14 +3142,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               {!note.isTrashed && (
                 <div 
                   className="live-empty-trailing-space"
-                  onClick={() => {
-                    setMode('source');
-                    setTimeout(() => {
-                      if (textareaRef.current) {
-                        textareaRef.current.focus();
-                        textareaRef.current.setSelectionRange(note.content.length, note.content.length);
-                      }
-                    }, 50);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const selection = window.getSelection()?.toString();
+                    if (!selection) {
+                      handleStartTypingInEditor(note.content.length);
+                    }
                   }}
                   title="Click here to continue typing at the end of the note"
                 >
@@ -2762,6 +3349,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         attachments={note.attachments || []}
         onAddAttachment={handleAddAttachment}
         onDeleteAttachment={handleDeleteAttachment}
+        onInsertAttachment={handleInsertAttachmentReference}
       />
         </>
       )}

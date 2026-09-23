@@ -62,7 +62,7 @@ const getCleanSnippet = (content: string) => {
   return content
     .replace(/^#+\s+/gm, '') // Remove markdown headers
     .replace(/\[\[(.*?)\]\]/g, '$1') // Remove wiki link brackets
-    .replace(/!\[.*?\]\(.*?\)/g, '') // Remove images
+    .replace(/!\[.*?\](?:\(.*?\))?/g, '') // Remove images
     .replace(/`{1,3}.*?`{1,3}/gs, '') // Remove code blocks
     .replace(/-\s\[[ x]\]\s/g, '') // Remove checklist marks
     .replace(/\n+/g, ' ')

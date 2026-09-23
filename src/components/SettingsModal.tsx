@@ -107,7 +107,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen && initialTab) {
-      setActiveTab(initialTab);
+      if (initialTab === 'accounts') {
+        setActiveTab('security');
+      } else {
+        setActiveTab(initialTab);
+      }
     }
   }, [isOpen, initialTab]);
 
@@ -513,7 +517,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'profile', label: 'Identity', icon: <User size={15} /> },
     { id: 'appearance', label: 'Themes & Typography', icon: <Palette size={15} /> },
     { id: 'controls', label: 'Hotkeys & Mouse', icon: <Keyboard size={15} /> },
-    { id: 'security', label: 'Security & Lock', icon: <ShieldCheck size={15} /> },
+    { id: 'security', label: 'Accounts & Security', icon: <ShieldCheck size={15} /> },
     { id: 'backup', label: 'Backup & Vault', icon: <HardDrive size={15} /> },
     { id: 'diagnostics', label: 'Storage & Beam', icon: <QrCode size={15} /> },
     { id: 'database', label: 'PostgreSQL Sync', icon: <Database size={15} /> }
@@ -1232,22 +1236,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <Columns3 size={16} />
                     </div>
                     <div>
-                      <span className="settings-toggle-title">Consolidated Sidebar Rail Mode</span>
+                      <span className="settings-toggle-title">Sidebar & Menu Style</span>
                       <span className="settings-toggle-sub">
-                        Collapse sidebar into a slim 48px icon rail to maximize screen space for editing.
+                        Choose between the floating Windows XP Start Menu rail and the persistent expanded directory sidebar.
                       </span>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={uiLayout ? uiLayout.sidebarCollapsed : false}
-                    onChange={(e) => {
+                </div>
+
+                {/* Sidebar Navigation Style Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginTop: '6px' }}>
+                  {/* Mode 1: Windows XP Start Menu */}
+                  <div
+                    className={`settings-nav-card ${uiLayout?.sidebarNavigationStyle !== 'classic' ? 'active' : ''}`}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      border: uiLayout?.sidebarNavigationStyle !== 'classic' ? '1.5px solid #6366f1' : '1px solid var(--border-color)',
+                      background: uiLayout?.sidebarNavigationStyle !== 'classic' ? 'rgba(99, 102, 241, 0.08)' : 'var(--bg-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onClick={() => {
                       if (onUpdateUiLayout) {
-                        onUpdateUiLayout({ sidebarCollapsed: e.target.checked });
+                        onUpdateUiLayout({
+                          sidebarNavigationStyle: 'xp',
+                          sidebarCollapsed: true
+                        });
                       }
                     }}
-                    className="settings-checkbox"
-                  />
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '16px' }}>🪟</span>
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Windows XP Start Menu</strong>
+                      </div>
+                      {uiLayout?.sidebarNavigationStyle !== 'classic' && (
+                        <span style={{ fontSize: '10px', background: '#6366f1', color: '#fff', padding: '1px 6px', borderRadius: '10px', fontWeight: 600 }}>Active</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                      Compact floating rail with iconic Start button, Profile switcher, and dual-column XP flyout menu.
+                    </p>
+                  </div>
+
+                  {/* Mode 2: Classic Expanded Sidebar */}
+                  <div
+                    className={`settings-nav-card ${uiLayout?.sidebarNavigationStyle === 'classic' ? 'active' : ''}`}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      border: uiLayout?.sidebarNavigationStyle === 'classic' ? '1.5px solid #6366f1' : '1px solid var(--border-color)',
+                      background: uiLayout?.sidebarNavigationStyle === 'classic' ? 'rgba(99, 102, 241, 0.08)' : 'var(--bg-secondary)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onClick={() => {
+                      if (onUpdateUiLayout) {
+                        onUpdateUiLayout({
+                          sidebarNavigationStyle: 'classic',
+                          sidebarCollapsed: false
+                        });
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '16px' }}>📂</span>
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Classic Expanded Sidebar</strong>
+                      </div>
+                      {uiLayout?.sidebarNavigationStyle === 'classic' && (
+                        <span style={{ fontSize: '10px', background: '#6366f1', color: '#fff', padding: '1px 6px', borderRadius: '10px', fontWeight: 600 }}>Active</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                      Full persistent left sidebar with Menu directory tree (M) and real-time Notes feed list (N).
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1744,9 +1809,94 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
       )}
 
-      {/* TAB 4: SECURITY & INACTIVITY AUTO-LOCK */}
+      {/* TAB 4: ACCOUNTS & SECURITY */}
       {activeTab === 'security' && (
         <div className="settings-symmetrical-grid">
+          {/* Workstation Account & Local Personas Card */}
+          <div className="settings-card-panel" style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h4 className="panel-section-title" style={{ margin: 0 }}>Workstation Account & Local Personas</h4>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                  MiLEARNAPP runs offline-first on your device. Manage your active workstation identity and security profile.
+                </p>
+              </div>
+              <span className="xp-persona-active-badge" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                Offline Vault Account
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Current Active Account Card */}
+              <div style={{ flex: '1 1 260px', padding: '12px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>
+                  {userProfile.avatarType === 'image' || userProfile.avatarType === 'gif' ? (
+                    <img src={userProfile.avatarValue} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    userProfile.avatarValue || '🦊'
+                  )}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{userProfile.name}</strong>
+                    <span style={{ fontSize: '10px', background: '#6366f1', color: '#fff', padding: '1px 6px', borderRadius: '10px', fontWeight: 600 }}>Active</span>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {userProfile.role || 'Knowledge Engineer'}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{userProfile.mood}</span>
+                </div>
+              </div>
+
+              {/* Fast Switch Personas */}
+              <div style={{ flex: '2 1 320px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Switch Account:</span>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                  {[
+                    { name: 'Alex Mercer', role: 'Full Stack Researcher', emoji: '🦊', mood: '🧠 Deep Focus', bio: 'Building systems, taking notes, exploring knowledge networks.' },
+                    { name: 'Night Owl', role: 'Creative Writer', emoji: '🦉', mood: '🎨 Creative Flow', bio: 'Late night drafts, poetry, and structured ideas.' },
+                    { name: 'Scholar', role: 'Academic Student', emoji: '📚', mood: '🧘 Zen Calm', bio: 'Active recall, spaced repetition, and lecture summaries.' }
+                  ].map((p) => {
+                    const isCur = userProfile.name === p.name;
+                    return (
+                      <button
+                        key={p.name}
+                        type="button"
+                        className={`dialog-secondary-btn ${isCur ? 'active' : ''}`}
+                        style={{
+                          fontSize: '12px',
+                          padding: '6px 12px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          borderColor: isCur ? '#6366f1' : undefined,
+                          background: isCur ? 'rgba(99, 102, 241, 0.12)' : undefined
+                        }}
+                        onClick={() => {
+                          if (onUpdateProfile) {
+                            onUpdateProfile({
+                              ...userProfile,
+                              name: p.name,
+                              role: p.role,
+                              avatarType: 'emoji',
+                              avatarValue: p.emoji,
+                              mood: p.mood,
+                              bio: p.bio
+                            });
+                          }
+                        }}
+                      >
+                        <span>{p.emoji}</span>
+                        <span>{p.name}</span>
+                        {isCur && <span style={{ fontSize: '10px', color: '#6366f1' }}>✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Inactivity Auto-Lock */}
           <div className="settings-card-panel">
             <h4 className="panel-section-title">Inactivity Auto-Lock</h4>

@@ -3,11 +3,12 @@ import { Upload, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Image as 
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { optimizer } from '../../services/optimizer';
+import type { Attachment } from '../../types';
 
 interface InsertImageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInsert: (markdownImageTag: string) => void;
+  onInsert: (markdownImageTag: string, attachment?: Attachment) => void;
 }
 
 export const InsertImageModal: React.FC<InsertImageModalProps> = ({
@@ -49,9 +50,32 @@ export const InsertImageModal: React.FC<InsertImageModalProps> = ({
     if (!finalSrc) return;
 
     const altText = caption.trim() || 'Image';
-    const tag = `![${altText}|${alignment}](${finalSrc})\n`;
 
-    onInsert(tag);
+    if (activeTab === 'upload') {
+      const mimeMatch = finalSrc.match(/^data:([^;]+);/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/webp';
+      const ext = mimeType.split('/')[1] || 'webp';
+      const attName = altText.includes('.') ? altText : `${altText}.${ext}`;
+
+      const newAttachment: Attachment = {
+        id: 'att-' + Math.random().toString(36).substr(2, 9),
+        name: attName,
+        type: 'image',
+        size: Math.round((finalSrc.length * 3) / 4),
+        mimeType: mimeType,
+        dataUrl: finalSrc,
+        createdAt: new Date().toISOString()
+      };
+
+      // Clean image markdown tag displaying only the image title & alignment
+      const tag = `![${altText}|${alignment}]\n`;
+      onInsert(tag, newAttachment);
+    } else {
+      // Clean web image URL
+      const tag = `![${altText}|${alignment}](${finalSrc})\n`;
+      onInsert(tag);
+    }
+
     // Reset state
     setImageUrl('');
     setCaption('');

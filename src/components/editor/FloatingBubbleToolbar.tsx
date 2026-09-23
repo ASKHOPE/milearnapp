@@ -13,6 +13,7 @@ import {
   AlignCenter, 
   AlignRight,
   Palette,
+  Type,
   Sparkles,
   Bookmark,
   Quote,
@@ -57,7 +58,7 @@ export const FloatingBubbleToolbar: React.FC<FloatingBubbleToolbarProps> = ({
   onClose: _onClose,
   onCreateFlashcard
 }) => {
-  const [activeMenu, setActiveMenu] = useState<'main' | 'highlight' | 'color' | 'align'>('main');
+  const [activeMenu, setActiveMenu] = useState<'main' | 'highlight' | 'color' | 'align' | 'font'>('main');
 
   if (!position.visible) return null;
 
@@ -148,6 +149,16 @@ export const FloatingBubbleToolbar: React.FC<FloatingBubbleToolbarProps> = ({
             title="Font Color"
           >
             <Palette size={13} color="#6366f1" />
+          </button>
+
+          {/* Font Family & Size Picker */}
+          <button
+            type="button"
+            className="bubble-btn"
+            onClick={() => setActiveMenu('font')}
+            title="Font Typography & Size"
+          >
+            <Type size={13} color="#8b5cf6" />
           </button>
 
           {/* Superscript & Subscript (SunEditor) */}
@@ -339,6 +350,99 @@ export const FloatingBubbleToolbar: React.FC<FloatingBubbleToolbarProps> = ({
             title="Align Right"
           >
             <AlignRight size={13} />
+          </button>
+          <button
+            type="button"
+            className="bubble-btn-sub-back"
+            onClick={() => setActiveMenu('main')}
+          >
+            Back
+          </button>
+        </div>
+      )}
+
+      {/* Font Family & Size Submenu */}
+      {activeMenu === 'font' && (
+        <div className="bubble-palette-menu" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span className="bubble-palette-title">Font:</span>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-family', 'sans');
+              setActiveMenu('main');
+            }}
+            title="Sans-Serif (Inter)"
+          >
+            Sans
+          </button>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-family', 'serif');
+              setActiveMenu('main');
+            }}
+            title="Serif (Editorial)"
+          >
+            Serif
+          </button>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-family', 'mono');
+              setActiveMenu('main');
+            }}
+            title="Monospace (Code)"
+          >
+            Mono
+          </button>
+          <div className="bubble-divider" />
+          <span className="bubble-palette-title">Size:</span>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-size', 'sm');
+              setActiveMenu('main');
+            }}
+            title="Small"
+          >
+            S
+          </button>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-size', 'base');
+              setActiveMenu('main');
+            }}
+            title="Default"
+          >
+            M
+          </button>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-size', 'lg');
+              setActiveMenu('main');
+            }}
+            title="Large"
+          >
+            L
+          </button>
+          <button
+            type="button"
+            className="bubble-btn-sub-pill"
+            onClick={() => {
+              onApplyFormat('font-size', 'xl');
+              setActiveMenu('main');
+            }}
+            title="Extra Large"
+          >
+            XL
           </button>
           <button
             type="button"
